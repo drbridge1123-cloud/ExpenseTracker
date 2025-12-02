@@ -197,6 +197,11 @@ CREATE TABLE `transactions` (
     `categorized_by` ENUM('rule', 'ai', 'manual', 'default') DEFAULT 'default',
     `categorization_confidence` DECIMAL(3,2) NULL,
     `is_reviewed` TINYINT(1) DEFAULT 0,
+    `is_reconciled` TINYINT(1) DEFAULT 0,
+    `reimbursement_status` ENUM('none', 'pending', 'submitted', 'approved', 'reimbursed') DEFAULT 'none',
+    `reimbursement_date` DATE NULL,
+    `reimbursement_notes` TEXT NULL,
+    `reconciliation_id` INT UNSIGNED NULL,
     `reviewed_at` TIMESTAMP NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -211,6 +216,7 @@ CREATE TABLE `transactions` (
     KEY `idx_transactions_vendor` (`vendor_name`),
     KEY `idx_transactions_batch` (`import_batch_id`),
     KEY `idx_transactions_user_date` (`user_id`, `transaction_date`),
+    KEY `idx_transactions_reconciliation` (`reconciliation_id`),
     CONSTRAINT `fk_transactions_user` FOREIGN KEY (`user_id`)
         REFERENCES `users` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_transactions_account` FOREIGN KEY (`account_id`)

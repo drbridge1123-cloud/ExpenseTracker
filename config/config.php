@@ -24,14 +24,14 @@ define('DB_CHARSET', 'utf8mb4');
 // Application Settings
 define('APP_NAME', 'Expense Tracker');
 define('APP_VERSION', '1.0.0');
-define('APP_URL', 'http://localhost/ExpensesTracker');
+define('APP_URL', 'http://localhost/ExpenseTracker');
 
 // Session Configuration
 define('SESSION_NAME', 'expense_tracker_session');
 define('SESSION_LIFETIME', 86400 * 7); // 7 days
 
 // File Upload Settings
-define('UPLOAD_DIR', APP_ROOT . '/uploads');
+define('UPLOAD_DIR', APP_ROOT . '/storage');
 define('MAX_UPLOAD_SIZE', 10 * 1024 * 1024); // 10MB
 define('ALLOWED_EXTENSIONS', ['csv', 'CSV']);
 

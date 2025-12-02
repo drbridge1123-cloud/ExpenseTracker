@@ -434,8 +434,43 @@ function formatAccountType(type) {
     return types[type] || type;
 }
 
-function getCategoryIcon(icon) {
-    return icon || '📁';
+function getCategoryIcon(iconName) {
+    const iconMap = {
+        'briefcase': '💼',
+        'laptop': '💻',
+        'trending-up': '📈',
+        'rotate-ccw': '🔄',
+        'plus-circle': '➕',
+        'home': '🏠',
+        'zap': '⚡',
+        'shopping-cart': '🛒',
+        'utensils': '🍽️',
+        'car': '🚗',
+        'fuel': '⛽',
+        'heart': '❤️',
+        'shield': '🛡️',
+        'film': '🎬',
+        'shopping-bag': '🛍️',
+        'gift': '🎁',
+        'book': '📚',
+        'plane': '✈️',
+        'smartphone': '📱',
+        'coffee': '☕',
+        'music': '🎵',
+        'dollar-sign': '💵',
+        'credit-card': '💳',
+        'percent': '💯',
+        'tag': '🏷️',
+        'folder': '📁',
+        'banknote': '💵',
+        'wrench': '🔧',
+        'repeat': '🔁',
+        'alert-circle': '⚠️',
+        'file-text': '📄',
+        'smile': '😊',
+        'help-circle': '❓'
+    };
+    return iconMap[iconName] || '📁';
 }
 
 // =====================================================

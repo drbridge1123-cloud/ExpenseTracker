@@ -1,0 +1,37 @@
+# Environment & Secrets
+config/env.php
+config/env.local.php
+.env
+
+# Storage & Uploads
+storage/
+uploads/
+
+# Logs
+logs/
+
+# Backups
+_backup_*/
+
+# IDE
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+vendor/
+node_modules/
+
+# Cache
+*.cache
+.phpunit.result.cache
+
+# Temp files
+*.tmp
+*.log
