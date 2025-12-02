@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Write Checks - Expense Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        /* Top Navigation */
+        .top-nav {
+            background: #2c4a3e;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            height: 56px;
+        }
+
+        .nav-brand {
+            color: white;
+            font-weight: 600;
+            font-size: 18px;
+            margin-right: 40px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-link {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+
+        .nav-link.active {
+            background: rgba(255,255,255,0.15);
+            color: white;
+        }
+
+        /* Page Header */
+        .page-header {
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 20px 24px;
+        }
+
+        .page-header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: #2ca01c;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #248a17;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #1a1a1a;
+            border: 1px solid #c8c8c8;
+        }
+
+        .btn-secondary:hover {
+            background: #f5f5f5;
+        }
+
+        .btn-text {
+            background: transparent;
+            color: #0077c5;
+            padding: 8px 12px;
+        }
+
+        .btn-text:hover {
+            background: #f0f7fc;
+        }
+
+        /* Main Content */
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 1fr 360px;
+            gap: 24px;
+        }
+
+        /* Card */
+        .card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+
+        .card-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        /* Check Form */
+        .check-form-card {
+            margin-bottom: 24px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-row.two-col {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group.span-2 {
+            grid-column: span 2;
+        }
+
+        .form-group.span-3 {
+            grid-column: span 3;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #404040;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 10px 12px;
+            border: 1px solid #c8c8c8;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #1a1a1a;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #2ca01c;
+            box-shadow: 0 0 0 3px rgba(44, 160, 28, 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: #8c8c8c;
+        }
+
+        /* Amount Field */
+        .amount-input-wrapper {
+            position: relative;
+        }
+
+        .amount-input-wrapper::before {
+            content: '$';
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #404040;
+            font-size: 14px;
+        }
+
+        .amount-input-wrapper input {
+            padding-left: 24px;
+        }
+
+        /* Checkbox */
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 0;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #2ca01c;
+        }
+
+        .checkbox-group label {
+            font-size: 14px;
+            color: #404040;
+            cursor: pointer;
+        }
+
+        /* Form Actions */
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding-top: 16px;
+            border-top: 1px solid #e0e0e0;
+            margin-top: 16px;
+        }
+
+        /* Check Preview */
+        .check-preview-card {
+            background: #fafafa;
+            border: 1px solid #d0d0d0;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .check-preview-inner {
+            padding: 20px;
+            background: linear-gradient(to bottom, #ffffff 0%, #f8f8f8 100%);
+            border: 1px solid #e8e8e8;
+            margin: 12px;
+            border-radius: 2px;
+        }
+
+        .check-header-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .check-number-box {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .check-number-box strong {
+            color: #1a1a1a;
+            font-size: 16px;
+        }
+
+        .check-date-box {
+            text-align: right;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .check-date-value {
+            color: #1a1a1a;
+            font-weight: 500;
+        }
+
+        .payee-line {
+            margin-bottom: 12px;
+        }
+
+        .payee-label {
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .payee-value {
+            font-size: 16px;
+            color: #1a1a1a;
+            padding: 4px 0;
+            border-bottom: 1px solid #888;
+            min-height: 28px;
+        }
+
+        .amount-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .amount-box {
+            border: 2px solid #1a1a1a;
+            padding: 8px 16px;
+            min-width: 100px;
+            text-align: right;
+        }
+
+        .amount-box-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1a1a1a;
+        }
+
+        .amount-words {
+            flex: 1;
+            font-size: 12px;
+            color: #404040;
+            border-bottom: 1px solid #888;
+            padding: 8px 0;
+            font-style: italic;
+        }
+
+        .memo-line {
+            margin-top: 16px;
+        }
+
+        .memo-label {
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .memo-value {
+            font-size: 13px;
+            color: #404040;
+            border-bottom: 1px solid #ccc;
+            padding: 4px 0;
+            min-height: 24px;
+        }
+
+        .signature-area {
+            margin-top: 20px;
+            text-align: right;
+        }
+
+        .signature-line {
+            width: 180px;
+            border-bottom: 1px solid #1a1a1a;
+            margin-left: auto;
+            padding-top: 30px;
+        }
+
+        .signature-label {
+            font-size: 9px;
+            color: #888;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        /* Recent Checks Sidebar */
+        .sidebar-card {
+            height: fit-content;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 12px;
+            background: #f8f8f8;
+            border-radius: 4px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+            margin: 0 -20px;
+            padding: 0 20px;
+        }
+
+        .tab {
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #666;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: all 0.15s;
+        }
+
+        .tab:hover {
+            color: #1a1a1a;
+        }
+
+        .tab.active {
+            color: #2ca01c;
+            border-bottom-color: #2ca01c;
+            font-weight: 500;
+        }
+
+        /* Checks List */
+        .checks-list {
+            margin-top: 16px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .check-list-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .check-list-item:hover {
+            background: #f8f8f8;
+            margin: 0 -20px;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+
+        .check-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .check-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 4px;
+        }
+
+        .check-list-number {
+            font-weight: 600;
+            color: #1a1a1a;
+            font-size: 14px;
+        }
+
+        .check-list-amount {
+            font-weight: 600;
+            color: #1a1a1a;
+            font-size: 14px;
+        }
+
+        .check-list-payee {
+            font-size: 13px;
+            color: #404040;
+            margin-bottom: 4px;
+        }
+
+        .check-list-meta {
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status-badge.pending {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .status-badge.printed {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .status-badge.cleared {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .status-badge.void {
+            background: #fce4ec;
+            color: #c62828;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #888;
+        }
+
+        .empty-state-text {
+            font-size: 14px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr 1fr;
+            }
+            .form-group.span-2,
+            .form-group.span-3 {
+                grid-column: span 2;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            .form-group.span-2,
+            .form-group.span-3 {
+                grid-column: span 1;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+            }
+            .top-nav, .page-header, .sidebar-card, .form-actions, .card-header {
+                display: none !important;
+            }
+            .main-container {
+                padding: 0;
+                display: block;
+            }
+            .check-form-card {
+                border: none;
+                box-shadow: none;
+            }
+            .card-body {
+                padding: 0;
+            }
+            .form-row, .checkbox-group {
+                display: none !important;
+            }
+            .check-preview-card {
+                border: 1px solid #000;
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="nav-brand">Expense Tracker</div>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">Dashboard</a>
+            <a href="reports.html" class="nav-link">Reports</a>
+            <a href="budgets.html" class="nav-link">Budgets</a>
+            <a href="recurring.html" class="nav-link">Recurring</a>
+            <a href="checks.html" class="nav-link active">Checks</a>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <header class="page-header">
+        <div class="page-header-content">
+            <h1 class="page-title">Write Checks</h1>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="printCheck()">Print</button>
+                <button class="btn btn-primary" onclick="resetForm()">+ New Check</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-container">
+        <!-- Check Form Card -->
+        <div class="card check-form-card">
+            <div class="card-header">
+                <span class="card-title">Check Details</span>
+                <button class="btn btn-text" onclick="resetForm()">Clear</button>
+            </div>
+            <div class="card-body">
+                <!-- Check Preview -->
+                <div class="check-preview-card">
+                    <div class="check-preview-inner">
+                        <div class="check-header-row">
+                            <div class="check-number-box">
+                                Check # <strong id="preview-number">----</strong>
+                            </div>
+                            <div class="check-date-box">
+                                Date: <span class="check-date-value" id="preview-date">--/--/----</span>
+                            </div>
+                        </div>
+
+                        <div class="payee-line">
+                            <div class="payee-label">Pay to the order of</div>
+                            <div class="payee-value" id="preview-payee"></div>
+                        </div>
+
+                        <div class="amount-row">
+                            <div class="amount-box">
+                                <span class="amount-box-value">$<span id="preview-amount">0.00</span></span>
+                            </div>
+                            <div class="amount-words" id="preview-amount-words">Zero and 00/100 dollars</div>
+                        </div>
+
+                        <div class="memo-line">
+                            <div class="memo-label">Memo</div>
+                            <div class="memo-value" id="preview-memo"></div>
+                        </div>
+
+                        <div class="signature-area">
+                            <div class="signature-line"></div>
+                            <div class="signature-label">Authorized Signature</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form -->
+                <form id="check-form">
+                    <input type="hidden" id="check-id">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="check-account">Bank Account</label>
+                            <select id="check-account" required onchange="updateNextCheckNumber()">
+                                <option value="">Select account</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="check-number">Check #</label>
+                            <input type="text" id="check-number" required placeholder="1001" oninput="updatePreview()">
+                        </div>
+                        <div class="form-group">
+                            <label for="check-date">Date</label>
+                            <input type="date" id="check-date" required onchange="updatePreview()">
+                        </div>
+                        <div class="form-group">
+                            <label for="check-amount">Amount</label>
+                            <div class="amount-input-wrapper">
+                                <input type="number" id="check-amount" min="0.01" step="0.01" required placeholder="0.00" oninput="updatePreview()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-row two-col">
+                        <div class="form-group">
+                            <label for="check-payee">Pay to the order of</label>
+                            <input type="text" id="check-payee" required placeholder="Enter payee name" oninput="updatePreview()">
+                        </div>
+                        <div class="form-group">
+                            <label for="check-category">Category</label>
+                            <select id="check-category">
+                                <option value="">Select category</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group span-3">
+                            <label for="check-memo">Memo</label>
+                            <input type="text" id="check-memo" placeholder="Invoice number, description, etc." oninput="updatePreview()">
+                        </div>
+                        <div class="form-group">
+                            <label for="check-status">Status</label>
+                            <select id="check-status">
+                                <option value="pending">Pending</option>
+                                <option value="printed">Printed</option>
+                                <option value="cleared">Cleared</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="create-transaction" checked>
+                        <label for="create-transaction">Record as transaction</label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="resetForm()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Check</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="card sidebar-card">
+            <div class="card-body">
+                <!-- Stats -->
+                <div class="stats-row">
+                    <div class="stat-item">
+                        <div class="stat-value" id="pending-count">0</div>
+                        <div class="stat-label">Pending</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="pending-amount">$0</div>
+                        <div class="stat-label">Outstanding</div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="tabs">
+                    <div class="tab active" onclick="filterChecks('', this)">All</div>
+                    <div class="tab" onclick="filterChecks('pending', this)">Pending</div>
+                    <div class="tab" onclick="filterChecks('cleared', this)">Cleared</div>
+                    <div class="tab" onclick="filterChecks('void', this)">Void</div>
+                </div>
+
+                <!-- Checks List -->
+                <div class="checks-list" id="checks-list">
+                    <div class="empty-state">
+                        <div class="empty-state-text">No checks written yet</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = '/Expenses Tracker/api';
+        const USER_ID = 1;
+
+        let checksData = null;
+        let accounts = [];
+        let categories = [];
+        let nextCheckNumbers = {};
+        let currentFilter = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('check-date').value = new Date().toISOString().split('T')[0];
+            loadData();
+            document.getElementById('check-form').addEventListener('submit', saveCheck);
+            updatePreview();
+        });
+
+        async function loadData() {
+            await Promise.all([loadChecks(), loadAccounts(), loadCategories()]);
+        }
+
+        async function loadChecks() {
+            let url = `${API_BASE}/checks/?user_id=${USER_ID}`;
+            if (currentFilter) url += `&status=${currentFilter}`;
+
+            try {
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.success) {
+                    checksData = result.data;
+                    nextCheckNumbers = result.data.next_check_numbers || {};
+                    renderChecks();
+                    updateSummary();
+                }
+            } catch (error) {
+                console.error('Error loading checks:', error);
+            }
+        }
+
+        async function loadAccounts() {
+            try {
+                const response = await fetch(`${API_BASE}/accounts/?user_id=${USER_ID}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    accounts = result.data.accounts.filter(a => a.account_type === 'checking');
+                    const select = document.getElementById('check-account');
+                    select.innerHTML = '<option value="">Select account</option>' +
+                        accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+                }
+            } catch (error) {
+                console.error('Error loading accounts:', error);
+            }
+        }
+
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${API_BASE}/categories/?user_id=${USER_ID}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    categories = result.data.categories.filter(c => c.category_type === 'expense');
+                    const select = document.getElementById('check-category');
+                    select.innerHTML = '<option value="">Select category</option>' +
+                        categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                }
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        function renderChecks() {
+            const container = document.getElementById('checks-list');
+            const checks = checksData?.checks || [];
+
+            if (checks.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-text">No checks found</div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = checks.map(check => `
+                <div class="check-list-item" onclick="editCheck(${check.id})">
+                    <div class="check-list-header">
+                        <span class="check-list-number">#${check.check_number}</span>
+                        <span class="check-list-amount">${formatCurrency(check.amount)}</span>
+                    </div>
+                    <div class="check-list-payee">${check.payee}</div>
+                    <div class="check-list-meta">
+                        <span>${formatDate(check.check_date)}</span>
+                        <span class="status-badge ${check.status}">${check.status}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateSummary() {
+            const summary = checksData?.summary || {};
+            document.getElementById('pending-count').textContent = summary.pending_count || 0;
+            document.getElementById('pending-amount').textContent = formatCurrency(summary.pending_amount || 0);
+        }
+
+        function filterChecks(status, element) {
+            currentFilter = status;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            if (element) element.classList.add('active');
+            loadChecks();
+        }
+
+        function updateNextCheckNumber() {
+            const accountId = document.getElementById('check-account').value;
+            if (accountId && nextCheckNumbers[accountId]) {
+                document.getElementById('check-number').value = nextCheckNumbers[accountId];
+            } else if (accountId) {
+                document.getElementById('check-number').value = '1001';
+            }
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const number = document.getElementById('check-number').value || '----';
+            const date = document.getElementById('check-date').value;
+            const payee = document.getElementById('check-payee').value || '';
+            const amount = parseFloat(document.getElementById('check-amount').value) || 0;
+            const memo = document.getElementById('check-memo').value || '';
+
+            document.getElementById('preview-number').textContent = number;
+            document.getElementById('preview-date').textContent = date ? formatDateShort(date) : '--/--/----';
+            document.getElementById('preview-payee').textContent = payee;
+            document.getElementById('preview-amount').textContent = amount.toFixed(2);
+            document.getElementById('preview-amount-words').textContent = numberToWords(amount);
+            document.getElementById('preview-memo').textContent = memo;
+        }
+
+        function numberToWords(amount) {
+            const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+                         'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+                         'Seventeen', 'Eighteen', 'Nineteen'];
+            const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+            const dollars = Math.floor(amount);
+            const cents = Math.round((amount - dollars) * 100);
+
+            let words = '';
+
+            if (dollars === 0) {
+                words = 'Zero';
+            } else if (dollars < 20) {
+                words = ones[dollars];
+            } else if (dollars < 100) {
+                words = tens[Math.floor(dollars / 10)] + (dollars % 10 ? ' ' + ones[dollars % 10] : '');
+            } else if (dollars < 1000) {
+                words = ones[Math.floor(dollars / 100)] + ' Hundred' +
+                       (dollars % 100 ? ' ' + (dollars % 100 < 20 ? ones[dollars % 100] :
+                        tens[Math.floor((dollars % 100) / 10)] + (dollars % 10 ? ' ' + ones[dollars % 10] : '')) : '');
+            } else {
+                const thousands = Math.floor(dollars / 1000);
+                const remainder = dollars % 1000;
+                words = (thousands < 20 ? ones[thousands] : tens[Math.floor(thousands / 10)] + (thousands % 10 ? ' ' + ones[thousands % 10] : '')) + ' Thousand';
+                if (remainder > 0) {
+                    words += ' ' + numberToWords(remainder).split(' and')[0];
+                }
+            }
+
+            return words + ' and ' + cents.toString().padStart(2, '0') + '/100 dollars';
+        }
+
+        async function saveCheck(e) {
+            e.preventDefault();
+
+            const data = {
+                user_id: USER_ID,
+                account_id: parseInt(document.getElementById('check-account').value),
+                check_number: document.getElementById('check-number').value,
+                payee: document.getElementById('check-payee').value,
+                amount: parseFloat(document.getElementById('check-amount').value),
+                check_date: document.getElementById('check-date').value,
+                memo: document.getElementById('check-memo').value,
+                category_id: document.getElementById('check-category').value || null,
+                status: document.getElementById('check-status').value,
+                create_transaction: document.getElementById('create-transaction').checked
+            };
+
+            const checkId = document.getElementById('check-id').value;
+            if (checkId) {
+                data.id = parseInt(checkId);
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/checks/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    resetForm();
+                    loadChecks();
+                } else {
+                    alert(result.message || 'Error saving check');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error saving check');
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('check-form').reset();
+            document.getElementById('check-id').value = '';
+            document.getElementById('check-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('create-transaction').checked = true;
+            document.getElementById('check-status').value = 'pending';
+            updatePreview();
+        }
+
+        function editCheck(id) {
+            const check = checksData.checks.find(c => c.id === id);
+            if (!check) return;
+
+            document.getElementById('check-id').value = id;
+            document.getElementById('check-account').value = check.account_id;
+            document.getElementById('check-number').value = check.check_number;
+            document.getElementById('check-date').value = check.check_date;
+            document.getElementById('check-payee').value = check.payee;
+            document.getElementById('check-amount').value = check.amount;
+            document.getElementById('check-memo').value = check.memo || '';
+            document.getElementById('check-category').value = check.category_id || '';
+            document.getElementById('check-status').value = check.status || 'pending';
+
+            updatePreview();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function printCheck() {
+            window.print();
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(amount);
+        }
+
+        function formatDate(dateStr) {
+            return new Date(dateStr).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+
+        function formatDateShort(dateStr) {
+            return new Date(dateStr).toLocaleDateString('en-US', {
+                month: '2-digit',
+                day: '2-digit',
+                year: 'numeric'
+            });
+        }
+    </script>
+</body>
+</html>

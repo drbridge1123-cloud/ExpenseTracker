@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"c:/xampp/mysql/bin/mysql.exe\" -u root expense_tracker -e \"SELECT id, user_id, folder_id FROM receipts;\")",
+      "Bash(\"c:/xampp/mysql/bin/mysql.exe\":*)",
+      "Bash(\"c:/xampp/mysql/bin/mysql.exe\" -u root expense_tracker -e \"SELECT ''Connected'' AS status;\")",
+      "Bash(\"c:/xampp/mysql/bin/mysql.exe\" -u root expense_tracker -e \"DESCRIBE receipts;\")",
+      "Bash(\"c:/xampp/mysql/bin/mysql.exe\" -u root expense_tracker -e \"SELECT id, user_id, name, icon FROM receipt_folders;\")",
+      "Bash(\"c:/xampp/mysql/bin/mysql.exe\" -u root expense_tracker --default-character-set=utf8mb4 -e \"SELECT id, name, icon FROM receipt_folders;\")",
+      "Bash(\"c:/xampp/mysql/bin/mysql.exe\" -u root expense_tracker -e \"ALTER TABLE receipts ADD COLUMN reimbursement_status VARCHAR(20) DEFAULT ''none'' AFTER amount;\")",
+      "Bash(\"c:/xampp/mysql/bin/mysql.exe\" -u root expense_tracker -e \"SELECT id, file_path FROM receipts;\")",
+      "Bash(\"c:/xampp/mysql/bin/mysql.exe\" -u root expense_tracker -e \"DELETE FROM receipts WHERE id = 11;\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

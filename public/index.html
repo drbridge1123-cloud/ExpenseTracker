@@ -1,0 +1,2378 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker - Personal Finance Management</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Login Page -->
+    <div id="login-page" class="login-page">
+        <div class="login-container">
+            <div class="login-header">
+                <h1><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"
+                        style="vertical-align: middle; margin-right: 8px;">
+                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>ExpenseTracker</h1>
+                <p>Personal Finance Management</p>
+            </div>
+
+            <form id="login-form" class="login-form">
+                <div class="form-group">
+                    <label>Username or Email</label>
+                    <input type="text" id="login-username" required placeholder="Enter username or email">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="login-password" required placeholder="Enter password">
+                        <button type="button" class="password-toggle"
+                            onclick="togglePasswordVisibility('login-password', this)">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                                </path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="login-error" id="login-error"></div>
+                <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+            </form>
+
+            <div class="login-footer">
+                <p>Don't have an account? <a href="#" onclick="showRegisterForm()">Register</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div class="modal-overlay" id="register-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Create Account</h3>
+                <button class="modal-close" onclick="closeRegisterModal()">&times;</button>
+            </div>
+            <form id="register-form" onsubmit="handleRegister(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Username *</label>
+                        <input type="text" id="register-username" required minlength="3"
+                            placeholder="Choose a username">
+                    </div>
+                    <div class="form-group">
+                        <label>Email *</label>
+                        <input type="email" id="register-email" required placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Display Name</label>
+                        <input type="text" id="register-display-name" placeholder="Your name">
+                    </div>
+                    <div class="form-group">
+                        <label>Password *</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="register-password" required minlength="6"
+                                placeholder="At least 6 characters">
+                            <button type="button" class="password-toggle"
+                                onclick="togglePasswordVisibility('register-password', this)">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                                    </path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password *</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="register-password-confirm" required
+                                placeholder="Confirm password">
+                            <button type="button" class="password-toggle"
+                                onclick="togglePasswordVisibility('register-password-confirm', this)">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                                    </path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeRegisterModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="app" style="display: none;">
+        <!-- Mobile Header -->
+        <header class="mobile-header">
+            <button class="hamburger-btn" onclick="toggleMobileSidebar()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+            <span class="mobile-header-title">ExpenseTracker</span>
+            <div class="mobile-header-user" id="mobile-user-avatar"></div>
+        </header>
+
+        <!-- Mobile Overlay -->
+        <div class="mobile-overlay" id="mobile-overlay" onclick="closeMobileSidebar()"></div>
+
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Logo -->
+            <div class="sidebar-logo">ExpenseTracker</div>
+
+            <!-- Fixed Menu: Dashboard -->
+            <nav class="fixed-menu">
+                <div class="menu-item active" data-page="dashboard">
+                    <span class="menu-icon">🏠</span>
+                    <span class="menu-label">Dashboard</span>
+                </div>
+            </nav>
+
+            <div class="section-divider"></div>
+
+            <!-- Section: MONEY (always expanded) -->
+            <div class="nav-section">
+                <div class="section-label">Money</div>
+                <nav class="section-menu">
+                    <div class="menu-item" data-page="transactions">
+                        <span class="menu-icon">💳</span>
+                        <span class="menu-label">Transactions</span>
+                    </div>
+                    <div class="menu-item" data-page="accounts">
+                        <span class="menu-icon">🏛</span>
+                        <span class="menu-label">Accounts</span>
+                    </div>
+                    <div class="menu-item" data-page="categories">
+                        <span class="menu-icon">📊</span>
+                        <span class="menu-label">Chart of Accounts</span>
+                    </div>
+                </nav>
+            </div>
+
+            <!-- Section: TOOLS (collapsible, default expanded) -->
+            <div class="collapsible-section" data-section="tools">
+                <div class="collapsible-header">
+                    <div class="collapsible-title">
+                        <svg class="collapsible-toggle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        <span>Tools</span>
+                    </div>
+                    <span class="collapsible-count">7</span>
+                </div>
+                <nav class="collapsible-body">
+                    <div class="menu-item" data-page="rules">
+                        <span class="menu-icon">⚙️</span>
+                        <span class="menu-label">Rules</span>
+                    </div>
+                    <div class="menu-item" data-page="budgets">
+                        <span class="menu-icon">💰</span>
+                        <span class="menu-label">Budgets</span>
+                    </div>
+                    <div class="menu-item" data-page="recurring">
+                        <span class="menu-icon">🔄</span>
+                        <span class="menu-label">Recurring</span>
+                    </div>
+                    <div class="menu-item" data-page="checks">
+                        <span class="menu-icon">✏️</span>
+                        <span class="menu-label">Write Checks</span>
+                    </div>
+                    <div class="menu-item" data-page="receipts">
+                        <span class="menu-icon">🧾</span>
+                        <span class="menu-label">Receipts</span>
+                    </div>
+                    <div class="menu-item" data-page="reconcile">
+                        <span class="menu-icon">✅</span>
+                        <span class="menu-label">Reconcile</span>
+                    </div>
+                    <div class="menu-item" data-page="import">
+                        <span class="menu-icon">📥</span>
+                        <span class="menu-label">Import CSV</span>
+                    </div>
+                </nav>
+            </div>
+
+            <!-- Section: REPORTS (collapsible, default collapsed) -->
+            <div class="collapsible-section collapsed" data-section="reports">
+                <div class="collapsible-header">
+                    <div class="collapsible-title">
+                        <svg class="collapsible-toggle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        <span>Reports</span>
+                    </div>
+                    <span class="collapsible-count">2</span>
+                </div>
+                <nav class="collapsible-body">
+                    <div class="menu-item" data-page="reports">
+                        <span class="menu-icon">📈</span>
+                        <span class="menu-label">Reports</span>
+                    </div>
+                    <div class="menu-item" data-page="cpa-portal">
+                        <span class="menu-icon">👤</span>
+                        <span class="menu-label">CPA Portal</span>
+                    </div>
+                </nav>
+            </div>
+
+            <!-- Section: ADMIN (collapsible, default collapsed) -->
+            <div class="collapsible-section collapsed admin-only" data-section="admin" id="nav-admin-section"
+                style="display: none;">
+                <div class="collapsible-header">
+                    <div class="collapsible-title">
+                        <svg class="collapsible-toggle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        <span>Admin</span>
+                    </div>
+                    <span class="collapsible-count">1</span>
+                </div>
+                <nav class="collapsible-body">
+                    <div class="menu-item" data-page="admin">
+                        <span class="menu-icon">⚙️</span>
+                        <span class="menu-label">Admin Panel</span>
+                    </div>
+                </nav>
+            </div>
+
+            <!-- User Area -->
+            <div class="user-area">
+                <div class="user-profile">
+                    <div class="user-avatar" id="user-avatar">U</div>
+                    <div class="user-info">
+                        <div class="user-name" id="current-user-name">User</div>
+                        <div class="user-role" id="current-user-role">User</div>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="handleLogout()">
+                    <span class="logout-icon">🚪</span>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <button class="menu-toggle" id="menu-toggle">&#9776;</button>
+                <div class="search-container">
+                    <input type="text" class="search-input" id="global-search" placeholder="Search transactions...">
+                </div>
+                <div class="top-bar-actions">
+                    <!-- Container Width Toggle -->
+                    <div class="width-toggle" id="widthToggle">
+                        <button class="width-toggle-btn active" data-width="100">100%</button>
+                        <button class="width-toggle-btn" data-width="75">75%</button>
+                        <button class="width-toggle-btn" data-width="50">50%</button>
+                    </div>
+
+                    <div class="user-switcher">
+                        <label for="user-select">User:</label>
+                        <select id="user-select" class="form-select user-select" onchange="switchUser(this.value)">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <span class="current-date" id="current-date"></span>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content" id="page-content" data-width="100">
+                <!-- Dashboard Page -->
+                <div class="page active" id="page-dashboard">
+                    <div class="page-header">
+                        <h2>Dashboard</h2>
+                        <div class="page-actions">
+                            <select id="dashboard-month" class="form-select">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Summary Cards -->
+                    <div class="summary-cards">
+                        <div class="card summary-card income clickable" onclick="showIncomeDetail()">
+                            <div class="card-icon">&#8593;</div>
+                            <div class="card-content">
+                                <span class="card-label">Income</span>
+                                <span class="card-value" id="total-income">$0.00</span>
+                            </div>
+                        </div>
+                        <div class="card summary-card expenses clickable" onclick="showExpensesDetail()">
+                            <div class="card-icon">&#8595;</div>
+                            <div class="card-content">
+                                <span class="card-label">Expenses</span>
+                                <span class="card-value" id="total-expenses">$0.00</span>
+                            </div>
+                        </div>
+                        <div class="card summary-card savings clickable" onclick="showSavingsDetail()">
+                            <div class="card-icon">&#128176;</div>
+                            <div class="card-content">
+                                <span class="card-label">Net Savings</span>
+                                <span class="card-value" id="net-savings">$0.00</span>
+                            </div>
+                        </div>
+                        <div class="card summary-card rate clickable" onclick="showSavingsRateDetail()">
+                            <div class="card-icon">%</div>
+                            <div class="card-content">
+                                <span class="card-label">Savings Rate</span>
+                                <span class="card-value" id="savings-rate">0%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row -->
+                    <div class="dashboard-row">
+                        <div class="card chart-card">
+                            <h3>Spending by Category</h3>
+                            <div class="category-chart" id="category-chart">
+                                <!-- Category breakdown -->
+                            </div>
+                        </div>
+                        <div class="card chart-card">
+                            <h3>Account Balances</h3>
+                            <div class="accounts-summary" id="accounts-summary">
+                                <!-- Account balances -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Transactions -->
+                    <div class="card">
+                        <h3>Recent Transactions</h3>
+                        <div class="transactions-list" id="recent-transactions">
+                            <!-- Recent transactions list -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transactions Page -->
+                <div class="page" id="page-transactions">
+                    <div class="page-header">
+                        <h2>Transactions</h2>
+                        <div class="page-actions">
+                            <select id="txn-account-filter" class="form-select">
+                                <option value="">All Accounts</option>
+                            </select>
+                            <select id="txn-category-filter" class="form-select">
+                                <option value="">All Categories</option>
+                            </select>
+                            <select id="txn-date-preset" class="form-select" onchange="applyDatePreset(this.value)">
+                                <optgroup label="📅 Quick">
+                                    <option value="today">Today</option>
+                                    <option value="yesterday">Yesterday</option>
+                                </optgroup>
+                                <optgroup label="📆 Week">
+                                    <option value="this_week">This Week</option>
+                                    <option value="last_week">Last Week</option>
+                                </optgroup>
+                                <optgroup label="🗓️ Month">
+                                    <option value="this_month" selected>This Month</option>
+                                    <option value="last_month">Last Month</option>
+                                    <option value="last_30">Last 30 Days</option>
+                                    <option value="last_90">Last 90 Days</option>
+                                </optgroup>
+                                <optgroup label="📊 Year">
+                                    <option value="this_year">This Year</option>
+                                    <option value="last_year">Last Year</option>
+                                    <option value="all">All Time</option>
+                                </optgroup>
+                                <optgroup label="🔧 Custom">
+                                    <option value="custom">Select Date Range...</option>
+                                </optgroup>
+                            </select>
+                            <input type="date" id="txn-start-date" class="form-input" style="display:none;">
+                            <input type="date" id="txn-end-date" class="form-input" style="display:none;">
+                        </div>
+                    </div>
+
+                    <div class="transactions-container">
+                        <div class="card transactions-table-card">
+                            <div class="bulk-actions" id="bulk-actions" style="display: none;">
+                                <span id="selected-count">0 selected</span>
+                                <button class="btn btn-danger btn-sm" onclick="deleteSelectedTransactions()">Delete
+                                    Selected</button>
+                                <button class="btn btn-secondary btn-sm" onclick="clearSelection()">Clear
+                                    Selection</button>
+                            </div>
+                            <table class="transactions-table" id="transactions-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px;"><input type="checkbox" id="select-all-transactions"
+                                                onchange="toggleSelectAllTransactions(this.checked)"></th>
+                                        <th class="sortable" data-sort="transaction_date"
+                                            onclick="sortTransactions('transaction_date')">
+                                            Date <span class="sort-icon" id="sort-icon-transaction_date">↓</span>
+                                        </th>
+                                        <th class="sortable" data-sort="description"
+                                            onclick="sortTransactions('description')">
+                                            Description <span class="sort-icon" id="sort-icon-description"></span>
+                                        </th>
+                                        <th>Category</th>
+                                        <th>Account</th>
+                                        <th class="sortable text-right" data-sort="amount"
+                                            onclick="sortTransactions('amount')">
+                                            Amount <span class="sort-icon" id="sort-icon-amount"></span>
+                                        </th>
+                                        <th style="width: 60px; text-align: center;" title="Receipt">📎</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactions-tbody">
+                                    <!-- Transactions rows -->
+                                </tbody>
+                            </table>
+                            <div class="pagination" id="transactions-pagination">
+                                <!-- Pagination -->
+                            </div>
+                        </div>
+
+                        <!-- Transaction Detail Panel -->
+                        <div class="detail-panel" id="transaction-detail-panel">
+                            <div class="detail-header">
+                                <h3>Transaction Details</h3>
+                                <button class="close-btn" id="close-detail">&times;</button>
+                            </div>
+                            <div class="detail-content" id="transaction-detail-content">
+                                <!-- Transaction details -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Accounts Page -->
+                <div class="page" id="page-accounts">
+                    <div class="page-header">
+                        <h2>Accounts</h2>
+                        <div class="page-actions">
+                            <button class="btn btn-primary" id="add-account-btn">+ Add Account</button>
+                        </div>
+                    </div>
+
+                    <div class="accounts-grid" id="accounts-grid">
+                        <!-- Account cards -->
+                    </div>
+                </div>
+
+                <!-- Chart of Accounts Page - 2 Panel Layout -->
+                <div class="page" id="page-categories">
+                    <!-- Page Header -->
+                    <div class="coa-page-header">
+                        <h2>Chart of Accounts</h2>
+                        <button class="btn-coa-primary" id="add-category-btn">
+                            <span class="btn-icon">+</span> New
+                        </button>
+                    </div>
+
+                    <!-- 2 Panel Container -->
+                    <div class="coa-2panel-container">
+                        <!-- Left Panel: Category List (Sidebar) -->
+                        <div class="coa-sidebar">
+                            <!-- Sidebar Header with Search -->
+                            <div class="coa-sidebar-header">
+                                <div class="coa-search-box">
+                                    <span class="coa-search-icon">&#128269;</span>
+                                    <input type="text" id="coa-search" placeholder="Search..." class="coa-search-input">
+                                </div>
+                                <select id="coa-type-filter" class="coa-filter-select-mini">
+                                    <option value="">All</option>
+                                    <option value="expense">Expense</option>
+                                    <option value="income">Income</option>
+                                    <option value="transfer">Transfer</option>
+                                </select>
+                            </div>
+
+                            <!-- Expand/Collapse Buttons -->
+                            <div class="coa-expand-collapse-bar">
+                                <button class="coa-expand-btn" onclick="expandAllCategories()">▼ Expand All</button>
+                                <button class="coa-collapse-btn" onclick="collapseAllCategories()">▲ Collapse
+                                    All</button>
+                            </div>
+
+                            <!-- Category List -->
+                            <div class="coa-sidebar-content" id="coa-content">
+                                <!-- Dynamic category list here -->
+                            </div>
+
+                            <!-- Sidebar Footer Stats -->
+                            <div class="coa-sidebar-footer">
+                                <div class="coa-sidebar-stat">
+                                    <span class="stat-label">Accounts</span>
+                                    <span class="stat-value" id="coa-count">0</span>
+                                </div>
+                                <div class="coa-sidebar-stat">
+                                    <span class="stat-label income">Income</span>
+                                    <span class="stat-value income" id="coa-total-income">$0</span>
+                                </div>
+                                <div class="coa-sidebar-stat">
+                                    <span class="stat-label expense">Expense</span>
+                                    <span class="stat-value expense" id="coa-total-expense">$0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Detail View -->
+                        <div class="coa-detail-panel" id="coa-detail-panel">
+                            <!-- Empty State -->
+                            <div class="coa-detail-empty" id="coa-detail-empty">
+                                <div class="empty-icon">📂</div>
+                                <div class="empty-text">Select a category to view details</div>
+                            </div>
+
+                            <!-- Detail Content (hidden initially) -->
+                            <div class="coa-detail-content" id="coa-detail-content" style="display: none;">
+                                <!-- Header -->
+                                <div class="coa-detail-header">
+                                    <div class="detail-header-left">
+                                        <span class="detail-icon" id="detail-icon">💰</span>
+                                        <div class="detail-title-wrap">
+                                            <h3 class="detail-name" id="detail-name">Category Name</h3>
+                                            <span class="detail-type-badge" id="detail-type">expense</span>
+                                        </div>
+                                    </div>
+                                    <div class="detail-header-actions">
+                                        <button class="btn-icon-sm" id="detail-edit-btn" title="Edit">✏️</button>
+                                        <button class="btn-icon-sm danger" id="detail-delete-btn"
+                                            title="Delete">🗑️</button>
+                                    </div>
+                                </div>
+
+                                <!-- Stats Row -->
+                                <div class="coa-detail-stats">
+                                    <div class="detail-stat">
+                                        <div class="detail-stat-label">This Month</div>
+                                        <div class="detail-stat-value" id="detail-this-month">$0.00</div>
+                                    </div>
+                                    <div class="detail-stat">
+                                        <div class="detail-stat-label">Last Month</div>
+                                        <div class="detail-stat-value" id="detail-last-month">$0.00</div>
+                                    </div>
+                                    <div class="detail-stat">
+                                        <div class="detail-stat-label">All Time</div>
+                                        <div class="detail-stat-value" id="detail-all-time">$0.00</div>
+                                    </div>
+                                    <div class="detail-stat">
+                                        <div class="detail-stat-label">Transactions</div>
+                                        <div class="detail-stat-value" id="detail-txn-count">0</div>
+                                    </div>
+                                </div>
+
+                                <!-- Info Section -->
+                                <div class="coa-detail-info">
+                                    <div class="detail-info-row">
+                                        <span class="info-label">Parent Category</span>
+                                        <span class="info-value" id="detail-parent">None</span>
+                                    </div>
+                                    <div class="detail-info-row">
+                                        <span class="info-label">System Category</span>
+                                        <span class="info-value" id="detail-system">No</span>
+                                    </div>
+                                </div>
+
+                                <!-- Transactions Section -->
+                                <div class="coa-detail-transactions">
+                                    <div class="detail-txn-header">
+                                        <h4>All Transactions</h4>
+                                        <div class="detail-txn-controls">
+                                            <input type="text" class="detail-txn-search" id="detail-txn-search"
+                                                placeholder="Search..." oninput="handleDetailSearch(this.value)">
+                                            <select class="detail-txn-sort" id="detail-txn-sort"
+                                                onchange="handleDetailSort(this.value)">
+                                                <option value="date">Date</option>
+                                                <option value="amount">Amount</option>
+                                                <option value="account">Account</option>
+                                                <option value="description">Description</option>
+                                            </select>
+                                            <button class="btn-bulk-categorize" id="btn-bulk-categorize"
+                                                onclick="openBulkCategorizeModal()" title="Bulk Categorize"
+                                                style="display: none;">
+                                                Move
+                                            </button>
+                                            <button class="btn-bulk-delete" id="btn-bulk-delete"
+                                                onclick="deleteSelectedDetailTransactions()" title="Delete Selected"
+                                                style="display: none;">
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="detail-txn-list" id="detail-txn-list">
+                                        <!-- Transaction rows populated by JS -->
+                                    </div>
+                                    <button class="detail-view-all-btn" id="detail-view-all-btn">
+                                        View All Transactions
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reports Page -->
+                <div class="page" id="page-reports">
+                    <!-- Page Header -->
+                    <div class="reports-header">
+                        <h2>Financial Reports</h2>
+                        <select id="report-period" class="form-select" onchange="changeReportPeriod(this.value)">
+                            <option value="month">This Month</option>
+                            <option value="last_month">Last Month</option>
+                            <option value="quarter">This Quarter</option>
+                            <option value="year">This Year</option>
+                            <option value="last_year">Last Year</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </div>
+
+                    <!-- Report Tabs -->
+                    <div class="reports-tabs">
+                        <button class="reports-tab active" data-tab="overview"
+                            onclick="switchReportTab('overview')">Overview</button>
+                        <button class="reports-tab" data-tab="pnl" onclick="switchReportTab('pnl')">P&L
+                            Statement</button>
+                        <button class="reports-tab" data-tab="comparison"
+                            onclick="switchReportTab('comparison')">Monthly Comparison</button>
+                        <button class="reports-tab" data-tab="categories"
+                            onclick="switchReportTab('categories')">Category Analysis</button>
+                        <button class="reports-tab" data-tab="custom" onclick="switchReportTab('custom')">Custom
+                            Report</button>
+                    </div>
+
+                    <!-- Overview Tab -->
+                    <div id="report-overview" class="reports-content active">
+                        <div class="reports-cards">
+                            <div class="reports-card">
+                                <span class="reports-card-label">Total Income</span>
+                                <span class="reports-card-value income" id="report-total-income">$0.00</span>
+                            </div>
+                            <div class="reports-card">
+                                <span class="reports-card-label">Total Expenses</span>
+                                <span class="reports-card-value expense" id="report-total-expenses">$0.00</span>
+                            </div>
+                            <div class="reports-card">
+                                <span class="reports-card-label">Net Income</span>
+                                <span class="reports-card-value" id="report-net-income">$0.00</span>
+                            </div>
+                            <div class="reports-card">
+                                <span class="reports-card-label">Savings Rate</span>
+                                <span class="reports-card-value" id="report-savings-rate">0%</span>
+                            </div>
+                        </div>
+
+                        <div class="reports-grid">
+                            <div class="reports-panel">
+                                <h3>Expense Breakdown</h3>
+                                <div class="reports-chart-container">
+                                    <canvas id="report-expense-chart"></canvas>
+                                </div>
+                            </div>
+                            <div class="reports-panel">
+                                <h3>Daily Spending Trend</h3>
+                                <div class="reports-chart-container">
+                                    <canvas id="report-trend-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="reports-grid">
+                            <div class="reports-panel">
+                                <h3>Top Spending Categories</h3>
+                                <div class="reports-list" id="report-category-list"></div>
+                            </div>
+                            <div class="reports-panel">
+                                <h3>Top Merchants</h3>
+                                <div class="reports-list" id="report-merchant-list"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monthly Comparison Tab -->
+                    <div id="report-comparison" class="reports-content">
+                        <div class="reports-cards">
+                            <div class="reports-card">
+                                <span class="reports-card-label">Avg Monthly Income</span>
+                                <span class="reports-card-value income" id="report-avg-income">$0.00</span>
+                            </div>
+                            <div class="reports-card">
+                                <span class="reports-card-label">Avg Monthly Expenses</span>
+                                <span class="reports-card-value expense" id="report-avg-expenses">$0.00</span>
+                            </div>
+                            <div class="reports-card">
+                                <span class="reports-card-label">Month-over-Month</span>
+                                <span class="reports-card-value" id="report-mom-change">-</span>
+                            </div>
+                        </div>
+
+                        <div class="reports-panel reports-panel-full">
+                            <h3>Income vs Expenses Over Time</h3>
+                            <div class="reports-chart-container reports-chart-tall">
+                                <canvas id="report-comparison-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category Analysis Tab -->
+                    <div id="report-categories" class="reports-content">
+                        <div class="reports-grid">
+                            <div class="reports-panel">
+                                <h3>Expenses by Category</h3>
+                                <div class="reports-chart-container">
+                                    <canvas id="report-category-pie"></canvas>
+                                </div>
+                            </div>
+                            <div class="reports-panel">
+                                <h3>Income by Category</h3>
+                                <div class="reports-chart-container">
+                                    <canvas id="report-income-pie"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="reports-panel reports-panel-full">
+                            <h3>All Categories</h3>
+                            <div class="reports-list" id="report-all-categories"></div>
+                        </div>
+                    </div>
+
+                    <!-- P&L Statement Tab -->
+                    <div id="report-pnl" class="reports-content">
+                        <div class="pnl-header">
+                            <div class="pnl-period-selector">
+                                <select id="pnl-period" class="form-select" onchange="changePnlPeriod(this.value)">
+                                    <option value="this_month">This Month</option>
+                                    <option value="last_month">Last Month</option>
+                                    <option value="this_quarter">This Quarter</option>
+                                    <option value="this_year" selected>This Year</option>
+                                    <option value="last_year">Last Year</option>
+                                    <option value="custom">Custom Range</option>
+                                </select>
+                                <div class="pnl-custom-dates" id="pnl-custom-dates" style="display: none;">
+                                    <input type="date" id="pnl-start-date" class="form-input">
+                                    <span>to</span>
+                                    <input type="date" id="pnl-end-date" class="form-input">
+                                    <button class="btn btn-primary btn-sm" onclick="loadPnlReport()">Apply</button>
+                                </div>
+                            </div>
+                            <div class="pnl-actions">
+                                <button class="btn btn-secondary" onclick="exportPnlPdf()">Export PDF</button>
+                                <button class="btn btn-secondary" onclick="exportPnlExcel()">Export Excel</button>
+                            </div>
+                        </div>
+
+                        <div class="pnl-statement">
+                            <div class="pnl-title">
+                                <h3>Profit & Loss Statement</h3>
+                                <span class="pnl-date-range" id="pnl-date-range">January 1 - December 31, 2025</span>
+                            </div>
+
+                            <!-- Income Section -->
+                            <div class="pnl-section">
+                                <div class="pnl-section-header">
+                                    <span>INCOME</span>
+                                    <span id="pnl-income-total">$0.00</span>
+                                </div>
+                                <div class="pnl-items" id="pnl-income-items">
+                                    <!-- Income items will be populated here -->
+                                </div>
+                            </div>
+
+                            <!-- Expenses Section -->
+                            <div class="pnl-section">
+                                <div class="pnl-section-header">
+                                    <span>EXPENSES</span>
+                                    <span id="pnl-expenses-total">$0.00</span>
+                                </div>
+                                <div class="pnl-items" id="pnl-expense-items">
+                                    <!-- Expense items will be populated here -->
+                                </div>
+                            </div>
+
+                            <!-- Net Income -->
+                            <div class="pnl-net-income">
+                                <span>NET INCOME</span>
+                                <span id="pnl-net-income">$0.00</span>
+                            </div>
+
+                            <!-- Summary Cards -->
+                            <div class="pnl-summary-cards">
+                                <div class="pnl-summary-card">
+                                    <span class="pnl-summary-label">Gross Margin</span>
+                                    <span class="pnl-summary-value" id="pnl-gross-margin">0%</span>
+                                </div>
+                                <div class="pnl-summary-card">
+                                    <span class="pnl-summary-label">Expense Ratio</span>
+                                    <span class="pnl-summary-value" id="pnl-expense-ratio">0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Monthly Trend Chart -->
+                        <div class="pnl-chart-section">
+                            <h3>Monthly Trend</h3>
+                            <div class="pnl-chart-container">
+                                <canvas id="pnl-trend-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Custom Report Tab -->
+                    <div id="report-custom" class="reports-content">
+                        <div class="custom-report-layout">
+                            <div class="cr-sidebar">
+                                <div class="cr-sidebar-header">
+                                    <h3>Select Categories</h3>
+                                    <div class="cr-select-actions">
+                                        <button class="cr-btn-link" id="cr-select-all">Select All</button>
+                                        <button class="cr-btn-link" id="cr-select-none">Clear</button>
+                                    </div>
+                                </div>
+                                <div class="cr-category-list" id="cr-category-list"></div>
+                                <div class="cr-sidebar-footer">
+                                    <span id="cr-selected-count">0 selected</span>
+                                </div>
+                            </div>
+                            <div class="cr-main">
+                                <div class="cr-toolbar">
+                                    <select id="cr-period" class="form-select">
+                                        <option value="this_month">This Month</option>
+                                        <option value="last_month">Last Month</option>
+                                        <option value="last_3_months">Last 3 Months</option>
+                                        <option value="last_6_months">Last 6 Months</option>
+                                        <option value="this_year" selected>This Year</option>
+                                        <option value="last_year">Last Year</option>
+                                        <option value="all_time">All Time</option>
+                                        <option value="custom">Custom Range</option>
+                                    </select>
+                                    <div class="cr-custom-dates" id="cr-custom-dates" style="display: none;">
+                                        <input type="date" id="cr-start-date" class="form-input">
+                                        <span>to</span>
+                                        <input type="date" id="cr-end-date" class="form-input">
+                                    </div>
+                                    <button class="btn btn-primary" id="cr-generate">Generate Report</button>
+                                </div>
+                                <div class="cr-results" id="cr-results">
+                                    <div class="cr-placeholder">
+                                        <div class="cr-placeholder-icon">📊</div>
+                                        <p>Select categories and click "Generate Report"</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Budgets Page -->
+                <div class="page" id="page-budgets">
+                    <div class="budgets-header">
+                        <h2>Monthly Budgets</h2>
+                        <div class="budgets-actions">
+                            <input type="month" id="budget-month" class="form-input">
+                            <button class="btn btn-primary" onclick="openAddBudgetModal()">+ Add Budget</button>
+                        </div>
+                    </div>
+
+                    <div class="budgets-summary-cards">
+                        <div class="budgets-summary-card">
+                            <span class="budgets-card-label">Total Budget</span>
+                            <span class="budgets-card-value" id="total-budget">$0.00</span>
+                        </div>
+                        <div class="budgets-summary-card">
+                            <span class="budgets-card-label">Total Spent</span>
+                            <span class="budgets-card-value expense" id="total-spent">$0.00</span>
+                        </div>
+                        <div class="budgets-summary-card">
+                            <span class="budgets-card-label">Remaining</span>
+                            <span class="budgets-card-value income" id="total-remaining">$0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="budgets-progress-card">
+                        <h3>Overall Budget Progress</h3>
+                        <div class="budgets-progress-bar">
+                            <div class="budgets-progress-fill" id="overall-progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div class="budgets-progress-text">
+                            <span id="progress-spent">$0 spent</span>
+                            <span id="progress-percent">0%</span>
+                            <span id="progress-budget">$0 budget</span>
+                        </div>
+                    </div>
+
+                    <div class="budgets-list" id="budgets-list">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">💰</div>
+                            <p>No budgets set yet. Click "Add Budget" to get started!</p>
+                        </div>
+                    </div>
+
+                    <!-- Budget Modal -->
+                    <div class="modal-overlay" id="budget-modal">
+                        <div class="modal budget-modal-content">
+                            <div class="modal-header">
+                                <h3 id="budget-modal-title">Add Budget</h3>
+                                <button class="modal-close" onclick="closeBudgetModal()">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="budget-form" onsubmit="saveBudget(event)">
+                                    <input type="hidden" id="budget-id">
+
+                                    <div class="form-group">
+                                        <label for="budget-category">Category</label>
+                                        <select id="budget-category" class="form-select" required>
+                                            <option value="">Select a category...</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="budget-amount">Budget Amount</label>
+                                        <div class="input-with-prefix">
+                                            <span class="input-prefix">$</span>
+                                            <input type="number" id="budget-amount" class="form-input" step="0.01"
+                                                min="0" placeholder="0.00" required>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="budget-period">Period</label>
+                                        <select id="budget-period" class="form-select">
+                                            <option value="monthly">Monthly</option>
+                                            <option value="weekly">Weekly</option>
+                                            <option value="yearly">Yearly</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="modal-actions">
+                                        <button type="button" class="btn btn-secondary"
+                                            onclick="closeBudgetModal()">Cancel</button>
+                                        <button type="button" class="btn btn-danger" id="budget-delete-btn"
+                                            onclick="deleteBudget()" style="display: none;">Delete</button>
+                                        <button type="submit" class="btn btn-primary">Save Budget</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recurring Page -->
+                <div class="page" id="page-recurring">
+                    <div class="recurring-header">
+                        <h2>Recurring Transactions</h2>
+                        <button class="btn btn-primary" onclick="openRecurringModal()">+ Add Recurring</button>
+                    </div>
+
+                    <div class="recurring-summary-cards">
+                        <div class="recurring-summary-card">
+                            <span class="recurring-card-label">Active Recurring</span>
+                            <span class="recurring-card-value" id="recurring-total-active">0</span>
+                        </div>
+                        <div class="recurring-summary-card">
+                            <span class="recurring-card-label">Due This Month</span>
+                            <span class="recurring-card-value" id="recurring-due-this-month">0</span>
+                        </div>
+                        <div class="recurring-summary-card">
+                            <span class="recurring-card-label">Monthly Expenses</span>
+                            <span class="recurring-card-value expense" id="recurring-monthly-total">$0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="recurring-list" id="recurring-list">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🔄</div>
+                            <p>No recurring transactions yet. Add subscriptions, rent, bills, etc.</p>
+                        </div>
+                    </div>
+
+                    <!-- Recurring Modal -->
+                    <div class="modal-overlay" id="recurring-modal">
+                        <div class="modal recurring-modal-content">
+                            <div class="modal-header">
+                                <h3 id="recurring-modal-title">Add Recurring Transaction</h3>
+                                <button class="modal-close" onclick="closeRecurringModal()">&times;</button>
+                            </div>
+                            <form id="recurring-form" onsubmit="saveRecurring(event)">
+                                <div class="modal-body">
+                                    <input type="hidden" id="recurring-id">
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Description *</label>
+                                            <input type="text" id="recurring-description" required
+                                                placeholder="e.g., Netflix, Rent, Electric Bill">
+                                        </div>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Amount *</label>
+                                            <input type="number" id="recurring-amount" step="0.01" min="0" required
+                                                placeholder="0.00">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Type</label>
+                                            <select id="recurring-type">
+                                                <option value="debit">Expense (Debit)</option>
+                                                <option value="credit">Income (Credit)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Account *</label>
+                                            <select id="recurring-account" required></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Category</label>
+                                            <select id="recurring-category"></select>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Frequency *</label>
+                                            <select id="recurring-frequency" onchange="updateDayOfMonthVisibility()">
+                                                <option value="daily">Daily</option>
+                                                <option value="weekly">Weekly</option>
+                                                <option value="biweekly">Bi-weekly</option>
+                                                <option value="monthly" selected>Monthly</option>
+                                                <option value="quarterly">Quarterly</option>
+                                                <option value="yearly">Yearly</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group" id="day-of-month-group">
+                                            <label>Day of Month</label>
+                                            <input type="number" id="recurring-day" min="1" max="31" placeholder="1-31">
+                                        </div>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Start Date *</label>
+                                            <input type="date" id="recurring-start" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>End Date (Optional)</label>
+                                            <input type="date" id="recurring-end">
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="recurring-auto-create">
+                                            <span>Automatically create transactions when due</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-danger" id="recurring-delete-btn"
+                                        onclick="deleteRecurringFromModal()" style="display: none; margin-right: auto;">Delete</button>
+                                    <button type="button" class="btn btn-secondary"
+                                        onclick="closeRecurringModal()">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Recurring</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Checks Page -->
+                <div class="page" id="page-checks">
+                    <div class="checks-header">
+                        <h2>Write Checks</h2>
+                        <div class="checks-actions">
+                            <button class="btn btn-secondary" onclick="printCheck()">Print</button>
+                            <button class="btn btn-primary" onclick="resetCheckForm()">+ New Check</button>
+                        </div>
+                    </div>
+
+                    <div class="checks-layout">
+                        <div class="checks-main">
+                            <div class="checks-form-card">
+                                <h3>Check Details</h3>
+
+                                <!-- Check Preview -->
+                                <div class="check-preview">
+                                    <div class="check-preview-inner">
+                                        <div class="check-preview-header">
+                                            <span>Check # <strong id="preview-number">----</strong></span>
+                                            <span>Date: <span id="preview-date">--/--/----</span></span>
+                                        </div>
+                                        <div class="check-preview-payee">
+                                            <small>Pay to the order of</small>
+                                            <div id="preview-payee"></div>
+                                        </div>
+                                        <div class="check-preview-amount">
+                                            <div class="check-amount-box">$<span id="preview-amount">0.00</span></div>
+                                            <div class="check-amount-words" id="preview-amount-words">Zero and 00/100
+                                                dollars</div>
+                                        </div>
+                                        <div class="check-preview-memo">
+                                            <small>Memo</small>
+                                            <div id="preview-memo"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <form id="check-form">
+                                    <input type="hidden" id="check-id">
+                                    <div class="checks-form-row">
+                                        <div class="form-group">
+                                            <label>Bank Account</label>
+                                            <select id="check-account" required
+                                                onchange="updateNextCheckNumber()"></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Check #</label>
+                                            <input type="text" id="check-number" required
+                                                oninput="updateCheckPreview()">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Date</label>
+                                            <input type="date" id="check-date" required onchange="updateCheckPreview()">
+                                        </div>
+                                        <div class="form-group amount-field">
+                                            <label>Amount</label>
+                                            <input type="number" id="check-amount" min="0.01" step="0.01" required
+                                                oninput="updateCheckPreview()" placeholder="0.00">
+                                        </div>
+                                    </div>
+                                    <div class="checks-form-row three-col">
+                                        <div class="form-group payee-field">
+                                            <label>Pay to the order of</label>
+                                            <input type="text" id="check-payee" required oninput="updateCheckPreview()"
+                                                placeholder="Recipient name">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Category</label>
+                                            <select id="check-category"></select>
+                                        </div>
+                                    </div>
+                                    <div class="checks-form-row three-col">
+                                        <div class="form-group memo-field">
+                                            <label>Memo</label>
+                                            <input type="text" id="check-memo" oninput="updateCheckPreview()"
+                                                placeholder="What is this check for?">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Status</label>
+                                            <select id="check-status">
+                                                <option value="pending">Pending</option>
+                                                <option value="printed">Printed</option>
+                                                <option value="cleared">Cleared</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="checks-form-footer">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="create-transaction" checked>
+                                            Record as transaction
+                                        </label>
+                                        <div class="checks-form-actions">
+                                            <button type="button" class="btn btn-secondary"
+                                                onclick="resetCheckForm()">Cancel</button>
+                                            <button type="submit" class="btn btn-primary">Save Check</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="checks-sidebar">
+                            <div class="checks-stats">
+                                <div class="checks-stat">
+                                    <span class="checks-stat-value" id="pending-count">0</span>
+                                    <span class="checks-stat-label">Pending</span>
+                                </div>
+                                <div class="checks-stat">
+                                    <span class="checks-stat-value" id="pending-amount">$0</span>
+                                    <span class="checks-stat-label">Outstanding</span>
+                                </div>
+                            </div>
+                            <div class="checks-filter-tabs">
+                                <button class="checks-filter-tab active" onclick="filterChecks('', this)">All</button>
+                                <button class="checks-filter-tab"
+                                    onclick="filterChecks('pending', this)">Pending</button>
+                                <button class="checks-filter-tab"
+                                    onclick="filterChecks('cleared', this)">Cleared</button>
+                            </div>
+                            <div class="checks-list" id="checks-list">
+                                <div class="empty-state">
+                                    <p>No checks written yet</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reconcile Page -->
+                <div class="page" id="page-reconcile">
+                    <div class="reconcile-header">
+                        <h2>Reconcile Accounts</h2>
+                        <div class="reconcile-actions">
+                            <button class="btn btn-secondary" onclick="undoLastReconcile()">Undo Last</button>
+                            <button class="btn btn-primary" onclick="finishReconciliation()">Finish
+                                Reconciliation</button>
+                        </div>
+                    </div>
+
+                    <!-- Account Selection -->
+                    <div class="reconcile-setup card">
+                        <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                style="vertical-align: middle; margin-right: 8px;">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>Start Reconciliation</h3>
+                        <div class="reconcile-form">
+                            <div class="form-group">
+                                <label>Select Account</label>
+                                <select id="reconcile-account" onchange="loadReconcileAccount()">
+                                    <option value="">-- Select Account --</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Statement Date</label>
+                                <input type="date" id="reconcile-statement-date" onchange="updateReconcileFilters()">
+                            </div>
+                            <div class="form-group">
+                                <label>Statement Ending Balance</label>
+                                <input type="number" id="reconcile-ending-balance" step="0.01"
+                                    placeholder="Enter balance from bank statement">
+                            </div>
+                            <button class="btn btn-primary" onclick="startReconciliation()">Begin
+                                Reconciliation</button>
+                        </div>
+                    </div>
+
+                    <!-- Reconciliation Summary -->
+                    <div class="reconcile-summary card" id="reconcile-summary" style="display: none;">
+                        <div class="reconcile-summary-grid">
+                            <div class="reconcile-summary-item">
+                                <span class="label">Statement Balance</span>
+                                <span class="value" id="stmt-balance">$0.00</span>
+                            </div>
+                            <div class="reconcile-summary-item">
+                                <span class="label">Cleared Balance</span>
+                                <span class="value" id="cleared-balance">$0.00</span>
+                            </div>
+                            <div class="reconcile-summary-item highlight">
+                                <span class="label">Difference</span>
+                                <span class="value" id="reconcile-difference">$0.00</span>
+                            </div>
+                        </div>
+                        <div class="reconcile-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="reconcile-progress-fill" style="width: 0%"></div>
+                            </div>
+                            <span class="progress-text" id="reconcile-progress-text">0 of 0 items cleared</span>
+                        </div>
+                    </div>
+
+                    <!-- Transactions to Reconcile -->
+                    <div class="reconcile-transactions card" id="reconcile-transactions" style="display: none;">
+                        <div class="reconcile-tabs">
+                            <button class="reconcile-tab active" data-tab="deposits"
+                                onclick="switchReconcileTab('deposits')">
+                                Deposits & Credits <span class="badge" id="deposits-count">0</span>
+                            </button>
+                            <button class="reconcile-tab" data-tab="payments" onclick="switchReconcileTab('payments')">
+                                Payments & Debits <span class="badge" id="payments-count">0</span>
+                            </button>
+                        </div>
+
+                        <div class="reconcile-toolbar">
+                            <div class="reconcile-search">
+                                <input type="text" id="reconcile-search" placeholder="Search transactions..."
+                                    oninput="filterReconcileTransactions()">
+                            </div>
+                            <div class="reconcile-bulk-actions">
+                                <button class="btn btn-sm" onclick="selectAllReconcile()">Select All</button>
+                                <button class="btn btn-sm" onclick="clearAllReconcile()">Clear All</button>
+                            </div>
+                        </div>
+
+                        <div class="reconcile-list-container">
+                            <!-- Deposits Tab -->
+                            <div class="reconcile-list active" id="reconcile-deposits">
+                                <div class="reconcile-list-header">
+                                    <span class="col-check"></span>
+                                    <span class="col-date">Date</span>
+                                    <span class="col-desc">Description</span>
+                                    <span class="col-amount">Amount</span>
+                                </div>
+                                <div class="reconcile-list-body" id="deposits-list">
+                                    <div class="empty-state">No deposits to reconcile</div>
+                                </div>
+                                <div class="reconcile-list-footer">
+                                    <span>Total Deposits:</span>
+                                    <span id="deposits-total">$0.00</span>
+                                </div>
+                            </div>
+
+                            <!-- Payments Tab -->
+                            <div class="reconcile-list" id="reconcile-payments">
+                                <div class="reconcile-list-header">
+                                    <span class="col-check"></span>
+                                    <span class="col-date">Date</span>
+                                    <span class="col-desc">Description</span>
+                                    <span class="col-amount">Amount</span>
+                                </div>
+                                <div class="reconcile-list-body" id="payments-list">
+                                    <div class="empty-state">No payments to reconcile</div>
+                                </div>
+                                <div class="reconcile-list-footer">
+                                    <span>Total Payments:</span>
+                                    <span id="payments-total">$0.00</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reconciliation History -->
+                    <div class="reconcile-history card">
+                        <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                style="vertical-align: middle; margin-right: 8px;">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>Reconciliation History</h3>
+                        <div class="reconcile-history-list" id="reconcile-history-list">
+                            <div class="empty-state">No reconciliations completed yet</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Receipts & Reimbursements Page -->
+                <div class="page" id="page-receipts">
+                    <div class="page-header">
+                        <h1>Receipts & Reimbursements</h1>
+                        <div class="header-actions">
+                            <!-- View Toggle -->
+                            <div class="view-toggle">
+                                <button type="button" class="view-btn active" id="view-btn-list" onclick="switchReceiptsView('list')">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="8" y1="6" x2="21" y2="6"/>
+                                        <line x1="8" y1="12" x2="21" y2="12"/>
+                                        <line x1="8" y1="18" x2="21" y2="18"/>
+                                        <line x1="3" y1="6" x2="3.01" y2="6"/>
+                                        <line x1="3" y1="12" x2="3.01" y2="12"/>
+                                        <line x1="3" y1="18" x2="3.01" y2="18"/>
+                                    </svg>
+                                    List
+                                </button>
+                                <button type="button" class="view-btn" id="view-btn-kanban" onclick="switchReceiptsView('kanban')">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="5" height="18" rx="1"/>
+                                        <rect x="10" y="3" width="5" height="12" rx="1"/>
+                                        <rect x="17" y="3" width="5" height="15" rx="1"/>
+                                    </svg>
+                                    Kanban
+                                </button>
+                            </div>
+                            <button class="btn btn-primary" onclick="openUploadReceiptModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="17 8 12 3 7 8" />
+                                    <line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                                Upload Receipt
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- List View -->
+                    <div class="receipts-view" id="receipts-list-view">
+                        <!-- Summary Cards -->
+                        <div class="receipts-summary-grid">
+                            <div class="summary-card pending clickable" onclick="switchReceiptsTab('pending')">
+                                <div class="summary-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <polyline points="12 6 12 12 16 14"/>
+                                    </svg>
+                                </div>
+                                <div class="summary-content">
+                                    <span class="summary-label">Pending</span>
+                                    <span class="summary-value" id="reimb-pending-total">$0.00</span>
+                                    <span class="summary-count" id="reimb-pending-count">0 items</span>
+                                </div>
+                            </div>
+                            <div class="summary-card cash clickable" onclick="switchReceiptsTab('cash')">
+                                <div class="summary-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </div>
+                                <div class="summary-content">
+                                    <span class="summary-label">Cash Pending</span>
+                                    <span class="summary-value" id="reimb-cash-total">$0.00</span>
+                                    <span class="summary-count" id="reimb-cash-count">0 items</span>
+                                </div>
+                            </div>
+                            <div class="summary-card submitted clickable" onclick="switchReceiptsTab('submitted')">
+                                <div class="summary-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 2L11 13"/>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                    </svg>
+                                </div>
+                                <div class="summary-content">
+                                    <span class="summary-label">Submitted</span>
+                                    <span class="summary-value" id="reimb-submitted-total">$0.00</span>
+                                    <span class="summary-count" id="reimb-submitted-count">0 items</span>
+                                </div>
+                            </div>
+                            <div class="summary-card reimbursed clickable" onclick="switchReceiptsTab('reimbursements')">
+                                <div class="summary-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="1" x2="12" y2="23"/>
+                                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                    </svg>
+                                </div>
+                                <div class="summary-content">
+                                    <span class="summary-label">Reimbursed</span>
+                                    <span class="summary-value" id="reimb-reimbursed-total">$0.00</span>
+                                    <span class="summary-count" id="reimb-reimbursed-count">0 items</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tabs -->
+                        <div class="receipts-tabs">
+                            <button class="tab-btn active" onclick="switchReceiptsTab('all')">All Receipts <span class="tab-count" id="tab-count-all">0</span></button>
+                            <button class="tab-btn" onclick="switchReceiptsTab('pending')">Pending <span class="tab-count" id="tab-count-pending">0</span></button>
+                            <button class="tab-btn" onclick="switchReceiptsTab('cash')">Cash Pending <span class="tab-count" id="tab-count-cash">0</span></button>
+                            <button class="tab-btn" onclick="switchReceiptsTab('submitted')">Submitted <span class="tab-count" id="tab-count-submitted">0</span></button>
+                            <button class="tab-btn" onclick="switchReceiptsTab('reimbursements')">Reimbursements <span class="tab-count" id="tab-count-reimbursements">0</span></button>
+                        </div>
+
+                        <!-- Bulk Action Bar -->
+                        <div class="receipt-bulk-actions" id="receipt-bulk-actions" style="display: none;">
+                            <span class="selected-count">0 selected</span>
+                            <button class="btn btn-danger btn-sm" onclick="bulkDeleteReceipts()">Delete</button>
+                            <button class="btn btn-secondary btn-sm" onclick="openMoveFolderModal()">Move to Folder</button>
+                            <button class="btn btn-outline btn-sm" onclick="selectAllReceipts()">Select All</button>
+                        </div>
+
+                        <!-- Receipts Grid -->
+                        <div class="receipts-grid" id="receipts-grid">
+                            <div class="empty-state">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <polyline points="14 2 14 8 20 8"/>
+                                    <line x1="16" y1="13" x2="8" y2="13"/>
+                                    <line x1="16" y1="17" x2="8" y2="17"/>
+                                </svg>
+                                <p>No receipts yet</p>
+                                <button class="btn btn-primary" onclick="openUploadReceiptModal()">Upload your first receipt</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kanban View -->
+                    <div class="receipts-view" id="receipts-kanban-view" style="display: none;">
+                    <div class="kanban-board" id="kanban-board">
+                        <!-- Pending Column -->
+                        <div class="kanban-column" data-status="pending">
+                            <div class="kanban-column-header pending">
+                                <div class="column-title">
+                                    <span class="column-icon">⏳</span>
+                                    <span>Pending</span>
+                                    <span class="column-count" id="kanban-count-pending">0</span>
+                                </div>
+                                <div class="column-total" id="kanban-total-pending">$0.00</div>
+                            </div>
+                            <div class="kanban-cards" id="kanban-cards-pending"
+                                ondragover="handleDragOver(event)"
+                                ondrop="handleDrop(event, 'pending')"
+                                ondragleave="handleDragLeave(event)">
+                            </div>
+                        </div>
+
+                        <!-- Cash Pending Column -->
+                        <div class="kanban-column" data-status="cash">
+                            <div class="kanban-column-header cash">
+                                <div class="column-title">
+                                    <span class="column-icon">💵</span>
+                                    <span>Cash Pending</span>
+                                    <span class="column-count" id="kanban-count-cash">0</span>
+                                </div>
+                                <div class="column-total" id="kanban-total-cash">$0.00</div>
+                            </div>
+                            <div class="kanban-cards" id="kanban-cards-cash"
+                                ondragover="handleDragOver(event)"
+                                ondrop="handleDrop(event, 'cash')"
+                                ondragleave="handleDragLeave(event)">
+                            </div>
+                        </div>
+
+                        <!-- Submitted Column -->
+                        <div class="kanban-column" data-status="submitted">
+                            <div class="kanban-column-header submitted">
+                                <div class="column-title">
+                                    <span class="column-icon">📤</span>
+                                    <span>Submitted</span>
+                                    <span class="column-count" id="kanban-count-submitted">0</span>
+                                </div>
+                                <div class="column-total" id="kanban-total-submitted">$0.00</div>
+                            </div>
+                            <div class="kanban-cards" id="kanban-cards-submitted"
+                                ondragover="handleDragOver(event)"
+                                ondrop="handleDrop(event, 'submitted')"
+                                ondragleave="handleDragLeave(event)">
+                            </div>
+                        </div>
+
+                        <!-- Reimbursed Column -->
+                        <div class="kanban-column" data-status="reimbursed">
+                            <div class="kanban-column-header reimbursed">
+                                <div class="column-title">
+                                    <span class="column-icon">✅</span>
+                                    <span>Reimbursed</span>
+                                    <span class="column-count" id="kanban-count-reimbursed">0</span>
+                                </div>
+                                <div class="column-total" id="kanban-total-reimbursed">$0.00</div>
+                            </div>
+                            <div class="kanban-cards" id="kanban-cards-reimbursed"
+                                ondragover="handleDragOver(event)"
+                                ondrop="handleDrop(event, 'reimbursed')"
+                                ondragleave="handleDragLeave(event)">
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Upload Receipt Modal -->
+                <div class="modal-overlay" id="receipt-upload-modal">
+                    <div class="modal receipt-modal">
+                        <div class="modal-header">
+                            <h3>Upload Receipt</h3>
+                            <button class="modal-close" onclick="closeReceiptUploadModal()">&times;</button>
+                        </div>
+                        <form id="receipt-upload-form" onsubmit="handleReceiptUpload(event)">
+                            <div class="modal-body">
+                                <div class="receipt-dropzone" id="receipt-dropzone">
+                                    <input type="file" id="receipt-file" accept="image/*,.pdf"
+                                        onchange="handleFileSelect(event)" hidden>
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af"
+                                        stroke-width="1.5">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                        <polyline points="17 8 12 3 7 8" />
+                                        <line x1="12" y1="3" x2="12" y2="15" />
+                                    </svg>
+                                    <p>Drag & drop or <span
+                                            onclick="document.getElementById('receipt-file').click()">browse</span></p>
+                                    <small>JPG, PNG, GIF, PDF (max 10MB)</small>
+                                </div>
+                                <div class="receipt-preview" id="receipt-preview" style="display: none;">
+                                    <img id="receipt-preview-img" src="" alt="Preview">
+                                    <button type="button" class="btn btn-sm btn-secondary"
+                                        onclick="clearReceiptPreview()">Remove</button>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Vendor / Store</label>
+                                        <input type="text" id="receipt-vendor" placeholder="e.g., Amazon, Costco">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Amount</label>
+                                        <input type="number" id="receipt-amount" step="0.01" placeholder="0.00">
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Receipt Date</label>
+                                        <input type="date" id="receipt-date">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Link to Transaction</label>
+                                        <select id="receipt-transaction">
+                                            <option value="">-- Select Transaction (Optional) --</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Description / Notes</label>
+                                    <textarea id="receipt-description" rows="2"
+                                        placeholder="What was this purchase for?"></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="receipt-cash" onchange="toggleCashReimbursement()">
+                                        Cash (no linked transaction)
+                                    </label>
+                                </div>
+
+                                <div class="form-group" id="cash-reimbursement-group" style="display: none;">
+                                    <label>Reimbursement Status</label>
+                                    <select id="receipt-reimbursement-status">
+                                        <option value="none">None</option>
+                                        <option value="pending">Pending</option>
+                                        <option value="submitted">Submitted</option>
+                                        <option value="reimbursed">Reimbursed</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary"
+                                    onclick="closeReceiptUploadModal()">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Upload Receipt</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Receipt View Modal -->
+                <div class="modal-overlay" id="receipt-view-modal">
+                    <div class="modal receipt-view-modal">
+                        <div class="modal-header">
+                            <h3>Receipt Details</h3>
+                            <button class="modal-close" onclick="closeReceiptViewModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="receipt-view-container">
+                                <div class="receipt-image-container">
+                                    <img id="receipt-view-img" src="" alt="Receipt">
+                                </div>
+                                <div class="receipt-details">
+                                    <div class="receipt-detail-row">
+                                        <span class="label">Vendor:</span>
+                                        <span class="value" id="receipt-view-vendor">-</span>
+                                    </div>
+                                    <div class="receipt-detail-row">
+                                        <span class="label">Amount:</span>
+                                        <span class="value" id="receipt-view-amount">-</span>
+                                    </div>
+                                    <div class="receipt-detail-row">
+                                        <span class="label">Date:</span>
+                                        <span class="value" id="receipt-view-date">-</span>
+                                    </div>
+                                    <div class="receipt-detail-row">
+                                        <span class="label">Description:</span>
+                                        <span class="value" id="receipt-view-description">-</span>
+                                    </div>
+                                    <div class="receipt-detail-row">
+                                        <span class="label">Linked Transaction:</span>
+                                        <span class="value" id="receipt-view-transaction">Not linked</span>
+                                    </div>
+                                    <div class="receipt-detail-row" id="receipt-link-row">
+                                        <select class="form-control" id="receipt-link-select" style="flex: 1;"
+                                            onchange="if(this.value) linkReceiptToTransaction()">
+                                            <option value="">-- Select Transaction --</option>
+                                        </select>
+                                    </div>
+                                    <div class="receipt-actions">
+                                        <button class="btn btn-outline" onclick="editReceipt()">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                            </svg>
+                                            Edit
+                                        </button>
+                                        <button class="btn btn-secondary" onclick="downloadReceipt()">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                <polyline points="7 10 12 15 17 10" />
+                                                <line x1="12" y1="15" x2="12" y2="3" />
+                                            </svg>
+                                            Download
+                                        </button>
+                                        <button class="btn btn-danger" onclick="deleteReceipt()">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2">
+                                                <polyline points="3 6 5 6 21 6" />
+                                                <path
+                                                    d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                            </svg>
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CPA Portal Page -->
+                <div class="page" id="page-cpa-portal">
+                    <div class="cpa-header">
+                        <h2>CPA Portal</h2>
+                        <p class="cpa-subtitle">Prepare and share financial documents with your accountant</p>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="cpa-quick-actions">
+                        <button class="cpa-action-btn" onclick="generateReportPackage()">
+                            <span class="action-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path
+                                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                                    </path>
+                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                </svg></span>
+                            <span class="action-text">Generate Report Package</span>
+                        </button>
+                        <button class="cpa-action-btn" onclick="openEmailModal()">
+                            <span class="action-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path
+                                        d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z">
+                                    </path>
+                                    <polyline points="22,6 12,13 2,6"></polyline>
+                                </svg></span>
+                            <span class="action-text">Email to Accountant</span>
+                        </button>
+                        <button class="cpa-action-btn" onclick="downloadAllReports()">
+                            <span class="action-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg></span>
+                            <span class="action-text">Download All Reports</span>
+                        </button>
+                    </div>
+
+                    <!-- Document Selection -->
+                    <div class="cpa-documents card">
+                        <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                style="vertical-align: middle; margin-right: 8px;">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>Available Documents</h3>
+                        <div class="cpa-period-selector">
+                            <label>Report Period:</label>
+                            <select id="cpa-period" onchange="updateCpaDocuments()">
+                                <option value="this_month">This Month</option>
+                                <option value="last_month">Last Month</option>
+                                <option value="this_quarter">This Quarter</option>
+                                <option value="last_quarter">Last Quarter</option>
+                                <option value="ytd" selected>Year to Date</option>
+                                <option value="last_year">Last Year</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                            <div class="cpa-custom-dates" id="cpa-custom-dates" style="display: none;">
+                                <input type="date" id="cpa-start-date">
+                                <span>to</span>
+                                <input type="date" id="cpa-end-date">
+                                <button class="btn btn-sm btn-primary" onclick="applyCpaCustomDates()">Apply</button>
+                            </div>
+                        </div>
+
+                        <div class="cpa-document-list" id="cpa-document-list">
+                            <div class="cpa-document-item">
+                                <input type="checkbox" id="doc-pnl" checked>
+                                <label for="doc-pnl">
+                                    <span class="doc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                            stroke="#6366f1" stroke-width="2">
+                                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                                        </svg></span>
+                                    <div class="doc-info">
+                                        <span class="doc-name">Profit & Loss Statement</span>
+                                        <span class="doc-desc">Income and expenses summary</span>
+                                    </div>
+                                </label>
+                                <button class="btn btn-sm" onclick="previewDocument('pnl')">Preview</button>
+                                <button class="btn btn-sm" onclick="downloadDocument('pnl')">Download</button>
+                            </div>
+                            <div class="cpa-document-item">
+                                <input type="checkbox" id="doc-transactions" checked>
+                                <label for="doc-transactions">
+                                    <span class="doc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                            stroke="#8b5cf6" stroke-width="2">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                            <polyline points="14 2 14 8 20 8"></polyline>
+                                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                                        </svg></span>
+                                    <div class="doc-info">
+                                        <span class="doc-name">Transaction Report</span>
+                                        <span class="doc-desc">All transactions with categories</span>
+                                    </div>
+                                </label>
+                                <button class="btn btn-sm" onclick="previewDocument('transactions')">Preview</button>
+                                <button class="btn btn-sm" onclick="downloadDocument('transactions')">Download</button>
+                            </div>
+                            <div class="cpa-document-item">
+                                <input type="checkbox" id="doc-categories" checked>
+                                <label for="doc-categories">
+                                    <span class="doc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                            stroke="#f59e0b" stroke-width="2">
+                                            <path
+                                                d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                                            </path>
+                                        </svg></span>
+                                    <div class="doc-info">
+                                        <span class="doc-name">Category Summary</span>
+                                        <span class="doc-desc">Expenses grouped by category</span>
+                                    </div>
+                                </label>
+                                <button class="btn btn-sm" onclick="previewDocument('categories')">Preview</button>
+                                <button class="btn btn-sm" onclick="downloadDocument('categories')">Download</button>
+                            </div>
+                            <div class="cpa-document-item">
+                                <input type="checkbox" id="doc-accounts">
+                                <label for="doc-accounts">
+                                    <span class="doc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                            stroke="#10b981" stroke-width="2">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <line x1="3" y1="9" x2="21" y2="9"></line>
+                                            <line x1="9" y1="21" x2="9" y2="9"></line>
+                                        </svg></span>
+                                    <div class="doc-info">
+                                        <span class="doc-name">Account Summary</span>
+                                        <span class="doc-desc">Balance summary for all accounts</span>
+                                    </div>
+                                </label>
+                                <button class="btn btn-sm" onclick="previewDocument('accounts')">Preview</button>
+                                <button class="btn btn-sm" onclick="downloadDocument('accounts')">Download</button>
+                            </div>
+                            <div class="cpa-document-item">
+                                <input type="checkbox" id="doc-vendors">
+                                <label for="doc-vendors">
+                                    <span class="doc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                            stroke="#ec4899" stroke-width="2">
+                                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                                        </svg></span>
+                                    <div class="doc-info">
+                                        <span class="doc-name">Vendor Report</span>
+                                        <span class="doc-desc">Spending by vendor/payee</span>
+                                    </div>
+                                </label>
+                                <button class="btn btn-sm" onclick="previewDocument('vendors')">Preview</button>
+                                <button class="btn btn-sm" onclick="downloadDocument('vendors')">Download</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Accountant Settings -->
+                    <div class="cpa-settings card">
+                        <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                style="vertical-align: middle; margin-right: 8px;">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>Accountant Information</h3>
+                        <div class="cpa-accountant-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Accountant Name</label>
+                                    <input type="text" id="cpa-name" placeholder="John Smith, CPA">
+                                </div>
+                                <div class="form-group">
+                                    <label>Email Address</label>
+                                    <input type="email" id="cpa-email" placeholder="accountant@email.com">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Company/Firm</label>
+                                    <input type="text" id="cpa-firm" placeholder="Smith & Associates">
+                                </div>
+                                <div class="form-group">
+                                    <label>Phone</label>
+                                    <input type="tel" id="cpa-phone" placeholder="(555) 123-4567">
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary" onclick="saveCpaSettings()">Save Settings</button>
+                        </div>
+                    </div>
+
+                    <!-- Shared History -->
+                    <div class="cpa-history card">
+                        <h3>Sharing History</h3>
+                        <div class="cpa-history-list" id="cpa-history-list">
+                            <div class="empty-state">No documents shared yet</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Email Modal -->
+                <div class="modal-overlay" id="email-modal" style="display: none;">
+                    <div class="modal cpa-email-modal">
+                        <div class="modal-header">
+                            <h3>Email Documents to Accountant</h3>
+                            <button class="modal-close" onclick="closeEmailModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>To:</label>
+                                <input type="email" id="email-to" placeholder="accountant@email.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Subject:</label>
+                                <input type="text" id="email-subject" value="Financial Documents - ">
+                            </div>
+                            <div class="form-group">
+                                <label>Message:</label>
+                                <textarea id="email-message" rows="4"
+                                    placeholder="Please find attached the financial documents for your review..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Attachments:</label>
+                                <div class="email-attachments" id="email-attachments">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" onclick="closeEmailModal()">Cancel</button>
+                            <button class="btn btn-primary" onclick="sendEmail()">Send Email</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Page -->
+                <div class="page" id="page-admin">
+                    <div class="admin-header">
+                        <h2>Admin Panel</h2>
+                        <button class="btn btn-primary" onclick="openUserModal()">+ Add User</button>
+                    </div>
+
+                    <div class="admin-stats" id="admin-stats">
+                        <div class="admin-stat-card">
+                            <span class="stat-icon">👥</span>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-total-users">0</span>
+                                <span class="stat-label">Total Users</span>
+                            </div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <span class="stat-icon">✅</span>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-active-users">0</span>
+                                <span class="stat-label">Active Users</span>
+                            </div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <span class="stat-icon">🔐</span>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-admin-users">0</span>
+                                <span class="stat-label">Admin Users</span>
+                            </div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <span class="stat-icon">📊</span>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-total-transactions">0</span>
+                                <span class="stat-label">Total Transactions</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-users-section">
+                        <h3>User Management</h3>
+                        <div class="admin-users-list" id="admin-users-list">
+                            <div class="loading">Loading users...</div>
+                        </div>
+                    </div>
+
+                    <!-- User Modal -->
+                    <div class="modal-overlay" id="user-modal">
+                        <div class="modal user-modal-content">
+                            <div class="modal-header">
+                                <h3 id="user-modal-title">Add User</h3>
+                                <button class="modal-close" onclick="closeUserModal()">&times;</button>
+                            </div>
+                            <form id="user-form" onsubmit="saveUser(event)">
+                                <div class="modal-body">
+                                    <input type="hidden" id="edit-user-id">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Username *</label>
+                                            <input type="text" id="edit-username" required minlength="3">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Email *</label>
+                                            <input type="email" id="edit-email" required>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Display Name</label>
+                                        <input type="text" id="edit-display-name">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Password <span id="password-hint">(required for new user)</span></label>
+                                        <input type="password" id="edit-password" minlength="6">
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="edit-is-active" checked>
+                                                <span>Active Account</span>
+                                            </label>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="edit-is-admin">
+                                                <span>Admin Access</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary"
+                                        onclick="closeUserModal()">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save User</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Reset Password Modal -->
+                    <div class="modal-overlay" id="reset-password-modal">
+                        <div class="modal">
+                            <div class="modal-header">
+                                <h3>Reset Password</h3>
+                                <button class="modal-close" onclick="closeResetPasswordModal()">&times;</button>
+                            </div>
+                            <form id="reset-password-form" onsubmit="submitResetPassword(event)">
+                                <div class="modal-body">
+                                    <input type="hidden" id="reset-user-id">
+                                    <p>Reset password for: <strong id="reset-username"></strong></p>
+                                    <div class="form-group">
+                                        <label>New Password *</label>
+                                        <input type="password" id="new-password" required minlength="6">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Confirm Password *</label>
+                                        <input type="password" id="confirm-password" required minlength="6">
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary"
+                                        onclick="closeResetPasswordModal()">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Reset Password</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Import Page -->
+                <div class="page" id="page-import">
+                    <div class="page-header">
+                        <h2>Import Transactions</h2>
+                    </div>
+
+                    <div class="card import-card">
+                        <form id="import-form" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label for="import-account">Select Account</label>
+                                <select id="import-account" class="form-select" required>
+                                    <option value="">Choose account...</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="import-institution">Bank/Institution</label>
+                                <select id="import-institution" class="form-select" required>
+                                    <option value="">Choose bank format...</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="import-file">CSV File</label>
+                                <div class="file-upload">
+                                    <input type="file" id="import-file" accept=".csv" required>
+                                    <div class="file-upload-text">
+                                        <span>Drop CSV file here or click to browse</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-block">Import Transactions</button>
+                        </form>
+
+                        <div class="import-result" id="import-result" style="display: none;">
+                            <!-- Import results -->
+                        </div>
+                    </div>
+
+                    <!-- Import History -->
+                    <div class="card">
+                        <h3>Import History</h3>
+                        <table class="import-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>File</th>
+                                    <th>Account</th>
+                                    <th>Imported</th>
+                                    <th>Duplicates</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="import-history">
+                                <!-- Import history rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Rules Page -->
+                <div class="page" id="page-rules">
+                    <!-- Page Header -->
+                    <div class="rules-page-header">
+                        <h2>Categorization Rules</h2>
+                        <button class="btn btn-primary" id="add-rule-btn">+ Add Rule</button>
+                    </div>
+
+                    <!-- Stats Cards -->
+                    <div class="rules-stats">
+                        <div class="rules-stat-card">
+                            <div class="rules-stat-value" id="rules-total">0</div>
+                            <div class="rules-stat-label">Total Rules</div>
+                        </div>
+                        <div class="rules-stat-card">
+                            <div class="rules-stat-value rules-stat-active" id="rules-active">0</div>
+                            <div class="rules-stat-label">Active (Hits > 0)</div>
+                        </div>
+                        <div class="rules-stat-card">
+                            <div class="rules-stat-value rules-stat-unused" id="rules-unused">0</div>
+                            <div class="rules-stat-label">Unused</div>
+                        </div>
+                        <div class="rules-stat-card">
+                            <div class="rules-stat-value rules-stat-hits" id="rules-total-hits">0</div>
+                            <div class="rules-stat-label">Total Hits</div>
+                        </div>
+                    </div>
+
+                    <!-- Toolbar -->
+                    <div class="rules-toolbar">
+                        <div class="rules-toolbar-left">
+                            <div class="rules-search-box">
+                                <span class="rules-search-icon">&#128269;</span>
+                                <input type="text" id="rules-search" placeholder="Search rules..."
+                                    class="rules-search-input">
+                            </div>
+                            <select id="rules-category-filter" class="rules-filter-select">
+                                <option value="">All Categories</option>
+                            </select>
+                            <select id="rules-type-filter" class="rules-filter-select">
+                                <option value="">All Types</option>
+                                <option value="income">Income</option>
+                                <option value="expense">Expense</option>
+                                <option value="transfer">Transfer</option>
+                            </select>
+                            <select id="rules-status-filter" class="rules-filter-select">
+                                <option value="">All Status</option>
+                                <option value="active">Active (Hits > 0)</option>
+                                <option value="unused">Unused (Hits = 0)</option>
+                            </select>
+                        </div>
+                        <div class="rules-toolbar-right">
+                            <button class="rules-toolbar-btn" id="rules-expand-all" title="Expand All">
+                                <span>&#9660;</span> Expand All
+                            </button>
+                            <button class="rules-toolbar-btn" id="rules-collapse-all" title="Collapse All">
+                                <span>&#9650;</span> Collapse All
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Rules Content (Grouped by Category) -->
+                    <div class="rules-content" id="rules-content">
+                        <!-- Dynamic content here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h3 id="modal-title">Modal Title</h3>
+                <button class="close-btn" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Modal content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Detail Modal -->
+    <div class="modal-overlay" id="category-detail-overlay">
+        <div class="modal category-detail-modal" id="category-detail-modal">
+            <div class="modal-header">
+                <div class="category-detail-header">
+                    <span class="category-detail-icon" id="cd-icon"></span>
+                    <h3 id="cd-name">Category Name</h3>
+                    <span class="category-detail-type" id="cd-type">expense</span>
+                </div>
+                <button class="close-btn" onclick="closeCategoryDetailModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Stats Row -->
+                <div class="cd-stats-row">
+                    <div class="cd-stat">
+                        <div class="cd-stat-label">This Month</div>
+                        <div class="cd-stat-value" id="cd-this-month">$0.00</div>
+                    </div>
+                    <div class="cd-stat">
+                        <div class="cd-stat-label">Last Month</div>
+                        <div class="cd-stat-value" id="cd-last-month">$0.00</div>
+                    </div>
+                    <div class="cd-stat">
+                        <div class="cd-stat-label">All Time</div>
+                        <div class="cd-stat-value" id="cd-all-time">$0.00</div>
+                    </div>
+                    <div class="cd-stat">
+                        <div class="cd-stat-label">Transactions</div>
+                        <div class="cd-stat-value" id="cd-txn-count">0</div>
+                    </div>
+                </div>
+
+                <!-- Info Section -->
+                <div class="cd-info-section">
+                    <div class="cd-info-row">
+                        <span class="cd-info-label">Parent Category</span>
+                        <span class="cd-info-value" id="cd-parent">None</span>
+                    </div>
+                    <div class="cd-info-row">
+                        <span class="cd-info-label">System Category</span>
+                        <span class="cd-info-value" id="cd-system">No</span>
+                    </div>
+                    <div class="cd-info-row">
+                        <span class="cd-info-label">Color</span>
+                        <span class="cd-info-value">
+                            <span class="cd-color-preview" id="cd-color"></span>
+                            <span id="cd-color-text">#000000</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Recent Transactions -->
+                <div class="cd-transactions-section">
+                    <h4>Recent Transactions</h4>
+                    <div class="cd-transactions-list" id="cd-transactions">
+                        <!-- Populated by JS -->
+                    </div>
+                    <button class="cd-view-all-btn" id="cd-view-all-btn" onclick="viewAllCategoryTransactions()">
+                        View All Transactions
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer cd-modal-footer">
+                <button class="btn btn-outline" id="cd-edit-btn" onclick="editCategoryFromDetail()">Edit</button>
+                <button class="btn btn-danger" id="cd-delete-btn" onclick="deleteCategoryFromDetail()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Categorize Modal -->
+    <div class="modal-overlay" id="bulk-categorize-overlay">
+        <div class="modal bulk-categorize-modal" id="bulk-categorize-modal">
+            <div class="modal-header">
+                <h3>Move Transactions to Category</h3>
+                <button class="close-btn" onclick="closeBulkCategorizeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="bulk-cat-info">
+                    <div class="bulk-cat-pattern">
+                        <span class="bulk-cat-label">Selected:</span>
+                        <span class="bulk-cat-value" id="bulk-cat-pattern">0 transactions</span>
+                    </div>
+                    <div class="bulk-cat-count">
+                        <span class="bulk-cat-label">Items:</span>
+                        <span class="bulk-cat-value" id="bulk-cat-count">-</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="bulk-cat-select">Move to Category</label>
+                    <select id="bulk-cat-select" class="form-select">
+                        <!-- Categories populated by JS -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="bulk-cat-create-rule" checked>
+                        <span>Create rule for future imports</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeBulkCategorizeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="executeBulkCategorize()">Move Transactions</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Scripts -->
+    <script type="module" src="js/utils.js"></script>
+    <script type="module" src="js/state.js"></script>
+    <script type="module" src="js/api.js"></script>
+    <script type="module" src="js/auth.js"></script>
+    <!-- Main App -->
+    <script src="app.js" defer></script>
+    <!-- Feature Modules -->
+    <script src="js/modules/categories.js" defer></script>
+    <script src="js/modules/reports.js" defer></script>
+    <script src="js/modules/receipts.js" defer></script>
+    <script src="js/modules/budgets.js" defer></script>
+    <script src="js/modules/recurring.js" defer></script>
+    <script src="js/modules/checks.js" defer></script>
+    <script src="js/modules/reconcile.js" defer></script>
+    <script src="js/modules/cpa.js" defer></script>
+    <script src="js/modules/admin.js" defer></script>
+    <script src="js/modules/dashboard.js" defer></script>
+    <script src="js/modules/import.js" defer></script>
+    <script src="js/modules/rules.js" defer></script>
+    <script src="js/modules/custom-reports.js" defer></script>
+    <script src="js/modules/transactions.js" defer></script>
+    <script src="js/modules/accounts.js" defer></script>
+</body>
+
+</html>

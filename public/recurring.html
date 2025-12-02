@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recurring Transactions - Expense Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .recurring-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .recurring-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .recurring-header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .summary-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .summary-card .label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .summary-card .value {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .recurring-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .recurring-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .recurring-card.inactive {
+            opacity: 0.5;
+        }
+
+        .recurring-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            background: var(--bg-secondary);
+        }
+
+        .recurring-info h3 {
+            margin: 0 0 4px 0;
+            font-size: 16px;
+        }
+
+        .recurring-meta {
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .recurring-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+        }
+
+        .recurring-amount {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .recurring-amount.debit { color: var(--danger-color); }
+        .recurring-amount.credit { color: var(--success-color); }
+
+        .recurring-next {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .recurring-next.soon {
+            color: var(--warning-color);
+            font-weight: 500;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+        }
+
+        .action-btn:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            background: var(--bg-primary);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin-bottom: 16px;
+        }
+
+        .back-link:hover {
+            color: var(--text-primary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .frequency-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            background: var(--accent-color);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="recurring-container">
+        <a href="index.html" class="back-link">← Back to Transactions</a>
+
+        <div class="recurring-header">
+            <h1>Recurring Transactions</h1>
+            <button class="btn btn-primary" onclick="openModal()">+ Add Recurring</button>
+        </div>
+
+        <div class="summary-cards">
+            <div class="summary-card">
+                <div class="label">Active Recurring</div>
+                <div class="value" id="total-active">0</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">Due This Month</div>
+                <div class="value" id="due-this-month">0</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">Monthly Expenses</div>
+                <div class="value" id="monthly-total">$0.00</div>
+            </div>
+        </div>
+
+        <div class="recurring-list" id="recurring-list">
+            <div class="empty-state">
+                <div class="empty-state-icon">🔄</div>
+                <p>No recurring transactions yet. Add subscriptions, rent, bills, etc.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="recurring-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modal-title">Add Recurring Transaction</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="recurring-form">
+                <input type="hidden" id="recurring-id">
+
+                <div class="form-group">
+                    <label for="recurring-description">Description</label>
+                    <input type="text" id="recurring-description" required placeholder="e.g., Netflix, Rent, Phone Bill">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="recurring-amount">Amount</label>
+                        <input type="number" id="recurring-amount" min="0" step="0.01" required placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="recurring-type">Type</label>
+                        <select id="recurring-type">
+                            <option value="debit">Expense</option>
+                            <option value="credit">Income</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="recurring-account">Account</label>
+                        <select id="recurring-account" required>
+                            <option value="">Select account...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="recurring-category">Category</label>
+                        <select id="recurring-category">
+                            <option value="">Select category...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="recurring-frequency">Frequency</label>
+                        <select id="recurring-frequency">
+                            <option value="monthly">Monthly</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="biweekly">Bi-weekly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="yearly">Yearly</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="recurring-day">Day of Month</label>
+                        <input type="number" id="recurring-day" min="1" max="31" placeholder="1-31">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="recurring-start">Start Date</label>
+                    <input type="date" id="recurring-start" required>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="delete-btn" style="display: none;" onclick="deleteRecurring()">Delete</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/Expenses Tracker/api';
+        const USER_ID = 1;
+
+        let recurringData = null;
+        let accounts = [];
+        let categories = [];
+        let currentEditId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            document.getElementById('recurring-form').addEventListener('submit', saveRecurring);
+            document.getElementById('recurring-start').value = new Date().toISOString().split('T')[0];
+        });
+
+        async function loadData() {
+            await Promise.all([loadRecurring(), loadAccounts(), loadCategories()]);
+        }
+
+        async function loadRecurring() {
+            try {
+                const response = await fetch(`${API_BASE}/recurring/?user_id=${USER_ID}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    recurringData = result.data;
+                    renderRecurring();
+                    updateSummary();
+                }
+            } catch (error) {
+                console.error('Error loading recurring:', error);
+            }
+        }
+
+        async function loadAccounts() {
+            try {
+                const response = await fetch(`${API_BASE}/accounts/?user_id=${USER_ID}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    accounts = result.data.accounts;
+                    const select = document.getElementById('recurring-account');
+                    select.innerHTML = '<option value="">Select account...</option>' +
+                        accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+                }
+            } catch (error) {
+                console.error('Error loading accounts:', error);
+            }
+        }
+
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${API_BASE}/categories/?user_id=${USER_ID}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    categories = result.data.categories;
+                    const select = document.getElementById('recurring-category');
+                    select.innerHTML = '<option value="">Select category...</option>' +
+                        categories.map(c => `<option value="${c.id}">${c.icon || '📁'} ${c.name}</option>`).join('');
+                }
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        function renderRecurring() {
+            const container = document.getElementById('recurring-list');
+            const items = recurringData.recurring;
+
+            if (items.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔄</div>
+                        <p>No recurring transactions yet. Add subscriptions, rent, bills, etc.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = items.map(item => {
+                const daysUntil = item.days_until;
+                let nextText = '';
+                let nextClass = '';
+
+                if (daysUntil === 0) {
+                    nextText = 'Due today';
+                    nextClass = 'soon';
+                } else if (daysUntil === 1) {
+                    nextText = 'Due tomorrow';
+                    nextClass = 'soon';
+                } else if (daysUntil <= 7) {
+                    nextText = `Due in ${daysUntil} days`;
+                    nextClass = 'soon';
+                } else if (item.next_occurrence) {
+                    nextText = `Next: ${formatDate(item.next_occurrence)}`;
+                }
+
+                return `
+                    <div class="recurring-card ${item.is_active ? '' : 'inactive'}">
+                        <div class="recurring-icon" style="background: ${item.category_color || '#6366f1'}20; color: ${item.category_color || '#6366f1'}">
+                            ${item.category_icon || '🔄'}
+                        </div>
+                        <div class="recurring-info">
+                            <h3>${item.description}</h3>
+                            <div class="recurring-meta">
+                                <span class="frequency-badge">${item.frequency}</span>
+                                <span>${item.account_name || 'No account'}</span>
+                                <span>${item.category_name || 'Uncategorized'}</span>
+                            </div>
+                        </div>
+                        <div class="recurring-actions">
+                            <div class="recurring-amount ${item.transaction_type}">
+                                ${item.transaction_type === 'debit' ? '-' : '+'}${formatCurrency(item.amount)}
+                            </div>
+                            <div class="recurring-next ${nextClass}">${nextText}</div>
+                            <div class="action-btns">
+                                <button class="action-btn" onclick="editRecurring(${item.id})">Edit</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateSummary() {
+            const { summary } = recurringData;
+            document.getElementById('total-active').textContent = summary.total_active;
+            document.getElementById('due-this-month').textContent = summary.upcoming_this_month;
+            document.getElementById('monthly-total').textContent = formatCurrency(summary.total_monthly_expenses);
+        }
+
+        function openModal() {
+            currentEditId = null;
+            document.getElementById('modal-title').textContent = 'Add Recurring Transaction';
+            document.getElementById('recurring-form').reset();
+            document.getElementById('recurring-start').value = new Date().toISOString().split('T')[0];
+            document.getElementById('delete-btn').style.display = 'none';
+            document.getElementById('recurring-modal').classList.add('active');
+        }
+
+        function editRecurring(id) {
+            const item = recurringData.recurring.find(r => r.id === id);
+            if (!item) return;
+
+            currentEditId = id;
+            document.getElementById('modal-title').textContent = 'Edit Recurring Transaction';
+            document.getElementById('recurring-id').value = id;
+            document.getElementById('recurring-description').value = item.description;
+            document.getElementById('recurring-amount').value = item.amount;
+            document.getElementById('recurring-type').value = item.transaction_type;
+            document.getElementById('recurring-account').value = item.account_id;
+            document.getElementById('recurring-category').value = item.category_id || '';
+            document.getElementById('recurring-frequency').value = item.frequency;
+            document.getElementById('recurring-day').value = item.day_of_month || '';
+            document.getElementById('recurring-start').value = item.start_date;
+            document.getElementById('delete-btn').style.display = 'block';
+            document.getElementById('recurring-modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('recurring-modal').classList.remove('active');
+        }
+
+        async function saveRecurring(e) {
+            e.preventDefault();
+
+            const data = {
+                user_id: USER_ID,
+                description: document.getElementById('recurring-description').value,
+                amount: parseFloat(document.getElementById('recurring-amount').value),
+                transaction_type: document.getElementById('recurring-type').value,
+                account_id: parseInt(document.getElementById('recurring-account').value),
+                category_id: document.getElementById('recurring-category').value || null,
+                frequency: document.getElementById('recurring-frequency').value,
+                day_of_month: document.getElementById('recurring-day').value || null,
+                start_date: document.getElementById('recurring-start').value
+            };
+
+            if (currentEditId) {
+                data.id = currentEditId;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/recurring/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    closeModal();
+                    loadRecurring();
+                } else {
+                    alert(result.message || 'Error saving');
+                }
+            } catch (error) {
+                console.error('Error saving:', error);
+                alert('Error saving');
+            }
+        }
+
+        async function deleteRecurring() {
+            if (!currentEditId) return;
+            if (!confirm('Delete this recurring transaction?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/recurring/?id=${currentEditId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    closeModal();
+                    loadRecurring();
+                } else {
+                    alert(result.message || 'Error deleting');
+                }
+            } catch (error) {
+                console.error('Error deleting:', error);
+            }
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(amount);
+        }
+
+        function formatDate(dateStr) {
+            return new Date(dateStr).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        document.getElementById('recurring-modal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

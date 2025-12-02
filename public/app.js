@@ -1,0 +1,707 @@
+/**
+ * Expense Tracker - Main Application
+ * Personal Finance Management System
+ */
+
+// API Configuration
+// API_BASE is now loaded from js/api.js
+
+// Application State
+// Application State
+// state is now loaded from js/state.js
+
+// Reimbursement status icon helper
+function getReimbursementIcon(status, amount) {
+    // Only show for expenses (negative amounts)
+    if (amount >= 0) return '';
+
+    const icons = {
+        'none': '',
+        'pending': '<span class="reimb-icon reimb-pending" title="Reimbursement Pending">⏳</span>',
+        'submitted': '<span class="reimb-icon reimb-submitted" title="Submitted for Reimbursement">📤</span>',
+        'approved': '<span class="reimb-icon reimb-approved" title="Reimbursement Approved">✅</span>',
+        'reimbursed': '<span class="reimb-icon reimb-reimbursed" title="Reimbursed">💰</span>',
+        'denied': '<span class="reimb-icon reimb-denied" title="Reimbursement Denied">❌</span>'
+    };
+    return icons[status] || '';
+}
+
+// DOM Elements
+// elements is now loaded from js/state.js
+
+// Initialize Application
+document.addEventListener('DOMContentLoaded', () => {
+    initApp();
+});
+
+async function initApp() {
+    // Setup login form
+    setupLoginForm();
+
+    // Check if user is already logged in
+    const isLoggedIn = await checkAuthSession();
+
+    if (!isLoggedIn) {
+        showLoginPage();
+        return;
+    }
+
+    // User is logged in - show main app
+    showMainApp();
+}
+
+function showLoginPage() {
+    document.getElementById('login-page').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+}
+
+async function showMainApp() {
+    document.getElementById('login-page').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+
+    // Set current date
+    const dateEl = document.getElementById('current-date');
+    if (dateEl) {
+        dateEl.textContent = formatDate(new Date(), 'long');
+    }
+
+    // Setup event listeners
+    setupNavigation();
+    setupMobileMenu();
+    setupSearch();
+    setupModal();
+
+    // Show/hide admin section (new sidebar structure)
+    const adminSection = document.getElementById('nav-admin-section');
+    if (adminSection) {
+        adminSection.style.display = state.isAdmin ? 'block' : 'none';
+    }
+
+    // Update user info in sidebar
+    updateUserInfo();
+
+    // Load users for user switcher (admins can see all users)
+    await loadUsers();
+
+    // Initialize dashboard month selector
+    initDashboardMonthSelector();
+
+    // Initialize report selectors
+    // initReportSelectors(); // initReportSelectors might be missing, check later
+
+    // Load initial data
+    if (state.currentUser) {
+        loadDashboard();
+    }
+}
+
+// =====================================================
+// Authentication
+// =====================================================
+// Authentication functions are now loaded from js/auth.js
+
+// =====================================================
+// Navigation
+// =====================================================
+
+function setupNavigation() {
+    // Handle menu items (new structure)
+    const menuItems = document.querySelectorAll('.menu-item[data-page]');
+    menuItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const page = item.dataset.page;
+            navigateTo(page);
+        });
+    });
+
+    // Setup collapsible sections
+    setupCollapsibleSections();
+
+    // Restore sidebar section states from localStorage
+    restoreSidebarSectionStates();
+}
+
+function setupCollapsibleSections() {
+    document.querySelectorAll('.collapsible-header').forEach(header => {
+        header.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const section = this.closest('.collapsible-section');
+            const body = section.querySelector('.collapsible-body');
+            const sectionId = section.dataset.section;
+
+            section.classList.toggle('collapsed');
+
+            if (section.classList.contains('collapsed')) {
+                body.style.maxHeight = '0';
+            } else {
+                body.style.maxHeight = body.scrollHeight + 'px';
+            }
+
+            // Save state to localStorage
+            saveSidebarSectionState(sectionId, section.classList.contains('collapsed'));
+        });
+    });
+
+    // Initialize expanded sections' max-height
+    document.querySelectorAll('.collapsible-section:not(.collapsed) .collapsible-body').forEach(body => {
+        body.style.maxHeight = body.scrollHeight + 'px';
+    });
+}
+
+function saveSidebarSectionState(sectionId, isCollapsed) {
+    const states = JSON.parse(localStorage.getItem('sidebarSections') || '{}');
+    states[sectionId] = isCollapsed;
+    localStorage.setItem('sidebarSections', JSON.stringify(states));
+}
+
+function restoreSidebarSectionStates() {
+    const states = JSON.parse(localStorage.getItem('sidebarSections') || '{}');
+    Object.keys(states).forEach(sectionId => {
+        const section = document.querySelector(`.collapsible-section[data-section="${sectionId}"]`);
+        if (section) {
+            const body = section.querySelector('.collapsible-body');
+            if (states[sectionId]) {
+                section.classList.add('collapsed');
+                body.style.maxHeight = '0';
+            } else {
+                section.classList.remove('collapsed');
+                body.style.maxHeight = body.scrollHeight + 'px';
+            }
+        }
+    });
+}
+
+function navigateTo(page) {
+    // Update nav active state for menu items
+    document.querySelectorAll('.menu-item[data-page]').forEach(item => {
+        item.classList.toggle('active', item.dataset.page === page);
+    });
+
+    // Show corresponding page
+    document.querySelectorAll('.page').forEach(p => {
+        p.classList.toggle('active', p.id === `page-${page}`);
+    });
+
+    state.currentPage = page;
+
+    // Load page-specific data
+    loadPageData(page);
+
+    // Close mobile menu
+    elements.sidebar.classList.remove('open');
+}
+
+async function loadPageData(page) {
+    if (!state.currentUser) return;
+
+    showLoading();
+
+    try {
+        switch (page) {
+            case 'dashboard':
+                await loadDashboard();
+                break;
+            case 'transactions':
+                await loadTransactions();
+                break;
+            case 'accounts':
+                await loadAccounts();
+                break;
+            case 'categories':
+                await loadCategories();
+                break;
+            case 'reports':
+                await loadReportsPage();
+                break;
+            case 'budgets':
+                await loadBudgetsPage();
+                break;
+            case 'recurring':
+                await loadRecurringPage();
+                break;
+            case 'checks':
+                await loadChecksPage();
+                break;
+            case 'receipts':
+                await loadReceiptsPage();
+                break;
+            case 'reconcile':
+                await loadReconcilePage();
+                break;
+            case 'cpa-portal':
+                await loadCpaPortalPage();
+                break;
+            case 'admin':
+                if (state.isAdmin) {
+                    await loadAdminPage();
+                }
+                break;
+            case 'import':
+                await loadImportPage();
+                break;
+            case 'rules':
+                await loadRules();
+                break;
+        }
+    } catch (error) {
+        showToast('Error loading data: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function setupMobileMenu() {
+    elements.menuToggle.addEventListener('click', () => {
+        elements.sidebar.classList.toggle('open');
+    });
+}
+
+// =====================================================
+// Users
+// =====================================================
+
+async function loadUsers() {
+    const userSelect = document.getElementById('user-select');
+    const switcher = document.querySelector('.user-switcher');
+
+    if (!userSelect) return;
+
+    let users = [];
+
+    // Admin can see all users
+    if (state.isAdmin) {
+        try {
+            const result = await apiGet('/admin/');
+            if (result.success && result.data.users) {
+                users = result.data.users.filter(u => u.is_active);
+            }
+        } catch (error) {
+            // Silently fail - session issue
+            console.log('Admin API not accessible');
+        }
+    }
+
+    // Fallback: use logged in user only
+    if (users.length === 0 && state.userData) {
+        users = [state.userData];
+    }
+
+    if (users.length > 0) {
+        userSelect.innerHTML = users.map(u =>
+            `<option value="${u.id}" ${u.id == state.currentUser ? 'selected' : ''}>${u.display_name || u.username}</option>`
+        ).join('');
+    }
+
+    state.users = users;
+
+    // Hide switcher if only one user
+    if (switcher) {
+        switcher.style.display = users.length > 1 ? 'flex' : 'none';
+    }
+}
+
+async function switchUser(userId) {
+    if (!userId) return;
+
+    state.currentUser = parseInt(userId);
+    console.log('Switched to user:', state.currentUser);
+
+    // Update sidebar user info
+    const selectedUser = state.users?.find(u => u.id == userId);
+    if (selectedUser) {
+        const nameEl = document.getElementById('current-user-name');
+        const avatarEl = document.getElementById('user-avatar');
+        if (nameEl) nameEl.textContent = selectedUser.display_name || selectedUser.username;
+        if (avatarEl) avatarEl.textContent = (selectedUser.display_name || selectedUser.username).charAt(0).toUpperCase();
+    }
+
+    // Reload current page data
+    await loadPageData(state.currentPage);
+}
+
+// =====================================================
+// Dashboard module is loaded from js/modules/dashboard.js
+// =====================================================
+// Transactions
+// =====================================================
+// Transaction functions are now loaded from js/transactions.js
+// The following functions have been moved:
+// - buildHierarchicalCategoryOptions
+// - buildGroupedAccountOptions
+// - loadTransactions
+// - loadFilterOptions
+// - applyDatePreset
+// - setupTransactionFilters
+// - fetchTransactions
+// - renderTransactionsTable
+// - renderPagination
+// - goToPage
+// - sortTransactions
+// - updateSortIcons
+
+/* TRANSACTIONS SECTION MOVED TO transactions.js - END */
+
+
+// Transactions module is loaded from js/modules/transactions.js
+// Accounts module is loaded from js/modules/accounts.js
+
+
+// =====================================================
+// Reports
+// =====================================================
+
+function initReportSelectors() {
+    // This function is no longer needed with the new Reports page design
+    // Keeping it empty to prevent errors from existing calls
+}
+
+async function generateReport() {
+    const type = document.getElementById('report-type').value;
+    const year = document.getElementById('report-year').value;
+    const month = document.getElementById('report-month').value;
+
+    showLoading();
+
+    const data = await apiGet('/reports/', {
+        user_id: state.currentUser,
+        type,
+        year,
+        month
+    });
+
+    hideLoading();
+
+    if (data.success) {
+        renderReport(data.data, type);
+    } else {
+        showToast('Error generating report', 'error');
+    }
+}
+
+function renderReport(data, type) {
+    const container = document.getElementById('report-content');
+    const report = data.report;
+
+    container.innerHTML = `
+        <div class="report-summary">
+            <div class="report-metric">
+                <div class="report-metric-value text-success">${formatCurrency(report.total_income)}</div>
+                <div class="report-metric-label">Total Income</div>
+            </div>
+            <div class="report-metric">
+                <div class="report-metric-value text-danger">${formatCurrency(report.total_expenses)}</div>
+                <div class="report-metric-label">Total Expenses</div>
+            </div>
+            <div class="report-metric">
+                <div class="report-metric-value ${report.net_savings >= 0 ? 'text-success' : 'text-danger'}">
+                    ${formatCurrency(report.net_savings)}
+                </div>
+                <div class="report-metric-label">Net Savings</div>
+            </div>
+            <div class="report-metric">
+                <div class="report-metric-value">${report.savings_rate.toFixed(1)}%</div>
+                <div class="report-metric-label">Savings Rate</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Spending by Category</h3>
+            <div class="category-chart">
+                ${report.category_breakdown.map(cat => `
+                    <div class="category-bar">
+                        <span class="category-bar-label">${cat.category_name}</span>
+                        <div class="category-bar-track">
+                            <div class="category-bar-fill" style="width: ${cat.percentage || 0}%; background: ${cat.category_color || '#6b7280'}"></div>
+                        </div>
+                        <span class="category-bar-amount">${formatCurrency(cat.total_amount)}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Top Vendors</h3>
+            <table class="transactions-table">
+                <thead>
+                    <tr>
+                        <th>Vendor</th>
+                        <th>Transactions</th>
+                        <th class="text-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${report.top_vendors.map(v => `
+                        <tr>
+                            <td>${v.vendor_name}</td>
+                            <td>${v.transaction_count}</td>
+                            <td class="text-right">${formatCurrency(v.total_amount)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+// =====================================================
+// Import module is loaded from js/modules/import.js
+// =====================================================
+// Search
+// =====================================================
+
+function setupSearch() {
+    let debounceTimer;
+
+    elements.globalSearch.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            const searchTerm = e.target.value.trim();
+            if (searchTerm.length >= 2) {
+                state.filters.search = searchTerm;
+                if (state.currentPage === 'transactions') {
+                    fetchTransactions();
+                } else {
+                    navigateTo('transactions');
+                }
+            } else if (searchTerm.length === 0) {
+                state.filters.search = '';
+                if (state.currentPage === 'transactions') {
+                    fetchTransactions();
+                }
+            }
+        }, 300);
+    });
+}
+
+// =====================================================
+// Modal
+// =====================================================
+
+function setupModal() {
+    elements.modalOverlay.addEventListener('click', (e) => {
+        if (e.target === elements.modalOverlay) {
+            closeModal();
+        }
+    });
+
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+}
+
+function openModal(title, content, size = '') {
+    const modal = document.getElementById('modal');
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-body').innerHTML = content;
+
+    // Remove previous size classes
+    modal.classList.remove('modal-lg', 'modal-sm');
+    if (size) {
+        modal.classList.add(size);
+    }
+
+    elements.modalOverlay.classList.add('open');
+}
+
+function closeModal() {
+    elements.modalOverlay.classList.remove('open');
+    // Clean up size classes
+    document.getElementById('modal').classList.remove('modal-lg', 'modal-sm');
+}
+
+// =====================================================
+// Toast Notifications & Loading
+// =====================================================
+// UI helper functions (showToast, showLoading, hideLoading) are now loaded from js/utils.js
+
+// =====================================================
+// API Helpers
+// =====================================================
+// API functions (apiGet, apiPost, etc.) are now loaded from js/api.js
+
+// =====================================================
+// Utility Functions
+// =====================================================
+// Utility functions (formatCurrency, formatDate, etc.) are now loaded from js/utils.js
+
+// Functions are now exposed globally from their respective modules:
+// - showTransactionDetail, updateTransactionCategory, goToPage, sortTransactions: js/modules/transactions.js
+// - deleteRule: js/modules/rules.js
+// - applyDatePreset: js/modules/transactions.js
+
+// =====================================================
+// Custom Report Builder module is loaded from js/modules/custom-reports.js
+
+// Reports module is loaded from js/modules/reports.js
+
+// =====================================================
+// Budgets module is loaded from js/modules/budgets.js
+// Recurring module is loaded from js/modules/recurring.js
+// Checks module is loaded from js/modules/checks.js
+// Reconcile module is loaded from js/modules/reconcile.js
+// CPA module is loaded from js/modules/cpa.js
+// Admin module is loaded from js/modules/admin.js
+// Mobile Sidebar Functions
+// =====================================================
+
+function toggleMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobile-overlay');
+
+    if (sidebar.classList.contains('mobile-open')) {
+        closeMobileSidebar();
+    } else {
+        sidebar.classList.add('mobile-open');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobile-overlay');
+
+    sidebar.classList.remove('mobile-open');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// Update mobile header user avatar
+function updateMobileUserAvatar() {
+    const avatar = document.getElementById('mobile-user-avatar');
+    const user = state?.currentUser;
+    if (avatar && user) {
+        const initials = (user.display_name || user.username || 'U')
+            .split(' ')
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .substring(0, 2);
+        avatar.textContent = initials;
+    }
+}
+
+// Close sidebar when clicking on menu item (mobile)
+document.addEventListener('DOMContentLoaded', function () {
+    const menuItems = document.querySelectorAll('.menu-item[data-page]');
+    menuItems.forEach(item => {
+        item.addEventListener('click', function () {
+            if (window.innerWidth <= 768) {
+                closeMobileSidebar();
+            }
+        });
+    });
+
+    // Update mobile avatar when user logs in
+    const originalShowApp = window.showApp;
+    if (typeof originalShowApp === 'function') {
+        window.showApp = function () {
+            originalShowApp();
+            updateMobileUserAvatar();
+        };
+    }
+});
+
+// Expose mobile functions globally
+window.toggleMobileSidebar = toggleMobileSidebar;
+window.closeMobileSidebar = closeMobileSidebar;
+
+// =====================================================
+// Container Width Toggle System
+// =====================================================
+
+class ContainerWidthToggle {
+    constructor() {
+        this.widths = ['100', '75', '50'];
+        this.currentIndex = 0;
+        this.storageKey = 'expense_tracker_container_width';
+
+        this.init();
+    }
+
+    init() {
+        // Load saved width from localStorage
+        const savedWidth = localStorage.getItem(this.storageKey);
+        if (savedWidth && this.widths.includes(savedWidth)) {
+            this.currentIndex = this.widths.indexOf(savedWidth);
+        }
+
+        // Apply initial state
+        this.applyWidth(this.widths[this.currentIndex]);
+
+        // Bind events
+        this.bindEvents();
+    }
+
+    bindEvents() {
+        // Button group click handlers
+        document.querySelectorAll('.width-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const width = e.target.dataset.width;
+                this.setWidth(width);
+            });
+        });
+    }
+
+    setWidth(width) {
+        // Update index
+        this.currentIndex = this.widths.indexOf(width);
+
+        // Apply to UI
+        this.applyWidth(width);
+
+        // Save to localStorage
+        localStorage.setItem(this.storageKey, width);
+    }
+
+    applyWidth(width) {
+        // Update main content width
+        const mainContent = document.getElementById('page-content');
+        if (mainContent) {
+            mainContent.dataset.width = width;
+        }
+
+        // Update button active states
+        document.querySelectorAll('.width-toggle-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.width === width);
+        });
+    }
+
+    // Cycle through widths (for single button toggle)
+    cycleWidth() {
+        this.currentIndex = (this.currentIndex + 1) % this.widths.length;
+        const newWidth = this.widths[this.currentIndex];
+        this.setWidth(newWidth);
+        return newWidth;
+    }
+
+    // Get current width
+    getCurrentWidth() {
+        return this.widths[this.currentIndex];
+    }
+}
+
+// Initialize Container Width Toggle when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    window.containerWidth = new ContainerWidthToggle();
+});
+
+// Expose globally
+window.ContainerWidthToggle = ContainerWidthToggle;
+
+// =====================================================
+// Password Visibility Toggle
+// =====================================================
+function togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    if (input.type === 'password') {
+        input.type = 'text';
+        // Change to "Hide" icon (Slash Eye)
+        btn.innerHTML = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>';
+    } else {
+        input.type = 'password';
+        // Change to "Show" icon (Normal Eye)
+        btn.innerHTML = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
+    }
+}
+window.togglePasswordVisibility = togglePasswordVisibility;

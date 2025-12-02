@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports - Expense Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .reports-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .reports-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .reports-header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .period-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .period-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .period-btn:hover {
+            background: var(--bg-secondary);
+        }
+
+        .period-btn.active {
+            background: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .date-inputs {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .date-inputs input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .summary-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .summary-card .label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .summary-card .value {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .summary-card .value.positive {
+            color: var(--success-color);
+        }
+
+        .summary-card .value.negative {
+            color: var(--danger-color);
+        }
+
+        .summary-card .subtext {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .chart-card h3 {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .category-list {
+            margin-top: 16px;
+        }
+
+        .category-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .category-item:last-child {
+            border-bottom: none;
+        }
+
+        .category-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 18px;
+        }
+
+        .category-info {
+            flex: 1;
+        }
+
+        .category-name {
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .category-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .category-amount {
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .category-percent {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+
+        .merchant-list {
+            margin-top: 8px;
+        }
+
+        .merchant-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .merchant-item:last-child {
+            border-bottom: none;
+        }
+
+        .merchant-name {
+            font-weight: 500;
+        }
+
+        .merchant-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin-bottom: 16px;
+        }
+
+        .back-link:hover {
+            color: var(--text-primary);
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-secondary);
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-secondary);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .period-selector {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="reports-container">
+        <a href="index.html" class="back-link">← Back to Transactions</a>
+
+        <div class="reports-header">
+            <h1>Financial Reports</h1>
+            <div class="period-selector">
+                <button class="period-btn active" data-period="month">This Month</button>
+                <button class="period-btn" data-period="quarter">This Quarter</button>
+                <button class="period-btn" data-period="year">This Year</button>
+                <button class="period-btn" data-period="custom">Custom</button>
+                <div class="date-inputs" style="display: none;">
+                    <input type="date" id="startDate">
+                    <span>to</span>
+                    <input type="date" id="endDate">
+                    <button class="period-btn" onclick="loadCustomPeriod()">Apply</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-buttons">
+            <button class="tab-btn active" data-tab="overview">Overview</button>
+            <button class="tab-btn" data-tab="comparison">Monthly Comparison</button>
+            <button class="tab-btn" data-tab="categories">Category Analysis</button>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overview-tab" class="tab-content active">
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="label">Total Income</div>
+                    <div class="value positive" id="total-income">$0.00</div>
+                </div>
+                <div class="summary-card">
+                    <div class="label">Total Expenses</div>
+                    <div class="value negative" id="total-expenses">$0.00</div>
+                </div>
+                <div class="summary-card">
+                    <div class="label">Net Income</div>
+                    <div class="value" id="net-income">$0.00</div>
+                </div>
+                <div class="summary-card">
+                    <div class="label">Savings Rate</div>
+                    <div class="value" id="savings-rate">0%</div>
+                    <div class="subtext">of income saved</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Expense Breakdown</h3>
+                    <div class="chart-container">
+                        <canvas id="expenseChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Daily Spending Trend</h3>
+                    <div class="chart-container">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Top Spending Categories</h3>
+                    <div class="category-list" id="category-list"></div>
+                </div>
+                <div class="chart-card">
+                    <h3>Top Merchants</h3>
+                    <div class="merchant-list" id="merchant-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Comparison Tab -->
+        <div id="comparison-tab" class="tab-content">
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="label">Average Monthly Income</div>
+                    <div class="value positive" id="avg-income">$0.00</div>
+                </div>
+                <div class="summary-card">
+                    <div class="label">Average Monthly Expenses</div>
+                    <div class="value negative" id="avg-expenses">$0.00</div>
+                </div>
+                <div class="summary-card">
+                    <div class="label">Month-over-Month Change</div>
+                    <div class="value" id="mom-change">-</div>
+                    <div class="subtext">in expenses</div>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h3>Income vs Expenses Over Time</h3>
+                <div class="chart-container" style="height: 400px;">
+                    <canvas id="comparisonChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Analysis Tab -->
+        <div id="categories-tab" class="tab-content">
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Expenses by Category</h3>
+                    <div class="chart-container">
+                        <canvas id="categoryPieChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Income by Category</h3>
+                    <div class="chart-container">
+                        <canvas id="incomePieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h3>All Categories</h3>
+                <div class="category-list" id="all-categories-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/Expenses Tracker/api';
+        const USER_ID = 1;
+
+        let currentPeriod = 'month';
+        let reportData = null;
+        let comparisonData = null;
+        let charts = {};
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setupEventListeners();
+            loadReportData();
+            loadComparisonData();
+        });
+
+        function setupEventListeners() {
+            // Period buttons
+            document.querySelectorAll('.period-btn[data-period]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentPeriod = btn.dataset.period;
+
+                    const dateInputs = document.querySelector('.date-inputs');
+                    if (currentPeriod === 'custom') {
+                        dateInputs.style.display = 'flex';
+                    } else {
+                        dateInputs.style.display = 'none';
+                        loadReportData();
+                    }
+                });
+            });
+
+            // Tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                    btn.classList.add('active');
+                    document.getElementById(btn.dataset.tab + '-tab').classList.add('active');
+                });
+            });
+        }
+
+        async function loadReportData() {
+            try {
+                let url = `${API_BASE}/reports/summary.php?user_id=${USER_ID}&period=${currentPeriod}`;
+
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+
+                if (currentPeriod === 'custom' && startDate && endDate) {
+                    url += `&start_date=${startDate}&end_date=${endDate}`;
+                }
+
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.success) {
+                    reportData = result.data;
+                    updateOverview();
+                    updateCharts();
+                }
+            } catch (error) {
+                console.error('Error loading report:', error);
+            }
+        }
+
+        async function loadComparisonData() {
+            try {
+                const response = await fetch(`${API_BASE}/reports/monthly-comparison.php?user_id=${USER_ID}&months=6`);
+                const result = await response.json();
+
+                if (result.success) {
+                    comparisonData = result.data;
+                    updateComparison();
+                }
+            } catch (error) {
+                console.error('Error loading comparison:', error);
+            }
+        }
+
+        function loadCustomPeriod() {
+            loadReportData();
+        }
+
+        function updateOverview() {
+            if (!reportData) return;
+
+            const { summary } = reportData;
+
+            document.getElementById('total-income').textContent = formatCurrency(summary.total_income);
+            document.getElementById('total-expenses').textContent = formatCurrency(summary.total_expenses);
+
+            const netIncomeEl = document.getElementById('net-income');
+            netIncomeEl.textContent = formatCurrency(summary.net_income);
+            netIncomeEl.className = 'value ' + (summary.net_income >= 0 ? 'positive' : 'negative');
+
+            const savingsEl = document.getElementById('savings-rate');
+            savingsEl.textContent = summary.savings_rate + '%';
+            savingsEl.className = 'value ' + (summary.savings_rate >= 0 ? 'positive' : 'negative');
+
+            // Update category list
+            updateCategoryList();
+            updateMerchantList();
+        }
+
+        function updateCategoryList() {
+            const container = document.getElementById('category-list');
+            const categories = reportData.expenses_by_category.slice(0, 8);
+            const total = categories.reduce((sum, c) => sum + parseFloat(c.total), 0);
+
+            container.innerHTML = categories.map(cat => {
+                const percent = total > 0 ? ((parseFloat(cat.total) / total) * 100).toFixed(1) : 0;
+                return `
+                    <div class="category-item">
+                        <div class="category-icon" style="background: ${cat.color || '#6366f1'}20; color: ${cat.color || '#6366f1'}">
+                            ${cat.icon || '📁'}
+                        </div>
+                        <div class="category-info">
+                            <div class="category-name">${cat.name}</div>
+                            <div class="category-count">${cat.transaction_count} transactions</div>
+                        </div>
+                        <div>
+                            <div class="category-amount">${formatCurrency(cat.total)}</div>
+                            <div class="category-percent">${percent}%</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Update all categories list
+            const allContainer = document.getElementById('all-categories-list');
+            const allCategories = [...reportData.expenses_by_category, ...reportData.income_by_category];
+            allContainer.innerHTML = allCategories.map(cat => {
+                const isIncome = reportData.income_by_category.some(c => c.id === cat.id);
+                return `
+                    <div class="category-item">
+                        <div class="category-icon" style="background: ${cat.color || '#6366f1'}20; color: ${cat.color || '#6366f1'}">
+                            ${cat.icon || '📁'}
+                        </div>
+                        <div class="category-info">
+                            <div class="category-name">${cat.name}</div>
+                            <div class="category-count">${cat.transaction_count} transactions • ${isIncome ? 'Income' : 'Expense'}</div>
+                        </div>
+                        <div>
+                            <div class="category-amount" style="color: ${isIncome ? 'var(--success-color)' : 'var(--danger-color)'}">
+                                ${isIncome ? '+' : '-'}${formatCurrency(cat.total)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateMerchantList() {
+            const container = document.getElementById('merchant-list');
+            const merchants = reportData.top_merchants;
+
+            container.innerHTML = merchants.map(m => `
+                <div class="merchant-item">
+                    <div>
+                        <div class="merchant-name">${m.vendor_name}</div>
+                        <div class="merchant-count">${m.transaction_count} transactions</div>
+                    </div>
+                    <div class="category-amount">${formatCurrency(m.total_spent)}</div>
+                </div>
+            `).join('');
+        }
+
+        function updateCharts() {
+            if (!reportData) return;
+
+            // Expense Pie Chart
+            const expenseCtx = document.getElementById('expenseChart').getContext('2d');
+            if (charts.expense) charts.expense.destroy();
+
+            const expenseData = reportData.expenses_by_category.slice(0, 8);
+            charts.expense = new Chart(expenseCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: expenseData.map(c => c.name),
+                    datasets: [{
+                        data: expenseData.map(c => parseFloat(c.total)),
+                        backgroundColor: expenseData.map(c => c.color || '#6366f1'),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { boxWidth: 12, padding: 8 }
+                        }
+                    }
+                }
+            });
+
+            // Category Pie Chart (for category tab)
+            const categoryPieCtx = document.getElementById('categoryPieChart').getContext('2d');
+            if (charts.categoryPie) charts.categoryPie.destroy();
+
+            charts.categoryPie = new Chart(categoryPieCtx, {
+                type: 'pie',
+                data: {
+                    labels: expenseData.map(c => c.name),
+                    datasets: [{
+                        data: expenseData.map(c => parseFloat(c.total)),
+                        backgroundColor: expenseData.map(c => c.color || '#6366f1'),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { boxWidth: 12, padding: 8 }
+                        }
+                    }
+                }
+            });
+
+            // Income Pie Chart
+            const incomePieCtx = document.getElementById('incomePieChart').getContext('2d');
+            if (charts.incomePie) charts.incomePie.destroy();
+
+            const incomeData = reportData.income_by_category;
+            charts.incomePie = new Chart(incomePieCtx, {
+                type: 'pie',
+                data: {
+                    labels: incomeData.map(c => c.name),
+                    datasets: [{
+                        data: incomeData.map(c => parseFloat(c.total)),
+                        backgroundColor: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { boxWidth: 12, padding: 8 }
+                        }
+                    }
+                }
+            });
+
+            // Daily Trend Chart
+            const trendCtx = document.getElementById('trendChart').getContext('2d');
+            if (charts.trend) charts.trend.destroy();
+
+            const trendData = reportData.daily_trend;
+            charts.trend = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: trendData.map(d => {
+                        const date = new Date(d.date);
+                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    }),
+                    datasets: [{
+                        label: 'Expenses',
+                        data: trendData.map(d => parseFloat(d.expenses)),
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }, {
+                        label: 'Income',
+                        data: trendData.map(d => parseFloat(d.income)),
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: value => '$' + value.toLocaleString()
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateComparison() {
+            if (!comparisonData) return;
+
+            const { averages, mom_expense_change, monthly_data } = comparisonData;
+
+            document.getElementById('avg-income').textContent = formatCurrency(averages.income);
+            document.getElementById('avg-expenses').textContent = formatCurrency(averages.expenses);
+
+            const momEl = document.getElementById('mom-change');
+            if (mom_expense_change !== null) {
+                momEl.textContent = (mom_expense_change >= 0 ? '+' : '') + mom_expense_change + '%';
+                momEl.className = 'value ' + (mom_expense_change <= 0 ? 'positive' : 'negative');
+            } else {
+                momEl.textContent = '-';
+            }
+
+            // Comparison Chart
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+            if (charts.comparison) charts.comparison.destroy();
+
+            charts.comparison = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: monthly_data.map(m => m.month_label),
+                    datasets: [{
+                        label: 'Income',
+                        data: monthly_data.map(m => m.income),
+                        backgroundColor: '#10b981'
+                    }, {
+                        label: 'Expenses',
+                        data: monthly_data.map(m => m.expenses),
+                        backgroundColor: '#ef4444'
+                    }, {
+                        label: 'Net',
+                        data: monthly_data.map(m => m.net),
+                        type: 'line',
+                        borderColor: '#6366f1',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: value => '$' + value.toLocaleString()
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(amount);
+        }
+    </script>
+</body>
+</html>

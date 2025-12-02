@@ -1,0 +1,2 @@
+[2025-11-28 02:16:48] [error] Query error: SQLSTATE[HY093]: Invalid parameter number | {"sql":"UPDATE `transactions` SET `category_id` = :category_id WHERE category_id = :category_id"}
+[2025-11-28 02:16:48] [error] Categories API error: SQLSTATE[HY093]: Invalid parameter number

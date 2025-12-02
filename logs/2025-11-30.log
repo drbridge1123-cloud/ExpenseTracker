@@ -1,0 +1,148 @@
+[2025-11-30 01:30:19] [debug] Login attempt | {"username":"hyunji","password_length":10}
+[2025-11-30 01:30:19] [debug] Password check | {"hash":"$2y$10$zq.4S7lBRNU0aUNJ4kGHo.tDKNrgfC4HJbabZd5OhlsibxP6FyuYi","verify_result":true}
+[2025-11-30 02:13:48] [debug] Login attempt | {"username":"hyunji","password_length":10}
+[2025-11-30 02:13:48] [debug] Password check | {"hash":"$2y$10$zq.4S7lBRNU0aUNJ4kGHo.tDKNrgfC4HJbabZd5OhlsibxP6FyuYi","verify_result":true}
+[2025-11-30 04:28:08] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[8060],"category_id":144}
+[2025-11-30 04:28:08] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8060)\n              AND user_id = :user_id","idList":"8060","category_id":144,"user_id":2}
+[2025-11-30 04:28:08] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 04:33:51] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7685,8032,8043,7595,7536,7535],"category_id":41}
+[2025-11-30 04:33:51] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7685,8032,8043,7595,7536,7535)\n              AND user_id = :user_id","idList":"7685,8032,8043,7595,7536,7535","category_id":41,"user_id":2}
+[2025-11-30 04:33:51] [debug] Bulk categorize result | {"updated":6}
+[2025-11-30 04:37:56] [debug] Rules query result | {"sql":"SELECT\n                r.*,\n                c.name AS category_name,\n                c.slug AS category_slug,\n                c.icon AS category_icon,\n                c.color AS category_color,\n                c.category_type,\n                u.username AS created_by_username\n            FROM categorization_rules r\n            LEFT JOIN categories c ON r.category_id = c.id\n            LEFT JOIN users u ON r.user_id = u.id\n            WHERE r.is_active = 1 AND (r.user_id IS NULL OR r.user_id = :user_id)\n            ORDER BY r.priority ASC, r.hit_count DESC, r.rule_name","params":{"user_id":2},"count":2,"ids":[342,343]}
+[2025-11-30 04:38:15] [debug] Rules query result | {"sql":"SELECT\n                r.*,\n                c.name AS category_name,\n                c.slug AS category_slug,\n                c.icon AS category_icon,\n                c.color AS category_color,\n                c.category_type,\n                u.username AS created_by_username\n            FROM categorization_rules r\n            LEFT JOIN categories c ON r.category_id = c.id\n            LEFT JOIN users u ON r.user_id = u.id\n            WHERE r.is_active = 1 AND (r.user_id IS NULL OR r.user_id = :user_id)\n            ORDER BY r.priority ASC, r.hit_count DESC, r.rule_name","params":{"user_id":2},"count":2,"ids":[342,343]}
+[2025-11-30 04:41:00] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7596,7614],"category_id":41}
+[2025-11-30 04:41:00] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7596,7614)\n              AND user_id = :user_id","idList":"7596,7614","category_id":41,"user_id":2}
+[2025-11-30 04:41:00] [debug] Bulk categorize result | {"updated":2}
+[2025-11-30 04:55:04] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7950],"category_id":151}
+[2025-11-30 04:55:04] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7950)\n              AND user_id = :user_id","idList":"7950","category_id":151,"user_id":2}
+[2025-11-30 04:55:04] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 04:56:16] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7854],"category_id":147}
+[2025-11-30 04:56:16] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7854)\n              AND user_id = :user_id","idList":"7854","category_id":147,"user_id":2}
+[2025-11-30 04:56:16] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 04:58:33] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7771,8105,8033,8034,7984],"category_id":41}
+[2025-11-30 04:58:33] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7771,8105,8033,8034,7984)\n              AND user_id = :user_id","idList":"7771,8105,8033,8034,7984","category_id":41,"user_id":2}
+[2025-11-30 04:58:33] [debug] Bulk categorize result | {"updated":5}
+[2025-11-30 06:03:38] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[8064],"category_id":146}
+[2025-11-30 06:03:38] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8064)\n              AND user_id = :user_id","idList":"8064","category_id":146,"user_id":2}
+[2025-11-30 06:03:38] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 06:04:41] [debug] Login attempt | {"username":"Danieldaniel","password_length":25}
+[2025-11-30 06:07:19] [debug] Login attempt | {"username":"Daniel","password_length":10}
+[2025-11-30 06:07:19] [debug] Password check | {"hash":"$2y$10$nAyUyliLthsnA0s\/kojzYeqyhWSL6hufVhvyCm19SKvTAtM1ryPya","verify_result":true}
+[2025-11-30 06:36:27] [debug] Login attempt | {"username":"Daniel","password_length":10}
+[2025-11-30 06:36:27] [debug] Password check | {"hash":"$2y$10$nAyUyliLthsnA0s\/kojzYeqyhWSL6hufVhvyCm19SKvTAtM1ryPya","verify_result":true}
+[2025-11-30 06:38:12] [debug] Login attempt | {"username":"Daniel","password_length":10}
+[2025-11-30 06:38:12] [debug] Password check | {"hash":"$2y$10$nAyUyliLthsnA0s\/kojzYeqyhWSL6hufVhvyCm19SKvTAtM1ryPya","verify_result":true}
+[2025-11-30 06:40:24] [debug] Login attempt | {"username":"Daniel","password_length":10}
+[2025-11-30 06:40:24] [debug] Password check | {"hash":"$2y$10$nAyUyliLthsnA0s\/kojzYeqyhWSL6hufVhvyCm19SKvTAtM1ryPya","verify_result":true}
+[2025-11-30 17:22:32] [debug] Login attempt | {"username":"hyunji","password_length":10}
+[2025-11-30 17:22:32] [debug] Password check | {"hash":"$2y$10$zq.4S7lBRNU0aUNJ4kGHo.tDKNrgfC4HJbabZd5OhlsibxP6FyuYi","verify_result":true}
+[2025-11-30 17:26:21] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7854],"category_id":145}
+[2025-11-30 17:26:21] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7854)\n              AND user_id = :user_id","idList":"7854","category_id":145,"user_id":2}
+[2025-11-30 17:26:21] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 17:31:36] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:31:40] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:31:46] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:31:47] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:31:54] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:32:01] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:32:04] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:32:57] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:32:59] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:33:26] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:33:59] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:34:02] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:35:16] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:35:18] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:35:26] [debug] Login attempt | {"username":"","password_length":0}
+[2025-11-30 17:35:33] [debug] Login attempt | {"username":"Daniel","password_length":10}
+[2025-11-30 17:35:33] [debug] Password check | {"hash":"$2y$10$Xo05HcOx04D6aUgWEra6s.HzDFhYC4XEgVEmQpPHn3Wqjf8eA1O.S","verify_result":false}
+[2025-11-30 17:35:39] [debug] Login attempt | {"username":"Daniel","password_length":11}
+[2025-11-30 17:35:39] [debug] Password check | {"hash":"$2y$10$Xo05HcOx04D6aUgWEra6s.HzDFhYC4XEgVEmQpPHn3Wqjf8eA1O.S","verify_result":true}
+[2025-11-30 17:38:13] [debug] Login attempt | {"username":"Daniel","password_length":10}
+[2025-11-30 17:38:13] [debug] Password check | {"hash":"$2y$10$Xo05HcOx04D6aUgWEra6s.HzDFhYC4XEgVEmQpPHn3Wqjf8eA1O.S","verify_result":false}
+[2025-11-30 17:38:17] [debug] Login attempt | {"username":"Daniel","password_length":11}
+[2025-11-30 17:38:17] [debug] Password check | {"hash":"$2y$10$Xo05HcOx04D6aUgWEra6s.HzDFhYC4XEgVEmQpPHn3Wqjf8eA1O.S","verify_result":true}
+[2025-11-30 18:20:54] [debug] Bulk categorize request | {"user_id":1,"transaction_ids":[8140],"category_id":146}
+[2025-11-30 18:20:54] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8140)\n              AND user_id = :user_id","idList":"8140","category_id":146,"user_id":1}
+[2025-11-30 18:20:54] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 19:42:58] [info] Deleted 1 transaction(s): 8140
+[2025-11-30 19:45:31] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[8064],"category_id":100}
+[2025-11-30 19:45:31] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8064)\n              AND user_id = :user_id","idList":"8064","category_id":100,"user_id":2}
+[2025-11-30 19:45:31] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 19:45:40] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[8060],"category_id":100}
+[2025-11-30 19:45:40] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8060)\n              AND user_id = :user_id","idList":"8060","category_id":100,"user_id":2}
+[2025-11-30 19:45:40] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 19:45:49] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[8065,7854],"category_id":100}
+[2025-11-30 19:45:49] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8065,7854)\n              AND user_id = :user_id","idList":"8065,7854","category_id":100,"user_id":2}
+[2025-11-30 19:45:49] [debug] Bulk categorize result | {"updated":2}
+[2025-11-30 19:48:29] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7531,8076,8017,7978,7889,7819,7760,7721,7659,7626,7579],"category_id":24}
+[2025-11-30 19:48:29] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7531,8076,8017,7978,7889,7819,7760,7721,7659,7626,7579)\n              AND user_id = :user_id","idList":"7531,8076,8017,7978,7889,7819,7760,7721,7659,7626,7579","category_id":24,"user_id":2}
+[2025-11-30 19:48:29] [debug] Bulk categorize result | {"updated":11}
+[2025-11-30 19:49:57] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7840,7839,7757,7643,7609,7557],"category_id":100}
+[2025-11-30 19:49:57] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7840,7839,7757,7643,7609,7557)\n              AND user_id = :user_id","idList":"7840,7839,7757,7643,7609,7557","category_id":100,"user_id":2}
+[2025-11-30 19:49:57] [debug] Bulk categorize result | {"updated":6}
+[2025-11-30 19:50:34] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7797,7853,7829],"category_id":100}
+[2025-11-30 19:50:34] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7797,7853,7829)\n              AND user_id = :user_id","idList":"7797,7853,7829","category_id":100,"user_id":2}
+[2025-11-30 19:50:34] [debug] Bulk categorize result | {"updated":3}
+[2025-11-30 19:50:49] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[8026],"category_id":100}
+[2025-11-30 19:50:49] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8026)\n              AND user_id = :user_id","idList":"8026","category_id":100,"user_id":2}
+[2025-11-30 19:50:49] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 19:51:07] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[8025,7836,7577,7589],"category_id":100}
+[2025-11-30 19:51:07] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8025,7836,7577,7589)\n              AND user_id = :user_id","idList":"8025,7836,7577,7589","category_id":100,"user_id":2}
+[2025-11-30 19:51:07] [debug] Bulk categorize result | {"updated":4}
+[2025-11-30 19:56:08] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[8112,7668,7666,7610,7645,8069,8081,8006,7943,7976,7993,7658,7528,7533,7545],"category_id":20}
+[2025-11-30 19:56:08] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8112,7668,7666,7610,7645,8069,8081,8006,7943,7976,7993,7658,7528,7533,7545)\n              AND user_id = :user_id","idList":"8112,7668,7666,7610,7645,8069,8081,8006,7943,7976,7993,7658,7528,7533,7545","category_id":20,"user_id":2}
+[2025-11-30 19:56:08] [debug] Bulk categorize result | {"updated":15}
+[2025-11-30 19:56:32] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7935],"category_id":100}
+[2025-11-30 19:56:32] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7935)\n              AND user_id = :user_id","idList":"7935","category_id":100,"user_id":2}
+[2025-11-30 19:56:32] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 19:56:50] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7850,7711,7591,7527,7631,7833],"category_id":100}
+[2025-11-30 19:56:50] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7850,7711,7591,7527,7631,7833)\n              AND user_id = :user_id","idList":"7850,7711,7591,7527,7631,7833","category_id":100,"user_id":2}
+[2025-11-30 19:56:50] [debug] Bulk categorize result | {"updated":6}
+[2025-11-30 19:57:33] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7693],"category_id":20}
+[2025-11-30 19:57:33] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7693)\n              AND user_id = :user_id","idList":"7693","category_id":20,"user_id":2}
+[2025-11-30 19:57:33] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 19:59:04] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[8100,8041,7995,7926,7842,7783,7732,7698,7635,7598,7551],"category_id":155}
+[2025-11-30 19:59:04] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8100,8041,7995,7926,7842,7783,7732,7698,7635,7598,7551)\n              AND user_id = :user_id","idList":"8100,8041,7995,7926,7842,7783,7732,7698,7635,7598,7551","category_id":155,"user_id":2}
+[2025-11-30 19:59:04] [debug] Bulk categorize result | {"updated":11}
+[2025-11-30 19:59:53] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7999,8054,7973,7997,7764,7744,7662,7702,7710,7627,7576,7593,7521,7543,7555],"category_id":100}
+[2025-11-30 19:59:53] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7999,8054,7973,7997,7764,7744,7662,7702,7710,7627,7576,7593,7521,7543,7555)\n              AND user_id = :user_id","idList":"7999,8054,7973,7997,7764,7744,7662,7702,7710,7627,7576,7593,7521,7543,7555","category_id":100,"user_id":2}
+[2025-11-30 19:59:53] [debug] Bulk categorize result | {"updated":15}
+[2025-11-30 20:00:32] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7859],"category_id":100}
+[2025-11-30 20:00:32] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7859)\n              AND user_id = :user_id","idList":"7859","category_id":100,"user_id":2}
+[2025-11-30 20:00:32] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 20:00:54] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7742,7629,7745,8063,8061,7784,8110,8123,8057],"category_id":100}
+[2025-11-30 20:00:54] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7742,7629,7745,8063,8061,7784,8110,8123,8057)\n              AND user_id = :user_id","idList":"7742,7629,7745,8063,8061,7784,8110,8123,8057","category_id":100,"user_id":2}
+[2025-11-30 20:00:54] [debug] Bulk categorize result | {"updated":9}
+[2025-11-30 20:01:11] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7805],"category_id":100}
+[2025-11-30 20:01:11] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7805)\n              AND user_id = :user_id","idList":"7805","category_id":100,"user_id":2}
+[2025-11-30 20:01:11] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 20:01:46] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7880],"category_id":20}
+[2025-11-30 20:01:46] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7880)\n              AND user_id = :user_id","idList":"7880","category_id":20,"user_id":2}
+[2025-11-30 20:01:46] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 20:02:13] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7942],"category_id":100}
+[2025-11-30 20:02:13] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7942)\n              AND user_id = :user_id","idList":"7942","category_id":100,"user_id":2}
+[2025-11-30 20:02:13] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 20:03:18] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7814,7822,7837,7844,7847],"category_id":100}
+[2025-11-30 20:03:18] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7814,7822,7837,7844,7847)\n              AND user_id = :user_id","idList":"7814,7822,7837,7844,7847","category_id":100,"user_id":2}
+[2025-11-30 20:03:18] [debug] Bulk categorize result | {"updated":5}
+[2025-11-30 20:04:38] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7647,7657,7665],"category_id":24}
+[2025-11-30 20:04:38] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7647,7657,7665)\n              AND user_id = :user_id","idList":"7647,7657,7665","category_id":24,"user_id":2}
+[2025-11-30 20:04:38] [debug] Bulk categorize result | {"updated":3}
+[2025-11-30 20:06:34] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7983],"category_id":20}
+[2025-11-30 20:06:34] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7983)\n              AND user_id = :user_id","idList":"7983","category_id":20,"user_id":2}
+[2025-11-30 20:06:34] [debug] Bulk categorize result | {"updated":1}
+[2025-11-30 20:06:55] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[8067,8018,7975,7977,7785,7729,7708,7547,7553,7556,7559],"category_id":15}
+[2025-11-30 20:06:55] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8067,8018,7975,7977,7785,7729,7708,7547,7553,7556,7559)\n              AND user_id = :user_id","idList":"8067,8018,7975,7977,7785,7729,7708,7547,7553,7556,7559","category_id":15,"user_id":2}
+[2025-11-30 20:06:55] [debug] Bulk categorize result | {"updated":11}
+[2025-11-30 20:07:06] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[8069,8081,8112,8006,7943,7976,7983,7993,7880,7658,7668,7666,7693,7645,7610,7528,7533,7545],"category_id":15}
+[2025-11-30 20:07:06] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8069,8081,8112,8006,7943,7976,7983,7993,7880,7658,7668,7666,7693,7645,7610,7528,7533,7545)\n              AND user_id = :user_id","idList":"8069,8081,8112,8006,7943,7976,7983,7993,7880,7658,7668,7666,7693,7645,7610,7528,7533,7545","category_id":15,"user_id":2}
+[2025-11-30 20:07:06] [debug] Bulk categorize result | {"updated":18}
+[2025-11-30 20:08:46] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[7697,7580],"category_id":158}
+[2025-11-30 20:08:46] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (7697,7580)\n              AND user_id = :user_id","idList":"7697,7580","category_id":158,"user_id":2}
+[2025-11-30 20:08:46] [debug] Bulk categorize result | {"updated":2}
+[2025-11-30 20:09:22] [debug] Login attempt | {"username":"Daniel","password_length":10}
+[2025-11-30 20:09:22] [debug] Password check | {"hash":"$2y$10$QXqGBTAuza5iMO5HNGPn3OKqMoThYhUE1Twt3w0T7..Umpcln\/hR2","verify_result":true}
+[2025-11-30 20:10:34] [debug] Bulk categorize request | {"user_id":2,"transaction_ids":[8059],"category_id":100}
+[2025-11-30 20:10:34] [debug] Bulk categorize SQL | {"sql":"UPDATE transactions\n            SET category_id = :category_id,\n                categorized_by = 'manual',\n                categorization_confidence = 100\n            WHERE id IN (8059)\n              AND user_id = :user_id","idList":"8059","category_id":100,"user_id":2}
+[2025-11-30 20:10:34] [debug] Bulk categorize result | {"updated":1}
