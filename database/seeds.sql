@@ -1,134 +1,55 @@
--- ExpenseTracker Seed Data
--- Run after schema.sql to populate default data
+-- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
+--
+-- Host: localhost    Database: expense_tracker
+-- ------------------------------------------------------
+-- Server version	10.4.32-MariaDB
 
--- =====================================================
--- Financial Institutions
--- =====================================================
-INSERT INTO financial_institutions (name, short_code, institution_type, country, csv_format, is_active) VALUES
-('Chase Bank', 'CHASE', 'bank', 'US', '{"date_col": 0, "description_col": 1, "amount_col": 2, "type_col": 3, "date_format": "m/d/Y"}', 1),
-('Chase Credit Card', 'CHASE_CC', 'credit_card', 'US', '{"date_col": 0, "post_date_col": 1, "description_col": 2, "category_col": 3, "type_col": 4, "amount_col": 5, "memo_col": 6, "date_format": "m/d/Y", "has_header": true}', 1),
-('Bank of America', 'BOFA', 'bank', 'US', '{"date_col": 0, "description_col": 1, "amount_col": 2, "date_format": "m/d/Y"}', 1),
-('Wells Fargo', 'WF', 'bank', 'US', '{"date_col": 0, "amount_col": 1, "description_col": 4, "date_format": "m/d/Y"}', 1),
-('Capital One', 'CAPONE', 'credit_card', 'US', '{"date_col": 0, "post_date_col": 1, "description_col": 3, "debit_col": 5, "credit_col": 6, "date_format": "Y-m-d"}', 1),
-('American Express', 'AMEX', 'credit_card', 'US', '{"date_col": 0, "description_col": 1, "amount_col": 2, "date_format": "m/d/Y"}', 1),
-('Discover', 'DISCOVER', 'credit_card', 'US', '{"date_col": 0, "post_date_col": 1, "description_col": 2, "amount_col": 3, "date_format": "m/d/Y"}', 1),
-('Citi Bank', 'CITI', 'bank', 'US', '{"date_col": 0, "description_col": 2, "debit_col": 3, "credit_col": 4, "date_format": "m/d/Y"}', 1),
-('Generic CSV', 'GENERIC', 'other', 'US', '{"date_col": 0, "description_col": 1, "amount_col": 2, "date_format": "Y-m-d"}', 1);
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
--- =====================================================
--- Categories
--- =====================================================
+--
+-- Dumping data for table `users`
+--
 
--- 1. Income
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(1, 'Income', 'income', 'dollar-sign', '#22c55e', 'income', 1, 1, NULL),
-(2, 'Salary', 'salary', 'briefcase', '#22c55e', 'income', 1, 2, 1),
-(3, 'Freelance / Side Income', 'freelance', 'laptop', '#22c55e', 'income', 1, 3, 1),
-(4, 'Investment Income', 'investment-income', 'trending-up', '#22c55e', 'income', 1, 4, 1);
+LOCK TABLES `users` WRITE;
+/*!40000 ALTER TABLE `users` DISABLE KEYS */;
+INSERT INTO `users` VALUES (1,'Daniel','drbridge1123@gmail.com','$2y$10$9m4lTTH3VEl8a05oEPej.OrapIb5zpzHVCK3W2rIeVdywmMMRQhuu','Daniel','USD','UTC',1,1,'2025-12-03 08:18:30','2025-12-02 09:41:00','2025-12-03 08:18:30'),(2,'Jianiel','jianielllc@gmail.com','$2y$10$FWKgCG3JJeMmPChaeevpXOjICgo8qUBmi6ZF1rFvc1.ZcP.l/fs0m','Jianiel','USD','UTC',1,1,'2025-12-03 12:38:14','2025-12-02 10:04:51','2025-12-03 12:38:14'),(3,'Hyunji','yhj413@gmail.com','$2y$10$gberthJM7zZGcXWXj23kUuAnzDSeNmQfDReqZvzqa4nkfs5Tg1W.m','Hyunji','USD','UTC',1,1,NULL,'2025-12-02 10:16:23','2025-12-02 10:16:23');
+/*!40000 ALTER TABLE `users` ENABLE KEYS */;
+UNLOCK TABLES;
 
--- 2. Housing
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(5, 'Housing', 'housing', 'home', '#f97316', 'expense', 1, 5, NULL),
-(6, 'Rent / Mortgage', 'rent-mortgage', 'home', '#f97316', 'expense', 1, 6, 5),
-(7, 'Utilities', 'utilities', 'zap', '#f97316', 'expense', 1, 7, 5),
-(8, 'Home Maintenance', 'home-maintenance', 'wrench', '#f97316', 'expense', 1, 8, 5);
+--
+-- Dumping data for table `categories`
+--
 
--- 3. Food & Dining
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(9, 'Food and Dining', 'food-dining', 'utensils', '#ef4444', 'expense', 1, 9, NULL),
-(10, 'Groceries', 'groceries', 'shopping-cart', '#ef4444', 'expense', 1, 10, 9),
-(11, 'Restaurants', 'restaurants', 'utensils', '#ef4444', 'expense', 1, 11, 9),
-(12, 'Coffee / Snacks', 'coffee-snacks', 'coffee', '#ef4444', 'expense', 1, 12, 9);
+LOCK TABLES `categories` WRITE;
+/*!40000 ALTER TABLE `categories` DISABLE KEYS */;
+INSERT INTO `categories` VALUES (1,NULL,NULL,'Income','income','dollar-sign','#22c55e','income',1,1,1,'2025-12-02 10:16:53'),(2,NULL,1,'Salary','salary','briefcase','#22c55e','income',1,1,2,'2025-12-02 10:16:53'),(3,NULL,1,'Freelance / Side Income','freelance','laptop','#22c55e','income',1,1,3,'2025-12-02 10:16:53'),(4,NULL,1,'Investment Income','investment-income','trending-up','#22c55e','income',1,1,4,'2025-12-02 10:16:53'),(5,NULL,NULL,'Housing','housing','home','#f97316','expense',1,1,5,'2025-12-02 10:17:01'),(6,NULL,5,'Rent / Mortgage','rent-mortgage','home','#f97316','expense',1,1,6,'2025-12-02 10:17:01'),(7,NULL,5,'Utilities','utilities','zap','#f97316','expense',1,1,7,'2025-12-02 10:17:01'),(8,NULL,5,'Home Maintenance','home-maintenance','wrench','#f97316','expense',1,1,8,'2025-12-02 10:17:01'),(9,NULL,NULL,'Food and Dining','food-dining','utensils','#ef4444','expense',1,1,9,'2025-12-02 10:17:11'),(10,NULL,9,'Groceries','groceries','shopping-cart','#ef4444','expense',1,1,10,'2025-12-02 10:17:11'),(11,NULL,9,'Restaurants','restaurants','utensils','#ef4444','expense',1,1,11,'2025-12-02 10:17:11'),(12,NULL,9,'Coffee / Snacks','coffee-snacks','coffee','#ef4444','expense',1,1,12,'2025-12-02 10:17:11'),(13,NULL,NULL,'Transportation','transportation','car','#22c55e','expense',1,1,13,'2025-12-02 10:17:20'),(14,NULL,13,'Gas','gas','fuel','#22c55e','expense',1,1,14,'2025-12-02 10:17:20'),(15,NULL,13,'Maintenance','vehicle-maintenance','wrench','#22c55e','expense',1,1,15,'2025-12-02 10:17:20'),(16,NULL,13,'Auto Insurance','auto-insurance','shield','#22c55e','expense',1,1,16,'2025-12-02 10:17:20'),(17,NULL,NULL,'Healthcare','healthcare','heart','#a855f7','expense',1,1,17,'2025-12-02 10:17:45'),(18,NULL,17,'Medical Visits','medical-visits','heart','#a855f7','expense',1,1,18,'2025-12-02 10:17:45'),(19,NULL,17,'Pharmacy','pharmacy','heart','#a855f7','expense',1,1,19,'2025-12-02 10:17:45'),(20,NULL,17,'Health Insurance','health-insurance','shield','#a855f7','expense',1,1,20,'2025-12-02 10:17:45'),(21,NULL,NULL,'Insurance','insurance','shield','#6b7280','expense',1,1,21,'2025-12-02 10:18:01'),(22,NULL,21,'Life Insurance','life-insurance','shield','#6b7280','expense',1,1,22,'2025-12-02 10:18:01'),(23,NULL,21,'Home / Renters Insurance','home-renters-insurance','shield','#6b7280','expense',1,1,23,'2025-12-02 10:18:01'),(24,NULL,21,'Auto Insurance General','auto-insurance-general','shield','#6b7280','expense',1,1,24,'2025-12-02 10:18:01'),(25,NULL,NULL,'Education','education','book','#3b82f6','expense',1,1,25,'2025-12-02 10:18:10'),(26,NULL,25,'Tuition / Courses','tuition-courses','book','#3b82f6','expense',1,1,26,'2025-12-02 10:18:10'),(27,NULL,25,'Books / Materials','books-materials','book','#3b82f6','expense',1,1,27,'2025-12-02 10:18:10'),(28,NULL,NULL,'Entertainment','entertainment','film','#ec4899','expense',1,1,28,'2025-12-02 10:18:20'),(29,NULL,28,'Streaming Services','streaming-services','film','#ec4899','expense',1,1,29,'2025-12-02 10:18:20'),(30,NULL,28,'Events / Activities','events-activities','film','#ec4899','expense',1,1,30,'2025-12-02 10:18:20'),(31,NULL,28,'Gaming / Hobbies','gaming-hobbies','smile','#ec4899','expense',1,1,31,'2025-12-02 10:18:20'),(32,NULL,NULL,'Personal Care','personal-care','smile','#f472b6','expense',1,1,32,'2025-12-02 10:18:29'),(33,NULL,32,'Hair / Grooming','hair-grooming','smile','#f472b6','expense',1,1,33,'2025-12-02 10:18:29'),(34,NULL,32,'Skincare / Products','skincare-products','smile','#f472b6','expense',1,1,34,'2025-12-02 10:18:29'),(35,NULL,32,'Clothing','clothing','shopping-bag','#f472b6','expense',1,1,35,'2025-12-02 10:18:29'),(36,NULL,NULL,'Shopping','shopping','shopping-bag','#a855f7','expense',1,1,36,'2025-12-02 10:18:38'),(37,NULL,36,'Household Supplies','household-supplies','shopping-cart','#a855f7','expense',1,1,37,'2025-12-02 10:18:38'),(38,NULL,36,'Electronics','electronics','smartphone','#a855f7','expense',1,1,38,'2025-12-02 10:18:38'),(39,NULL,36,'Gifts Purchases','gifts-purchases','gift','#a855f7','expense',1,1,39,'2025-12-02 10:18:38'),(40,NULL,NULL,'Travel','travel','plane','#0ea5e9','expense',1,1,40,'2025-12-02 10:18:47'),(41,NULL,40,'Flights','flights','plane','#0ea5e9','expense',1,1,41,'2025-12-02 10:18:47'),(42,NULL,40,'Hotels','hotels','home','#0ea5e9','expense',1,1,42,'2025-12-02 10:18:47'),(43,NULL,40,'Activities / Food','travel-activities','utensils','#0ea5e9','expense',1,1,43,'2025-12-02 10:18:47'),(44,NULL,NULL,'Business Expenses','business-expenses','briefcase','#92400e','expense',1,1,44,'2025-12-02 10:18:56'),(45,NULL,44,'Office Supplies','office-supplies','file-text','#92400e','expense',1,1,45,'2025-12-02 10:18:56'),(46,NULL,44,'Software Subscriptions','software-subscriptions','laptop','#92400e','expense',1,1,46,'2025-12-02 10:18:56'),(47,NULL,44,'Business Meals','business-meals','utensils','#92400e','expense',1,1,47,'2025-12-02 10:18:56'),(48,NULL,NULL,'Property Management','property-management','home','#14b8a6','expense',1,1,48,'2025-12-02 10:19:06'),(49,NULL,48,'Repairs and Maintenance','repairs-maintenance','wrench','#14b8a6','expense',1,1,49,'2025-12-02 10:19:06'),(50,NULL,48,'Property Tax','property-tax','file-text','#14b8a6','expense',1,1,50,'2025-12-02 10:19:06'),(51,NULL,48,'HOA / Insurance','hoa-insurance','shield','#14b8a6','expense',1,1,51,'2025-12-02 10:19:06'),(52,NULL,NULL,'Financial','financial','dollar-sign','#7c3aed','expense',1,1,52,'2025-12-02 10:19:15'),(53,NULL,52,'Bank Fees','bank-fees','credit-card','#7c3aed','expense',1,1,53,'2025-12-02 10:19:15'),(54,NULL,52,'Loan Payments','loan-payments','dollar-sign','#7c3aed','expense',1,1,54,'2025-12-02 10:19:15'),(55,NULL,52,'Investments','investments','trending-up','#7c3aed','expense',1,1,55,'2025-12-02 10:19:15'),(56,NULL,NULL,'Gifts / Charity','gifts-charity','gift','#f43f5e','expense',1,1,56,'2025-12-02 10:19:23'),(57,NULL,56,'Gifts Given','gifts-given','gift','#f43f5e','expense',1,1,57,'2025-12-02 10:19:23'),(58,NULL,56,'Donations','donations','heart','#f43f5e','expense',1,1,58,'2025-12-02 10:19:23'),(59,NULL,NULL,'Uncategorized','uncategorized','help-circle','#9ca3af','expense',1,1,99,'2025-12-02 10:24:31'),(61,NULL,13,'Parking','parking',NULL,'#3b82f6','expense',0,1,100,'2025-12-02 10:27:56'),(82,2,NULL,'Rental Income','rental-income','??','#22c55e','income',0,1,0,'2025-12-02 12:52:50'),(83,2,NULL,'Management Fees','management-fees','??','#10b981','income',0,1,0,'2025-12-02 12:52:50'),(84,2,NULL,'Other Income','other-income-biz','??','#06b6d4','income',0,1,0,'2025-12-02 12:52:50'),(85,2,NULL,'Property Maintenance','property-maintenance','??','#ef4444','expense',0,1,0,'2025-12-02 12:52:50'),(86,2,NULL,'Utilities','utilities-biz','??','#f97316','expense',0,1,0,'2025-12-02 12:52:50'),(87,2,NULL,'Insurance','insurance-biz','???','#f59e0b','expense',0,1,0,'2025-12-02 12:52:50'),(88,2,NULL,'Taxes & Licenses','taxes-licenses','??','#eab308','expense',0,1,0,'2025-12-02 12:52:50'),(89,2,NULL,'Office Expenses','office-expenses','??','#84cc16','expense',0,1,0,'2025-12-02 12:52:50'),(90,2,NULL,'Professional Services','professional-services','??','#22c55e','expense',0,1,0,'2025-12-02 12:52:50'),(91,2,NULL,'Marketing','marketing','??','#3b82f6','expense',0,1,0,'2025-12-02 12:52:50'),(92,2,NULL,'Payroll','payroll','??','#6366f1','expense',0,1,0,'2025-12-02 12:52:50'),(93,2,NULL,'Bank & Finance','bank-finance','??','#8b5cf6','expense',0,1,0,'2025-12-02 12:52:50'),(94,2,82,'Residential Rent','residential-rent','??','#22c55e','income',0,1,0,'2025-12-02 12:53:29'),(95,2,82,'Commercial Rent','commercial-rent','??','#22c55e','income',0,1,0,'2025-12-02 12:53:29'),(96,2,82,'Late Fees','late-fees','?','#22c55e','income',0,1,0,'2025-12-02 12:53:29'),(97,2,83,'Property Management Fee','property-mgmt-fee','??','#10b981','income',0,1,0,'2025-12-02 12:53:29'),(98,2,83,'Leasing Fee','leasing-fee','??','#10b981','income',0,1,0,'2025-12-02 12:53:29'),(99,2,83,'Renewal Fee','renewal-fee','??','#10b981','income',0,1,0,'2025-12-02 12:53:29'),(100,2,84,'Application Fees','application-fees','??','#06b6d4','income',0,1,0,'2025-12-02 12:53:29'),(101,2,84,'Pet Fees','pet-fees','??','#06b6d4','income',0,1,0,'2025-12-02 12:53:29'),(102,2,84,'Interest Income','interest-income','??','#06b6d4','income',0,1,0,'2025-12-02 12:53:29'),(103,2,85,'Repairs','repairs','???','#ef4444','expense',0,1,0,'2025-12-02 12:53:29'),(104,2,85,'Landscaping','landscaping','??','#ef4444','expense',0,1,0,'2025-12-02 12:53:29'),(105,2,85,'Cleaning','cleaning','??','#ef4444','expense',0,1,0,'2025-12-02 12:53:29'),(106,2,86,'Electric','electric','?','#f97316','expense',0,1,0,'2025-12-02 12:53:29'),(107,2,86,'Water/Sewer','water-sewer','??','#f97316','expense',0,1,0,'2025-12-02 12:53:29'),(108,2,86,'Gas','gas-utility','??','#f97316','expense',0,1,0,'2025-12-02 12:53:29'),(109,2,87,'Property Insurance','property-insurance','??','#f59e0b','expense',0,1,0,'2025-12-02 12:53:29'),(110,2,87,'Liability Insurance','liability-insurance','??','#f59e0b','expense',0,1,0,'2025-12-02 12:53:29'),(111,2,87,'Workers Comp','workers-comp','??','#f59e0b','expense',0,1,0,'2025-12-02 12:53:29'),(112,2,88,'Property Tax','property-tax','???','#eab308','expense',0,1,0,'2025-12-02 12:53:29'),(113,2,88,'Business License','business-license','??','#eab308','expense',0,1,0,'2025-12-02 12:53:29'),(114,2,88,'HOA Fees','hoa-fees','???','#eab308','expense',0,1,0,'2025-12-02 12:53:29'),(115,2,89,'Office Supplies','office-supplies','??','#84cc16','expense',0,1,0,'2025-12-02 12:53:29'),(116,2,89,'Software/Subscriptions','software-subs','??','#84cc16','expense',0,1,0,'2025-12-02 12:53:29'),(117,2,89,'Phone/Internet','phone-internet','??','#84cc16','expense',0,1,0,'2025-12-02 12:53:29'),(118,2,90,'Legal Fees','legal-fees','??','#22c55e','expense',0,1,0,'2025-12-02 12:53:29'),(119,2,90,'Accounting','accounting','??','#22c55e','expense',0,1,0,'2025-12-02 12:53:29'),(120,2,90,'Contractors','contractors','??','#22c55e','expense',0,1,0,'2025-12-02 12:53:29'),(121,2,91,'Advertising','advertising','??','#3b82f6','expense',0,1,0,'2025-12-02 12:53:29'),(122,2,91,'Listing Fees','listing-fees','???','#3b82f6','expense',0,1,0,'2025-12-02 12:53:29'),(123,2,91,'Signage','signage','??','#3b82f6','expense',0,1,0,'2025-12-02 12:53:29'),(124,2,92,'Salaries/Wages','salaries-wages','??','#6366f1','expense',0,1,0,'2025-12-02 12:53:29'),(125,2,92,'Payroll Taxes','payroll-taxes','??','#6366f1','expense',0,1,0,'2025-12-02 12:53:29'),(126,2,92,'Benefits','benefits','??','#6366f1','expense',0,1,0,'2025-12-02 12:53:29'),(127,2,93,'Bank Fees','bank-fees-biz','??','#8b5cf6','expense',0,1,0,'2025-12-02 12:53:29'),(128,2,93,'Loan Interest','loan-interest','??','#8b5cf6','expense',0,1,0,'2025-12-02 12:53:29'),(129,2,93,'Mortgage Payment','mortgage-payment','??','#8b5cf6','expense',0,1,0,'2025-12-02 12:53:29');
+/*!40000 ALTER TABLE `categories` ENABLE KEYS */;
+UNLOCK TABLES;
 
--- 4. Transportation
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(13, 'Transportation', 'transportation', 'car', '#22c55e', 'expense', 1, 13, NULL),
-(14, 'Gas', 'gas', 'fuel', '#22c55e', 'expense', 1, 14, 13),
-(15, 'Maintenance', 'vehicle-maintenance', 'wrench', '#22c55e', 'expense', 1, 15, 13),
-(16, 'Auto Insurance', 'auto-insurance', 'shield', '#22c55e', 'expense', 1, 16, 13);
+--
+-- Dumping data for table `financial_institutions`
+--
 
--- 5. Healthcare
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(17, 'Healthcare', 'healthcare', 'heart', '#a855f7', 'expense', 1, 17, NULL),
-(18, 'Medical Visits', 'medical-visits', 'heart', '#a855f7', 'expense', 1, 18, 17),
-(19, 'Pharmacy', 'pharmacy', 'heart', '#a855f7', 'expense', 1, 19, 17),
-(20, 'Health Insurance', 'health-insurance', 'shield', '#a855f7', 'expense', 1, 20, 17);
+LOCK TABLES `financial_institutions` WRITE;
+/*!40000 ALTER TABLE `financial_institutions` DISABLE KEYS */;
+INSERT INTO `financial_institutions` VALUES (1,'Chase Bank','CHASE','bank','US','{\"date_col\": 0, \"description_col\": 1, \"amount_col\": 2, \"type_col\": 3, \"date_format\": \"m/d/Y\"}',NULL,NULL,1,'2025-12-02 09:40:16'),(2,'Bank of America','BOFA','bank','US','{\"date_col\": 0, \"description_col\": 1, \"amount_col\": 2, \"date_format\": \"m/d/Y\"}',NULL,NULL,1,'2025-12-02 09:40:16'),(3,'Wells Fargo','WF','bank','US','{\"date_col\": 0, \"amount_col\": 1, \"description_col\": 4, \"date_format\": \"m/d/Y\"}',NULL,NULL,1,'2025-12-02 09:40:16'),(4,'Capital One','CAPONE','credit_card','US','{\"date_col\": 0, \"post_date_col\": 1, \"description_col\": 3, \"debit_col\": 5, \"credit_col\": 6, \"date_format\": \"Y-m-d\"}',NULL,NULL,1,'2025-12-02 09:40:16'),(5,'American Express','AMEX','credit_card','US','{\"date_col\": 0, \"description_col\": 1, \"amount_col\": 2, \"date_format\": \"m/d/Y\"}',NULL,NULL,1,'2025-12-02 09:40:16'),(6,'Discover','DISCOVER','credit_card','US','{\"date_col\": 0, \"post_date_col\": 1, \"description_col\": 2, \"amount_col\": 3, \"date_format\": \"m/d/Y\"}',NULL,NULL,1,'2025-12-02 09:40:16'),(7,'Citi Bank','CITI','bank','US','{\"date_col\": 0, \"description_col\": 2, \"debit_col\": 3, \"credit_col\": 4, \"date_format\": \"m/d/Y\"}',NULL,NULL,1,'2025-12-02 09:40:16'),(8,'Generic CSV','GENERIC','other','US','{\"date_col\": 0, \"description_col\": 1, \"amount_col\": 2, \"date_format\": \"Y-m-d\"}',NULL,NULL,1,'2025-12-02 09:40:16'),(9,'Chase Credit Card','CHASE_CC','bank','US','{\"date_col\": 0, \"post_date_col\": 1, \"description_col\": 2, \"category_col\": 3, \"type_col\": 4, \"amount_col\": 5, \"memo_col\": 6, \"date_format\": \"m/d/Y\", \"has_header\": true}',NULL,NULL,1,'2025-12-02 10:22:23');
+/*!40000 ALTER TABLE `financial_institutions` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
--- 6. Insurance
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(21, 'Insurance', 'insurance', 'shield', '#6b7280', 'expense', 1, 21, NULL),
-(22, 'Life Insurance', 'life-insurance', 'shield', '#6b7280', 'expense', 1, 22, 21),
-(23, 'Home / Renters Insurance', 'home-renters-insurance', 'shield', '#6b7280', 'expense', 1, 23, 21),
-(24, 'Auto Insurance General', 'auto-insurance-general', 'shield', '#6b7280', 'expense', 1, 24, 21);
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- 7. Education
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(25, 'Education', 'education', 'book', '#3b82f6', 'expense', 1, 25, NULL),
-(26, 'Tuition / Courses', 'tuition-courses', 'book', '#3b82f6', 'expense', 1, 26, 25),
-(27, 'Books / Materials', 'books-materials', 'book', '#3b82f6', 'expense', 1, 27, 25);
-
--- 8. Entertainment
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(28, 'Entertainment', 'entertainment', 'film', '#ec4899', 'expense', 1, 28, NULL),
-(29, 'Streaming Services', 'streaming-services', 'film', '#ec4899', 'expense', 1, 29, 28),
-(30, 'Events / Activities', 'events-activities', 'film', '#ec4899', 'expense', 1, 30, 28),
-(31, 'Gaming / Hobbies', 'gaming-hobbies', 'smile', '#ec4899', 'expense', 1, 31, 28);
-
--- 9. Personal Care
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(32, 'Personal Care', 'personal-care', 'smile', '#f472b6', 'expense', 1, 32, NULL),
-(33, 'Hair / Grooming', 'hair-grooming', 'smile', '#f472b6', 'expense', 1, 33, 32),
-(34, 'Skincare / Products', 'skincare-products', 'smile', '#f472b6', 'expense', 1, 34, 32),
-(35, 'Clothing', 'clothing', 'shopping-bag', '#f472b6', 'expense', 1, 35, 32);
-
--- 10. Shopping
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(36, 'Shopping', 'shopping', 'shopping-bag', '#a855f7', 'expense', 1, 36, NULL),
-(37, 'Household Supplies', 'household-supplies', 'shopping-cart', '#a855f7', 'expense', 1, 37, 36),
-(38, 'Electronics', 'electronics', 'smartphone', '#a855f7', 'expense', 1, 38, 36),
-(39, 'Gifts Purchases', 'gifts-purchases', 'gift', '#a855f7', 'expense', 1, 39, 36);
-
--- 11. Travel
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(40, 'Travel', 'travel', 'plane', '#0ea5e9', 'expense', 1, 40, NULL),
-(41, 'Flights', 'flights', 'plane', '#0ea5e9', 'expense', 1, 41, 40),
-(42, 'Hotels', 'hotels', 'home', '#0ea5e9', 'expense', 1, 42, 40),
-(43, 'Activities / Food', 'travel-activities', 'utensils', '#0ea5e9', 'expense', 1, 43, 40);
-
--- 12. Business Expenses
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(44, 'Business Expenses', 'business-expenses', 'briefcase', '#92400e', 'expense', 1, 44, NULL),
-(45, 'Office Supplies', 'office-supplies', 'file-text', '#92400e', 'expense', 1, 45, 44),
-(46, 'Software Subscriptions', 'software-subscriptions', 'laptop', '#92400e', 'expense', 1, 46, 44),
-(47, 'Business Meals', 'business-meals', 'utensils', '#92400e', 'expense', 1, 47, 44);
-
--- 13. Property Management
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(48, 'Property Management', 'property-management', 'home', '#14b8a6', 'expense', 1, 48, NULL),
-(49, 'Repairs and Maintenance', 'repairs-maintenance', 'wrench', '#14b8a6', 'expense', 1, 49, 48),
-(50, 'Property Tax', 'property-tax', 'file-text', '#14b8a6', 'expense', 1, 50, 48),
-(51, 'HOA / Insurance', 'hoa-insurance', 'shield', '#14b8a6', 'expense', 1, 51, 48);
-
--- 14. Financial
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(52, 'Financial', 'financial', 'dollar-sign', '#7c3aed', 'expense', 1, 52, NULL),
-(53, 'Bank Fees', 'bank-fees', 'credit-card', '#7c3aed', 'expense', 1, 53, 52),
-(54, 'Loan Payments', 'loan-payments', 'dollar-sign', '#7c3aed', 'expense', 1, 54, 52),
-(55, 'Investments', 'investments', 'trending-up', '#7c3aed', 'expense', 1, 55, 52);
-
--- 15. Gifts / Charity
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(56, 'Gifts / Charity', 'gifts-charity', 'gift', '#f43f5e', 'expense', 1, 56, NULL),
-(57, 'Gifts Given', 'gifts-given', 'gift', '#f43f5e', 'expense', 1, 57, 56),
-(58, 'Donations', 'donations', 'heart', '#f43f5e', 'expense', 1, 58, 56);
-
--- 16. Uncategorized (for unmapped transactions)
-INSERT INTO categories (id, name, slug, icon, color, category_type, is_system, sort_order, parent_id) VALUES
-(59, 'Uncategorized', 'uncategorized', 'help-circle', '#9ca3af', 'expense', 1, 99, NULL);
-
--- =====================================================
--- Default User (optional - remove in production)
--- Password: Dbghrud83#
--- =====================================================
-INSERT INTO users (username, email, password_hash, display_name, is_active, is_admin) VALUES
-('Daniel', 'daniel@example.com', '$2y$10$vPh1rE2b0nvEcKtPkIfLOOvTaI4HzO5ps2STvMQ/KnLyIlLvKakQi', 'Daniel', 1, 1);
+-- Dump completed on 2025-12-03  4:45:13
