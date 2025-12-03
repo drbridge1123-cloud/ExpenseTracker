@@ -195,8 +195,8 @@ function createKanbanCard(item) {
             <div class="kanban-card-vendor">${escapeHtml(vendor)}</div>
             ${desc && desc !== vendor ? `<div class="kanban-card-desc">${escapeHtml(desc)}</div>` : ''}
             <div class="kanban-card-footer">
-                <span class="kanban-card-type ${isCash ? 'cash' : 'transaction'}">${isCash ? '💵 Cash' : '💳 Card'}</span>
-                <span class="kanban-card-receipt ${hasReceipt ? 'has-receipt' : ''}">${hasReceipt ? '📎' : ''}</span>
+                <span class="kanban-card-type ${isCash ? 'cash' : 'transaction'}">${isCash ? 'Cash' : 'Card'}</span>
+                ${hasReceipt ? '<span class="kanban-card-receipt has-receipt">Receipt</span>' : ''}
             </div>
         </div>
     `;
