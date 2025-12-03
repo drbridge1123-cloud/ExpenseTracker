@@ -206,9 +206,9 @@
                         <span class="menu-icon">✅</span>
                         <span class="menu-label">Reconcile</span>
                     </div>
-                    <div class="menu-item" data-page="import">
-                        <span class="menu-icon">📥</span>
-                        <span class="menu-label">Import CSV</span>
+                    <div class="menu-item" data-page="data-management">
+                        <span class="menu-icon">💾</span>
+                        <span class="menu-label">Data Management</span>
                     </div>
                 </nav>
             </div>
@@ -2217,6 +2217,472 @@
                         <!-- Dynamic content here -->
                     </div>
                 </div>
+
+                <!-- Data Management Page -->
+                <div class="page" id="page-data-management">
+                    <div class="dm-container">
+                        <!-- Header -->
+                        <div class="dm-header">
+                            <div class="dm-header-content">
+                                <h1>Data Management</h1>
+                                <p>Export, import, backup and restore your financial data</p>
+                            </div>
+                        </div>
+
+                        <!-- Navigation Tabs -->
+                        <div class="dm-nav">
+                            <button class="dm-nav-item active" data-tab="export">
+                                <svg class="dm-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                                <span>Export</span>
+                            </button>
+                            <button class="dm-nav-item" data-tab="import">
+                                <svg class="dm-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                <span>Import</span>
+                            </button>
+                            <button class="dm-nav-item" data-tab="backup">
+                                <svg class="dm-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                    <polyline points="17 21 17 13 7 13 7 21"/>
+                                    <polyline points="7 3 7 8 15 8"/>
+                                </svg>
+                                <span>Backup</span>
+                            </button>
+                            <button class="dm-nav-item" data-tab="restore">
+                                <svg class="dm-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="1 4 1 10 7 10"/>
+                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                                </svg>
+                                <span>Restore</span>
+                            </button>
+                        </div>
+
+                        <!-- Export Tab -->
+                        <div id="export-content" class="dm-tab-content active">
+                            <div class="dm-card">
+                                <div class="dm-card-header">
+                                    <div class="dm-card-icon dm-icon-blue">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                            <polyline points="17 8 12 3 7 8"/>
+                                            <line x1="12" y1="3" x2="12" y2="15"/>
+                                        </svg>
+                                    </div>
+                                    <div class="dm-card-title">
+                                        <h2>Export Data</h2>
+                                        <p>Download your data as CSV files</p>
+                                    </div>
+                                </div>
+
+                                <div class="dm-card-body">
+                                    <p class="dm-section-label">Select data to export</p>
+                                    <div class="dm-export-grid">
+                                        <label class="dm-checkbox-card">
+                                            <input type="checkbox" name="dm-export" value="transactions" checked>
+                                            <div class="dm-checkbox-content">
+                                                <div class="dm-checkbox-icon">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                                    </svg>
+                                                </div>
+                                                <span class="dm-checkbox-label">Transactions</span>
+                                                <span class="dm-checkbox-desc">All income & expenses</span>
+                                            </div>
+                                            <div class="dm-checkbox-check">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                                    <polyline points="20 6 9 17 4 12"/>
+                                                </svg>
+                                            </div>
+                                        </label>
+                                        <label class="dm-checkbox-card">
+                                            <input type="checkbox" name="dm-export" value="categories">
+                                            <div class="dm-checkbox-content">
+                                                <div class="dm-checkbox-icon">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                                                    </svg>
+                                                </div>
+                                                <span class="dm-checkbox-label">Categories</span>
+                                                <span class="dm-checkbox-desc">Custom categories</span>
+                                            </div>
+                                            <div class="dm-checkbox-check">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                                    <polyline points="20 6 9 17 4 12"/>
+                                                </svg>
+                                            </div>
+                                        </label>
+                                        <label class="dm-checkbox-card">
+                                            <input type="checkbox" name="dm-export" value="accounts">
+                                            <div class="dm-checkbox-content">
+                                                <div class="dm-checkbox-icon">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+                                                    </svg>
+                                                </div>
+                                                <span class="dm-checkbox-label">Accounts</span>
+                                                <span class="dm-checkbox-desc">Bank accounts</span>
+                                            </div>
+                                            <div class="dm-checkbox-check">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                                    <polyline points="20 6 9 17 4 12"/>
+                                                </svg>
+                                            </div>
+                                        </label>
+                                        <label class="dm-checkbox-card">
+                                            <input type="checkbox" name="dm-export" value="rules">
+                                            <div class="dm-checkbox-content">
+                                                <div class="dm-checkbox-icon">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+                                                    </svg>
+                                                </div>
+                                                <span class="dm-checkbox-label">Rules</span>
+                                                <span class="dm-checkbox-desc">Auto-categorization</span>
+                                            </div>
+                                            <div class="dm-checkbox-check">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                                    <polyline points="20 6 9 17 4 12"/>
+                                                </svg>
+                                            </div>
+                                        </label>
+                                        <label class="dm-checkbox-card">
+                                            <input type="checkbox" name="dm-export" value="recurring">
+                                            <div class="dm-checkbox-content">
+                                                <div class="dm-checkbox-icon">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                                    </svg>
+                                                </div>
+                                                <span class="dm-checkbox-label">Recurring</span>
+                                                <span class="dm-checkbox-desc">Scheduled items</span>
+                                            </div>
+                                            <div class="dm-checkbox-check">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                                    <polyline points="20 6 9 17 4 12"/>
+                                                </svg>
+                                            </div>
+                                        </label>
+                                        <label class="dm-checkbox-card">
+                                            <input type="checkbox" name="dm-export" value="budgets">
+                                            <div class="dm-checkbox-content">
+                                                <div class="dm-checkbox-icon">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>
+                                                    </svg>
+                                                </div>
+                                                <span class="dm-checkbox-label">Budgets</span>
+                                                <span class="dm-checkbox-desc">Budget settings</span>
+                                            </div>
+                                            <div class="dm-checkbox-check">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                                    <polyline points="20 6 9 17 4 12"/>
+                                                </svg>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="dm-card-footer">
+                                    <div class="dm-loading" id="dm-export-loading">
+                                        <div class="dm-spinner"></div>
+                                        <span>Preparing download...</span>
+                                    </div>
+                                    <button class="dm-btn dm-btn-primary" onclick="exportSelectedData()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                            <polyline points="7 10 12 15 17 10"/>
+                                            <line x1="12" y1="15" x2="12" y2="3"/>
+                                        </svg>
+                                        Download CSV Files
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Import Tab -->
+                        <div id="import-content" class="dm-tab-content">
+                            <div class="dm-grid-2">
+                                <div class="dm-card">
+                                    <div class="dm-card-header">
+                                        <div class="dm-card-icon dm-icon-green">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                                <polyline points="7 10 12 15 17 10"/>
+                                                <line x1="12" y1="15" x2="12" y2="3"/>
+                                            </svg>
+                                        </div>
+                                        <div class="dm-card-title">
+                                            <h2>Import Data</h2>
+                                            <p>Upload CSV files to import</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="dm-card-body">
+                                        <div class="dm-form-group">
+                                            <label class="dm-label">Data Type</label>
+                                            <select class="dm-select" id="dm-import-type">
+                                                <option value="categories">Categories</option>
+                                                <option value="accounts">Accounts</option>
+                                                <option value="rules">Categorization Rules</option>
+                                                <option value="recurring">Recurring Transactions</option>
+                                                <option value="budgets">Budgets</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="dm-form-group">
+                                            <label class="dm-label">CSV File</label>
+                                            <div class="dm-dropzone" id="dm-import-dropzone">
+                                                <input type="file" id="dm-import-file" accept=".csv" onchange="updateImportFileName(this)">
+                                                <div class="dm-dropzone-content">
+                                                    <svg class="dm-dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                                        <polyline points="14 2 14 8 20 8"/>
+                                                        <line x1="12" y1="18" x2="12" y2="12"/>
+                                                        <line x1="9" y1="15" x2="15" y2="15"/>
+                                                    </svg>
+                                                    <p class="dm-dropzone-text">Drop CSV file here or <span>browse</span></p>
+                                                    <p class="dm-dropzone-hint" id="dm-import-file-name">No file selected</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="dm-result-box" id="dm-import-result"></div>
+                                    </div>
+
+                                    <div class="dm-card-footer">
+                                        <div class="dm-loading" id="dm-import-loading">
+                                            <div class="dm-spinner"></div>
+                                            <span>Importing...</span>
+                                        </div>
+                                        <button class="dm-btn dm-btn-success" onclick="importData()">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                                <polyline points="17 8 12 3 7 8"/>
+                                                <line x1="12" y1="3" x2="12" y2="15"/>
+                                            </svg>
+                                            Import Data
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="dm-card dm-card-info">
+                                    <div class="dm-card-header">
+                                        <div class="dm-card-icon dm-icon-gray">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                                            </svg>
+                                        </div>
+                                        <div class="dm-card-title">
+                                            <h2>CSV Format</h2>
+                                            <p>Required columns</p>
+                                        </div>
+                                    </div>
+                                    <div class="dm-card-body">
+                                        <div class="dm-info-list">
+                                            <div class="dm-info-item">
+                                                <div class="dm-info-badge">Categories</div>
+                                                <code>Name, Type</code>
+                                            </div>
+                                            <div class="dm-info-item">
+                                                <div class="dm-info-badge">Accounts</div>
+                                                <code>Account Name</code>
+                                            </div>
+                                            <div class="dm-info-item">
+                                                <div class="dm-info-badge">Rules</div>
+                                                <code>Match Value, Category</code>
+                                            </div>
+                                            <div class="dm-info-item">
+                                                <div class="dm-info-badge">Recurring</div>
+                                                <code>Description, Amount</code>
+                                            </div>
+                                            <div class="dm-info-item">
+                                                <div class="dm-info-badge">Budgets</div>
+                                                <code>Amount, Category</code>
+                                            </div>
+                                        </div>
+                                        <p class="dm-info-note">Each file must include a header row with column names.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Backup Tab -->
+                        <div id="backup-content" class="dm-tab-content">
+                            <div class="dm-card">
+                                <div class="dm-card-header">
+                                    <div class="dm-card-icon dm-icon-purple">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                            <polyline points="17 21 17 13 7 13 7 21"/>
+                                            <polyline points="7 3 7 8 15 8"/>
+                                        </svg>
+                                    </div>
+                                    <div class="dm-card-title">
+                                        <h2>Full Backup</h2>
+                                        <p>Download complete data archive</p>
+                                    </div>
+                                </div>
+
+                                <div class="dm-card-body">
+                                    <div class="dm-backup-preview">
+                                        <div class="dm-backup-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                                                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                                                <line x1="12" y1="22.08" x2="12" y2="12"/>
+                                            </svg>
+                                        </div>
+                                        <div class="dm-backup-info">
+                                            <h3>ExpenseTracker_Backup.zip</h3>
+                                            <p>Complete backup including all your data</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="dm-included-list">
+                                        <p class="dm-section-label">Backup includes</p>
+                                        <div class="dm-included-grid">
+                                            <div class="dm-included-item">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                                                <span>Transactions</span>
+                                            </div>
+                                            <div class="dm-included-item">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                                                <span>Categories</span>
+                                            </div>
+                                            <div class="dm-included-item">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                                                <span>Accounts</span>
+                                            </div>
+                                            <div class="dm-included-item">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                                                <span>Rules & Budgets</span>
+                                            </div>
+                                            <div class="dm-included-item">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                                                <span>Bank Statements</span>
+                                            </div>
+                                            <div class="dm-included-item">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                                                <span>Receipt Images</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="dm-card-footer">
+                                    <div class="dm-loading" id="dm-backup-loading">
+                                        <div class="dm-spinner"></div>
+                                        <span>Creating backup...</span>
+                                    </div>
+                                    <button class="dm-btn dm-btn-purple" onclick="createFullBackup()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                            <polyline points="7 10 12 15 17 10"/>
+                                            <line x1="12" y1="15" x2="12" y2="3"/>
+                                        </svg>
+                                        Download Backup
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Restore Tab -->
+                        <div id="restore-content" class="dm-tab-content">
+                            <div class="dm-card">
+                                <div class="dm-card-header">
+                                    <div class="dm-card-icon dm-icon-orange">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="1 4 1 10 7 10"/>
+                                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                                        </svg>
+                                    </div>
+                                    <div class="dm-card-title">
+                                        <h2>Restore Backup</h2>
+                                        <p>Restore from a backup file</p>
+                                    </div>
+                                </div>
+
+                                <div class="dm-card-body">
+                                    <div class="dm-alert dm-alert-warning">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                                        </svg>
+                                        <div>
+                                            <strong>Caution</strong>
+                                            <p>Replace mode will permanently delete existing data before restoring.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="dm-form-group">
+                                        <label class="dm-label">Restore Mode</label>
+                                        <div class="dm-radio-cards">
+                                            <label class="dm-radio-card">
+                                                <input type="radio" name="dm-restore-mode" value="merge" checked>
+                                                <div class="dm-radio-content">
+                                                    <div class="dm-radio-indicator"></div>
+                                                    <div class="dm-radio-text">
+                                                        <span class="dm-radio-title">Merge</span>
+                                                        <span class="dm-radio-desc">Keep existing data, add new records</span>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                            <label class="dm-radio-card">
+                                                <input type="radio" name="dm-restore-mode" value="replace">
+                                                <div class="dm-radio-content">
+                                                    <div class="dm-radio-indicator"></div>
+                                                    <div class="dm-radio-text">
+                                                        <span class="dm-radio-title">Replace</span>
+                                                        <span class="dm-radio-desc">Delete all existing data first</span>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="dm-form-group">
+                                        <label class="dm-label">Backup File</label>
+                                        <div class="dm-dropzone" id="dm-restore-dropzone">
+                                            <input type="file" id="dm-restore-file" accept=".zip" onchange="updateRestoreFileName(this)">
+                                            <div class="dm-dropzone-content">
+                                                <svg class="dm-dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                                                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                                                </svg>
+                                                <p class="dm-dropzone-text">Drop ZIP file here or <span>browse</span></p>
+                                                <p class="dm-dropzone-hint" id="dm-restore-file-name">No file selected</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="dm-result-box" id="dm-restore-result"></div>
+                                </div>
+
+                                <div class="dm-card-footer">
+                                    <div class="dm-loading" id="dm-restore-loading">
+                                        <div class="dm-spinner"></div>
+                                        <span>Restoring data...</span>
+                                    </div>
+                                    <button class="dm-btn dm-btn-warning" onclick="restoreBackup()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="1 4 1 10 7 10"/>
+                                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                                        </svg>
+                                        Restore Backup
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -2373,6 +2839,7 @@
     <script src="js/modules/custom-reports.js" defer></script>
     <script src="js/modules/transactions.js" defer></script>
     <script src="js/modules/accounts.js" defer></script>
+    <script src="js/modules/data-management.js" defer></script>
 </body>
 
 </html>

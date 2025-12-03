@@ -242,6 +242,9 @@ async function loadPageData(page) {
             case 'rules':
                 await loadRules();
                 break;
+            case 'data-management':
+                loadDataManagementPage();
+                break;
         }
     } catch (error) {
         showToast('Error loading data: ' + error.message, 'error');
