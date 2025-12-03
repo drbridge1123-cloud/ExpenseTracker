@@ -538,6 +538,99 @@ CREATE TABLE `receipt_folders` (
 -- ALTER TABLE receipts ADD KEY idx_receipts_folder (folder_id);
 -- -----------------------------------------------------
 
+-- -----------------------------------------------------
+-- Table: receipts
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `receipts`;
+CREATE TABLE `receipts` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id` INT UNSIGNED NOT NULL,
+    `transaction_id` INT UNSIGNED NULL,
+    `folder_id` INT UNSIGNED NULL,
+    `file_name` VARCHAR(255) NOT NULL,
+    `original_name` VARCHAR(255) NULL,
+    `file_path` VARCHAR(500) NOT NULL,
+    `file_type` VARCHAR(50) NULL,
+    `file_size` INT UNSIGNED NULL,
+    `description` TEXT NULL,
+    `receipt_date` DATE NULL,
+    `vendor_name` VARCHAR(200) NULL,
+    `amount` DECIMAL(15,2) NULL,
+    `reimbursement_status` ENUM('none', 'pending', 'submitted', 'approved', 'reimbursed') DEFAULT 'none',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_receipts_user` (`user_id`),
+    KEY `idx_receipts_transaction` (`transaction_id`),
+    KEY `idx_receipts_folder` (`folder_id`),
+    CONSTRAINT `fk_receipts_user` FOREIGN KEY (`user_id`)
+        REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_receipts_transaction` FOREIGN KEY (`transaction_id`)
+        REFERENCES `transactions` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_receipts_folder` FOREIGN KEY (`folder_id`)
+        REFERENCES `receipt_folders` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------
+-- Table: checks
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `checks`;
+CREATE TABLE `checks` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id` INT UNSIGNED NOT NULL,
+    `account_id` INT UNSIGNED NOT NULL,
+    `transaction_id` INT UNSIGNED NULL,
+    `check_number` VARCHAR(20) NOT NULL,
+    `payee` VARCHAR(200) NOT NULL,
+    `amount` DECIMAL(15,2) NOT NULL,
+    `check_date` DATE NOT NULL,
+    `memo` TEXT NULL,
+    `category_id` INT UNSIGNED NULL,
+    `status` ENUM('pending', 'cleared', 'void') DEFAULT 'pending',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_checks_account_number` (`account_id`, `check_number`),
+    KEY `idx_checks_user` (`user_id`),
+    KEY `idx_checks_account` (`account_id`),
+    KEY `idx_checks_date` (`check_date`),
+    CONSTRAINT `fk_checks_user` FOREIGN KEY (`user_id`)
+        REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_checks_account` FOREIGN KEY (`account_id`)
+        REFERENCES `accounts` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_checks_transaction` FOREIGN KEY (`transaction_id`)
+        REFERENCES `transactions` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_checks_category` FOREIGN KEY (`category_id`)
+        REFERENCES `categories` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------
+-- Table: reconciliations
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `reconciliations`;
+CREATE TABLE `reconciliations` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id` INT UNSIGNED NOT NULL,
+    `account_id` INT UNSIGNED NOT NULL,
+    `statement_date` DATE NOT NULL,
+    `statement_balance` DECIMAL(15,2) NOT NULL,
+    `reconciled_balance` DECIMAL(15,2) NULL,
+    `difference` DECIMAL(15,2) NULL,
+    `status` ENUM('in_progress', 'completed', 'abandoned') DEFAULT 'in_progress',
+    `reconciled_date` TIMESTAMP NULL,
+    `notes` TEXT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_reconciliations_user` (`user_id`),
+    KEY `idx_reconciliations_account` (`account_id`),
+    KEY `idx_reconciliations_date` (`reconciled_date`),
+    CONSTRAINT `fk_reconciliations_user` FOREIGN KEY (`user_id`)
+        REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_reconciliations_account` FOREIGN KEY (`account_id`)
+        REFERENCES `accounts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- =====================================================
 -- End of Schema
 -- =====================================================

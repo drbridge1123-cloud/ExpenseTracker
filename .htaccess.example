@@ -1,15 +1,16 @@
 # Expense Tracker - Apache Configuration
-# For XAMPP on Windows
+# Copy this file to .htaccess and replace YOUR_FOLDER_NAME with your actual folder name
+# Or run install.php to auto-generate this file
 
 # Enable rewrite engine
 RewriteEngine On
 
-# Set base directory
-RewriteBase /expensetracker/
+# Set base directory (CHANGE THIS to your folder name)
+RewriteBase /YOUR_FOLDER_NAME/
 
 # Redirect all requests to public folder (except api and existing files)
-RewriteCond %{REQUEST_URI} !^/expensetracker/public/
-RewriteCond %{REQUEST_URI} !^/expensetracker/api/
+RewriteCond %{REQUEST_URI} !^/YOUR_FOLDER_NAME/public/
+RewriteCond %{REQUEST_URI} !^/YOUR_FOLDER_NAME/api/
 RewriteRule ^(.*)$ public/$1 [L]
 
 # Block access to sensitive directories

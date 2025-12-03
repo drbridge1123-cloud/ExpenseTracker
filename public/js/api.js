@@ -1,5 +1,12 @@
-// API Configuration
-const API_BASE = '/ExpensesTracker/api/v1';
+// API Configuration - Auto-detect base path from current URL
+const API_BASE = (() => {
+    // Get the base path from current location
+    const pathParts = window.location.pathname.split('/');
+    // Find the app folder (first non-empty path segment that's not 'public')
+    const appFolder = pathParts.find((part, index) => index > 0 && part !== '' && part !== 'public');
+    // Return the API base path
+    return appFolder ? '/' + appFolder + '/api/v1' : '/api/v1';
+})();
 
 // API Helpers
 async function apiGet(endpoint, params = {}) {

@@ -1,7 +1,8 @@
 # Environment & Secrets
-config/env.php
-config/env.local.php
 .env
+.env.local
+.htaccess
+.installed
 
 # Storage & Uploads
 storage/

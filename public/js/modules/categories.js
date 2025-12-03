@@ -367,8 +367,22 @@ function renderChartOfAccounts() {
     }
 
     // Separate parents and children
-    const parentCategories = filteredCategories.filter(c => !c.parent_id || c.parent_id == 0);
+    let parentCategories = filteredCategories.filter(c => !c.parent_id || c.parent_id == 0);
     const childCategories = filteredCategories.filter(c => c.parent_id && c.parent_id != 0);
+
+    // Sort parent categories: Assets first, then by category_type and sort_order
+    parentCategories.sort((a, b) => {
+        // Assets always first
+        if (a.slug === 'assets') return -1;
+        if (b.slug === 'assets') return 1;
+        // Then by category_type
+        if (a.category_type !== b.category_type) {
+            const typeOrder = { 'income': 1, 'expense': 2, 'transfer': 3, 'other': 4 };
+            return (typeOrder[a.category_type] || 5) - (typeOrder[b.category_type] || 5);
+        }
+        // Then by sort_order
+        return (a.sort_order || 0) - (b.sort_order || 0);
+    });
 
     // Group children by parent
     const childrenByParent = {};
@@ -392,18 +406,31 @@ function renderChartOfAccounts() {
         const hasChildren = children.length > 0;
         const isExpanded = coaState.expandedCategories.has(catId);
         const icon = getCategoryIcon(cat.icon);
+        const isAssetContainer = cat.slug === 'assets' || cat.is_asset_container;
 
         // Calculate balance (total_amount from stats)
-        const balance = cat.total_amount || 0;
-        let totalWithChildren = balance;
-        children.forEach(child => totalWithChildren += (child.total_amount || 0));
+        // Skip Assets category and bank accounts from balance calculation
+        let balance = 0;
+        let totalWithChildren = 0;
 
-        // Track totals by type
-        if (cat.category_type === 'income') {
-            totalIncome += totalWithChildren;
-        } else if (cat.category_type === 'expense') {
-            totalExpense += totalWithChildren;
+        if (!isAssetContainer) {
+            balance = cat.total_amount || 0;
+            totalWithChildren = balance;
+            children.forEach(child => {
+                // Skip bank account children
+                if (!child.is_account) {
+                    totalWithChildren += (child.total_amount || 0);
+                }
+            });
+
+            // Track totals by type (exclude Assets/other)
+            if (cat.category_type === 'income') {
+                totalIncome += totalWithChildren;
+            } else if (cat.category_type === 'expense') {
+                totalExpense += totalWithChildren;
+            }
         }
+
         accountCount++;
 
         // Determine balance display class
@@ -439,16 +466,20 @@ function renderChartOfAccounts() {
             html += `<div class="sub-items ${isExpanded ? '' : 'collapsed'}" data-subs="${catId}">`;
 
             children.forEach(child => {
-                const childBalance = child.total_amount || 0;
+                // For bank accounts, show current_balance; for categories, show total_amount
+                const childBalance = child.is_account ? (child.current_balance || 0) : (child.total_amount || 0);
                 const childBalanceClass = childBalance === 0 ? 'zero' : (childBalance >= 0 ? 'positive' : 'negative');
                 const isChildSelected = selectedCategoryId === child.id;
                 accountCount++;
 
+                // Bank accounts are not editable inline and not clickable for transactions
+                const isAccount = child.is_account;
+
                 html += `
-                    <div class="sub-item ${isChildSelected ? 'selected' : ''}"
+                    <div class="sub-item ${isChildSelected ? 'selected' : ''} ${isAccount ? 'is-bank-account' : ''}"
                          data-category-id="${child.id}"
-                         onclick="selectCategory(${child.id}, event)">
-                        <span class="sub-name" ondblclick="startInlineEdit(event, ${child.id}, '${child.name.replace(/'/g, "\\'")}')">${child.name}</span>
+                         onclick="${isAccount ? '' : `selectCategory(${child.id}, event)`}">
+                        <span class="sub-name" ${isAccount ? '' : `ondblclick="startInlineEdit(event, ${child.id}, '${child.name.replace(/'/g, "\\'")}')"`}>${child.name}</span>
                         <span class="sub-balance ${childBalanceClass}">${formatCurrency(Math.abs(childBalance))}</span>
                     </div>
                 `;

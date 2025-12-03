@@ -45,18 +45,13 @@ function handleGet(Database $db): void {
     $conditions = ['c.is_active = 1'];
     $params = [];
 
-    // Filter categories by user
-    // Jianiel (user_id=3) has separate Business categories
-    // Daniel (1), Hyunji (2), and others use shared Personal categories (user_id IS NULL)
-    if ($userId == 3) {
-        // Jianiel: Only show Business categories (user_id = 3)
+    // Filter categories by user - each user has their own categories
+    if ($userId) {
         $conditions[] = 'c.user_id = :user_id';
         $params['user_id'] = $userId;
-    } else if ($userId) {
-        // Daniel, Hyunji, others: Show Personal shared categories (user_id IS NULL)
-        $conditions[] = 'c.user_id IS NULL';
     } else {
-        $conditions[] = 'c.user_id IS NULL'; // Default: system/shared categories
+        // No user specified - return empty or system categories
+        $conditions[] = 'c.user_id IS NULL';
     }
 
     if ($type && in_array($type, ['income', 'expense', 'transfer', 'other'])) {
@@ -87,9 +82,81 @@ function handleGet(Database $db): void {
 
     $categories = $db->fetchAll($sql, $params);
 
+    // Add real bank accounts under Assets category
+    if ($userId) {
+        // Find Assets category for this user
+        $assetsCategory = null;
+        foreach ($categories as $cat) {
+            if ($cat['slug'] === 'assets' && !$cat['parent_id']) {
+                $assetsCategory = $cat;
+                break;
+            }
+        }
+
+        if ($assetsCategory) {
+            // Get user's actual bank accounts
+            $accounts = $db->fetchAll(
+                "SELECT id, account_name, account_type, current_balance, color
+                 FROM accounts
+                 WHERE user_id = :user_id AND is_active = 1
+                 ORDER BY account_name",
+                ['user_id' => $userId]
+            );
+
+            // Add accounts as virtual sub-categories under Assets
+            foreach ($accounts as $account) {
+                $iconMap = [
+                    'checking' => '💳',
+                    'savings' => '💰',
+                    'credit_card' => '💳',
+                    'investment' => '📈',
+                    'cash' => '💵',
+                    'other' => '🏦'
+                ];
+
+                $categories[] = [
+                    'id' => 'account_' . $account['id'],
+                    'user_id' => $userId,
+                    'parent_id' => $assetsCategory['id'],
+                    'name' => $account['account_name'],
+                    'slug' => 'account-' . $account['id'],
+                    'icon' => $iconMap[$account['account_type']] ?? '🏦',
+                    'color' => $account['color'] ?? '#3B82F6',
+                    'category_type' => 'other',
+                    'is_system' => 0,
+                    'sort_order' => 0,
+                    'parent_name' => 'Assets',
+                    'parent_slug' => 'assets',
+                    'is_account' => true,
+                    'account_type' => $account['account_type'],
+                    'current_balance' => (float)$account['current_balance'],
+                    'transaction_count' => 0,
+                    'month_total' => 0,
+                    'last_month_total' => 0,
+                    'total_amount' => (float)$account['current_balance']
+                ];
+            }
+        }
+    }
+
     // Add stats separately if requested (to avoid duplicate issues)
     if ($includeStats && $userId) {
         for ($i = 0; $i < count($categories); $i++) {
+            // Skip virtual account entries (they already have stats)
+            if (!empty($categories[$i]['is_account'])) {
+                continue;
+            }
+
+            // Skip Assets category - it's just a container for bank accounts, not for transactions
+            if ($categories[$i]['slug'] === 'assets') {
+                $categories[$i]['transaction_count'] = 0;
+                $categories[$i]['month_total'] = 0;
+                $categories[$i]['last_month_total'] = 0;
+                $categories[$i]['total_amount'] = 0;
+                $categories[$i]['is_asset_container'] = true;
+                continue;
+            }
+
             $statsParams = ['category_id' => $categories[$i]['id'], 'user_id' => $userId];
 
             // Transaction count

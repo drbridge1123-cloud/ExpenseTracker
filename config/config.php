@@ -9,26 +9,34 @@ if (!defined('APP_ROOT')) {
     define('APP_ROOT', dirname(__DIR__));
 }
 
+// Load environment variables
+require_once __DIR__ . '/env.php';
+$envFile = APP_ROOT . '/.env';
+if (file_exists($envFile)) {
+    loadEnv($envFile);
+}
+
 // Environment
-define('APP_ENV', 'development'); // 'development' or 'production'
-define('APP_DEBUG', APP_ENV === 'development');
+define('APP_ENV', env('APP_ENV', 'development'));
+define('APP_DEBUG', env('APP_DEBUG', APP_ENV === 'development'));
 
 // Database Configuration
-define('DB_HOST', 'localhost');
-define('DB_PORT', 3306);
-define('DB_NAME', 'expense_tracker');
-define('DB_USER', 'root');
-define('DB_PASS', ''); // Default XAMPP has no password
+define('DB_HOST', env('DB_HOST', 'localhost'));
+define('DB_PORT', env('DB_PORT', 3306));
+define('DB_NAME', env('DB_NAME', 'expense_tracker'));
+define('DB_USER', env('DB_USER', 'root'));
+define('DB_PASS', env('DB_PASS', ''));
 define('DB_CHARSET', 'utf8mb4');
 
 // Application Settings
-define('APP_NAME', 'Expense Tracker');
+define('APP_NAME', env('APP_NAME', 'Expense Tracker'));
 define('APP_VERSION', '1.0.0');
-define('APP_URL', 'http://localhost/ExpenseTracker');
+define('APP_URL', env('APP_URL', 'http://localhost/expensetracker'));
+define('APP_PATH', env('APP_PATH', 'expensetracker'));
 
 // Session Configuration
 define('SESSION_NAME', 'expense_tracker_session');
-define('SESSION_LIFETIME', 86400 * 7); // 7 days
+define('SESSION_LIFETIME', env('SESSION_LIFETIME', 86400 * 7));
 
 // File Upload Settings
 define('UPLOAD_DIR', APP_ROOT . '/storage');
@@ -36,7 +44,7 @@ define('MAX_UPLOAD_SIZE', 10 * 1024 * 1024); // 10MB
 define('ALLOWED_EXTENSIONS', ['csv', 'CSV']);
 
 // Timezone
-define('APP_TIMEZONE', 'America/New_York');
+define('APP_TIMEZONE', env('APP_TIMEZONE', 'America/New_York'));
 date_default_timezone_set(APP_TIMEZONE);
 
 // API Settings
@@ -60,8 +68,8 @@ if (APP_DEBUG) {
 define('DEFAULT_CURRENCY', 'USD');
 
 // Categorization Settings
-define('AI_CATEGORIZATION_ENABLED', false); // Set true when AI API is configured
-define('AI_API_KEY', ''); // OpenAI or other AI service key
+define('AI_CATEGORIZATION_ENABLED', env('AI_CATEGORIZATION_ENABLED', false));
+define('AI_API_KEY', env('AI_API_KEY', ''));
 define('CATEGORIZATION_CONFIDENCE_THRESHOLD', 0.7);
 
 // Logging

@@ -53,6 +53,19 @@ class Categorizer {
      * Load default category (Uncategorized)
      */
     private function loadDefaultCategory(): void {
+        // First try to find user-specific uncategorized category
+        if ($this->userId) {
+            $uncategorized = $this->db->fetch(
+                "SELECT id FROM categories WHERE slug = 'uncategorized' AND user_id = :user_id LIMIT 1",
+                ['user_id' => $this->userId]
+            );
+            if ($uncategorized) {
+                $this->defaultCategoryId = (int)$uncategorized['id'];
+                return;
+            }
+        }
+
+        // Fallback to system uncategorized
         $uncategorized = $this->db->fetch(
             "SELECT id FROM categories WHERE slug = 'uncategorized' AND is_system = 1 LIMIT 1"
         );
