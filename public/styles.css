@@ -6040,6 +6040,252 @@ body {
     color: var(--danger);
 }
 
+/* =====================================================
+   P&L Accordion Styles
+   ===================================================== */
+
+.pnl-accordion-section {
+    margin-bottom: 16px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.pnl-accordion-section .pnl-section-header {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.pnl-accordion-section .pnl-section-header:hover {
+    filter: brightness(0.95);
+}
+
+.pnl-section-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pnl-section-header .pnl-chevron {
+    transition: transform 0.3s ease;
+}
+
+.pnl-accordion-section.expanded .pnl-section-header .pnl-chevron {
+    transform: rotate(90deg);
+}
+
+.pnl-section-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+    padding: 0 16px;
+}
+
+.pnl-accordion-section.expanded .pnl-section-content {
+    max-height: 5000px;
+    padding: 8px 16px 16px 16px;
+}
+
+/* Accordion Item (Category) */
+.pnl-accordion-item {
+    margin-bottom: 4px;
+}
+
+.pnl-accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 14px;
+    transition: background-color 0.2s ease;
+}
+
+.pnl-accordion-header.has-children {
+    cursor: pointer;
+}
+
+.pnl-accordion-header.has-children:hover {
+    background: var(--border-color);
+}
+
+.pnl-accordion-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pnl-accordion-header .pnl-chevron {
+    transition: transform 0.3s ease;
+    color: var(--text-secondary);
+}
+
+.pnl-accordion-header.expanded .pnl-chevron {
+    transform: rotate(90deg);
+}
+
+.pnl-chevron-spacer {
+    display: inline-block;
+    width: 16px;
+}
+
+.pnl-chevron-spacer.small {
+    width: 14px;
+}
+
+.pnl-cat-icon {
+    font-size: 16px;
+}
+
+.pnl-cat-name {
+    color: var(--text-primary);
+}
+
+.pnl-cat-amount {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+/* Accordion Content */
+.pnl-accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+    margin-left: 24px;
+    border-left: 2px solid var(--border-color);
+    padding-left: 12px;
+}
+
+.pnl-accordion-content.expanded {
+    max-height: 3000px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+/* Sub-item (Sub-category) */
+.pnl-accordion-subitem {
+    margin-bottom: 2px;
+}
+
+.pnl-accordion-subheader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.pnl-accordion-subheader.has-children {
+    cursor: pointer;
+}
+
+.pnl-accordion-subheader.has-children:hover {
+    background: var(--bg-secondary);
+}
+
+.pnl-accordion-subheader .pnl-chevron {
+    transition: transform 0.3s ease;
+    color: var(--text-secondary);
+}
+
+.pnl-accordion-subheader.expanded .pnl-chevron {
+    transform: rotate(90deg);
+}
+
+.pnl-subcat-icon {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.pnl-subcat-name {
+    color: var(--text-primary);
+}
+
+.pnl-subcat-amount {
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+/* Transactions list */
+.pnl-accordion-transactions {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+    margin-left: 22px;
+    padding-left: 10px;
+    border-left: 1px dashed var(--border-color);
+}
+
+.pnl-accordion-transactions.expanded {
+    max-height: 2000px;
+    margin-top: 4px;
+    margin-bottom: 8px;
+}
+
+.pnl-transaction-list {
+    padding: 4px 0;
+}
+
+.pnl-transaction-row {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+}
+
+.pnl-transaction-row:hover {
+    background: var(--bg-secondary);
+}
+
+.pnl-txn-date {
+    width: 70px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.pnl-txn-desc {
+    flex: 1;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 12px;
+}
+
+.pnl-txn-amount {
+    font-weight: 500;
+    color: var(--text-primary);
+    text-align: right;
+    min-width: 80px;
+}
+
+/* Expand/Collapse buttons */
+.pnl-actions .btn-ghost {
+    padding: 6px 8px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pnl-actions .btn-ghost:hover {
+    background: var(--bg-secondary);
+    border-color: var(--text-secondary);
+}
+
+.pnl-actions .btn-ghost svg {
+    display: block;
+}
+
 @media (max-width: 768px) {
     .pnl-header {
         flex-direction: column;

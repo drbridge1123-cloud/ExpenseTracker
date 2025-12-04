@@ -87,7 +87,8 @@ async function loadPnlReport() {
     if (endInput) endInput.value = endDate;
 
     try {
-        const response = await fetch(`${API_BASE}/reports/profit-loss.php?user_id=${state.currentUser}&start_date=${startDate}&end_date=${endDate}`);
+        // Include transactions for accordion detail view
+        const response = await fetch(`${API_BASE}/reports/profit-loss.php?user_id=${state.currentUser}&start_date=${startDate}&end_date=${endDate}&include_transactions=1`);
         const result = await response.json();
 
         if (result.success) {
@@ -177,43 +178,45 @@ function renderPnlStatement() {
         dateRange.textContent = `${start.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
     }
 
-    // Render income items
+    // Render income accordion items (using hierarchy if available)
     const incomeContainer = document.getElementById('pnl-income-items');
     if (incomeContainer) {
-        if (pnlData.income.categories.length > 0) {
-            incomeContainer.innerHTML = pnlData.income.categories.map(cat => `
-                <div class="pnl-item">
-                    <div class="pnl-item-name">
-                        <span class="pnl-item-icon">${cat.category_icon || '💵'}</span>
-                        <span>${cat.category_name}</span>
-                    </div>
-                    <div class="pnl-item-amount">
-                        ${formatCurrency(cat.total)}
-                        <span class="pnl-item-percent">(${cat.percent}%)</span>
-                    </div>
-                </div>
-            `).join('');
+        const hierarchy = pnlData.income.hierarchy || [];
+        if (hierarchy.length > 0) {
+            incomeContainer.innerHTML = hierarchy.map(cat => renderPnlAccordionCategory(cat, 'income')).join('');
+        } else if (pnlData.income.categories.length > 0) {
+            // Fallback to flat list
+            incomeContainer.innerHTML = pnlData.income.categories.map(cat => renderPnlAccordionCategory({
+                id: cat.category_id,
+                name: cat.category_name,
+                icon: cat.category_icon,
+                total: cat.total,
+                percent: cat.percent,
+                transactions: cat.transactions || [],
+                sub_categories: []
+            }, 'income')).join('');
         } else {
             incomeContainer.innerHTML = '<div class="pnl-empty-message">No income recorded</div>';
         }
     }
 
-    // Render expense items
+    // Render expense accordion items (using hierarchy if available)
     const expenseContainer = document.getElementById('pnl-expense-items');
     if (expenseContainer) {
-        if (pnlData.expenses.categories.length > 0) {
-            expenseContainer.innerHTML = pnlData.expenses.categories.map(cat => `
-                <div class="pnl-item">
-                    <div class="pnl-item-name">
-                        <span class="pnl-item-icon">${cat.category_icon || '📁'}</span>
-                        <span>${cat.category_name}</span>
-                    </div>
-                    <div class="pnl-item-amount">
-                        ${formatCurrency(cat.total)}
-                        <span class="pnl-item-percent">(${cat.percent}%)</span>
-                    </div>
-                </div>
-            `).join('');
+        const hierarchy = pnlData.expenses.hierarchy || [];
+        if (hierarchy.length > 0) {
+            expenseContainer.innerHTML = hierarchy.map(cat => renderPnlAccordionCategory(cat, 'expense')).join('');
+        } else if (pnlData.expenses.categories.length > 0) {
+            // Fallback to flat list
+            expenseContainer.innerHTML = pnlData.expenses.categories.map(cat => renderPnlAccordionCategory({
+                id: cat.category_id,
+                name: cat.category_name,
+                icon: cat.category_icon,
+                total: cat.total,
+                percent: cat.percent,
+                transactions: cat.transactions || [],
+                sub_categories: []
+            }, 'expense')).join('');
         } else {
             expenseContainer.innerHTML = '<div class="pnl-empty-message">No expenses recorded</div>';
         }
@@ -235,6 +238,163 @@ function renderPnlStatement() {
     // Update summary cards
     document.getElementById('pnl-gross-margin').textContent = pnlData.summary.gross_margin + '%';
     document.getElementById('pnl-expense-ratio').textContent = pnlData.summary.expense_ratio + '%';
+
+    // Expand main sections by default
+    document.querySelectorAll('.pnl-accordion-section').forEach(section => {
+        section.classList.add('expanded');
+    });
+}
+
+/**
+ * Render a single category as accordion item (with sub-categories and transactions)
+ */
+function renderPnlAccordionCategory(cat, type) {
+    const hasSubCategories = cat.sub_categories && cat.sub_categories.length > 0;
+    const hasTransactions = cat.transactions && cat.transactions.length > 0;
+    const hasChildren = hasSubCategories || hasTransactions;
+    const uniqueId = `pnl-cat-${type}-${cat.id}`;
+
+    let html = `
+        <div class="pnl-accordion-item" data-category-id="${cat.id}">
+            <div class="pnl-accordion-header ${hasChildren ? 'has-children' : ''}" onclick="${hasChildren ? `togglePnlCategory('${uniqueId}')` : ''}">
+                <div class="pnl-accordion-toggle">
+                    ${hasChildren ? `
+                        <svg class="pnl-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    ` : '<span class="pnl-chevron-spacer"></span>'}
+                    <span class="pnl-cat-icon">${cat.icon || (type === 'income' ? '💵' : '📁')}</span>
+                    <span class="pnl-cat-name">${cat.name}</span>
+                </div>
+                <div class="pnl-cat-amount">
+                    ${formatCurrency(cat.total)}
+                </div>
+            </div>
+    `;
+
+    if (hasChildren) {
+        html += `<div class="pnl-accordion-content" id="${uniqueId}">`;
+
+        // Render sub-categories
+        if (hasSubCategories) {
+            cat.sub_categories.forEach(subCat => {
+                const subUniqueId = `pnl-subcat-${type}-${subCat.id}`;
+                const subHasTransactions = subCat.transactions && subCat.transactions.length > 0;
+
+                html += `
+                    <div class="pnl-accordion-subitem">
+                        <div class="pnl-accordion-subheader ${subHasTransactions ? 'has-children' : ''}" onclick="${subHasTransactions ? `togglePnlCategory('${subUniqueId}')` : ''}">
+                            <div class="pnl-accordion-toggle">
+                                ${subHasTransactions ? `
+                                    <svg class="pnl-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg>
+                                ` : '<span class="pnl-chevron-spacer small"></span>'}
+                                <span class="pnl-subcat-icon">${subCat.icon || '•'}</span>
+                                <span class="pnl-subcat-name">${subCat.name}</span>
+                            </div>
+                            <div class="pnl-subcat-amount">${formatCurrency(subCat.total)}</div>
+                        </div>
+                `;
+
+                if (subHasTransactions) {
+                    html += `<div class="pnl-accordion-transactions" id="${subUniqueId}">`;
+                    html += renderPnlTransactionList(subCat.transactions);
+                    html += `</div>`;
+                }
+
+                html += `</div>`;
+            });
+        }
+
+        // Render direct transactions (if category has no sub-categories)
+        if (hasTransactions && !hasSubCategories) {
+            html += renderPnlTransactionList(cat.transactions);
+        }
+
+        html += `</div>`;
+    }
+
+    html += `</div>`;
+    return html;
+}
+
+/**
+ * Render transaction list for accordion
+ */
+function renderPnlTransactionList(transactions) {
+    if (!transactions || transactions.length === 0) return '';
+
+    return `
+        <div class="pnl-transaction-list">
+            ${transactions.map(txn => `
+                <div class="pnl-transaction-row">
+                    <span class="pnl-txn-date">${formatPnlDate(txn.date)}</span>
+                    <span class="pnl-txn-desc">${txn.vendor || txn.description || 'Transaction'}</span>
+                    <span class="pnl-txn-amount">${formatCurrency(txn.amount)}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+/**
+ * Format date for P&L display
+ */
+function formatPnlDate(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/**
+ * Toggle category accordion
+ */
+function togglePnlCategory(elementId) {
+    const content = document.getElementById(elementId);
+    if (!content) return;
+
+    const header = content.previousElementSibling;
+    const isExpanded = content.classList.contains('expanded');
+
+    if (isExpanded) {
+        content.classList.remove('expanded');
+        header.classList.remove('expanded');
+    } else {
+        content.classList.add('expanded');
+        header.classList.add('expanded');
+    }
+}
+
+/**
+ * Toggle main P&L section (Income/Expenses)
+ */
+function togglePnlSection(sectionName) {
+    const section = document.querySelector(`.pnl-accordion-section[data-section="${sectionName}"]`);
+    if (!section) return;
+
+    section.classList.toggle('expanded');
+}
+
+/**
+ * Expand all P&L accordion items
+ */
+function pnlExpandAll() {
+    document.querySelectorAll('.pnl-accordion-section').forEach(el => el.classList.add('expanded'));
+    document.querySelectorAll('.pnl-accordion-content').forEach(el => el.classList.add('expanded'));
+    document.querySelectorAll('.pnl-accordion-transactions').forEach(el => el.classList.add('expanded'));
+    document.querySelectorAll('.pnl-accordion-header, .pnl-accordion-subheader').forEach(el => el.classList.add('expanded'));
+}
+
+/**
+ * Collapse all P&L accordion items
+ */
+function pnlCollapseAll() {
+    document.querySelectorAll('.pnl-accordion-content').forEach(el => el.classList.remove('expanded'));
+    document.querySelectorAll('.pnl-accordion-transactions').forEach(el => el.classList.remove('expanded'));
+    document.querySelectorAll('.pnl-accordion-header, .pnl-accordion-subheader').forEach(el => el.classList.remove('expanded'));
+    // Keep main sections expanded
+    document.querySelectorAll('.pnl-accordion-section').forEach(el => el.classList.add('expanded'));
 }
 
 function updatePnlChart() {
@@ -769,3 +929,8 @@ window.switchReportTab = switchReportTab;
 window.updateReportOverview = updateReportOverview;
 window.updateReportCharts = updateReportCharts;
 window.updateComparisonTab = updateComparisonTab;
+// P&L Accordion functions
+window.togglePnlSection = togglePnlSection;
+window.togglePnlCategory = togglePnlCategory;
+window.pnlExpandAll = pnlExpandAll;
+window.pnlCollapseAll = pnlCollapseAll;

@@ -774,6 +774,12 @@
                                 </div>
                             </div>
                             <div class="pnl-actions">
+                                <button class="btn btn-ghost btn-sm" onclick="pnlExpandAll()" title="Expand All">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10l5 5 5-5"/><path d="M7 4l5 5 5-5"/></svg>
+                                </button>
+                                <button class="btn btn-ghost btn-sm" onclick="pnlCollapseAll()" title="Collapse All">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 14l-5-5-5 5"/><path d="M17 20l-5-5-5 5"/></svg>
+                                </button>
                                 <button class="btn btn-secondary" onclick="exportPnlPdf()">Export PDF</button>
                                 <button class="btn btn-secondary" onclick="exportPnlExcel()">Export Excel</button>
                             </div>
@@ -785,25 +791,35 @@
                                 <span class="pnl-date-range" id="pnl-date-range">January 1 - December 31, 2025</span>
                             </div>
 
-                            <!-- Income Section -->
-                            <div class="pnl-section">
-                                <div class="pnl-section-header">
-                                    <span>INCOME</span>
+                            <!-- Income Section (Accordion) -->
+                            <div class="pnl-accordion-section" data-section="income">
+                                <div class="pnl-section-header income" onclick="togglePnlSection('income')">
+                                    <div class="pnl-section-toggle">
+                                        <svg class="pnl-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
+                                        <span>INCOME</span>
+                                    </div>
                                     <span id="pnl-income-total">$0.00</span>
                                 </div>
-                                <div class="pnl-items" id="pnl-income-items">
-                                    <!-- Income items will be populated here -->
+                                <div class="pnl-section-content" id="pnl-income-items">
+                                    <!-- Income accordion items will be populated here -->
                                 </div>
                             </div>
 
-                            <!-- Expenses Section -->
-                            <div class="pnl-section">
-                                <div class="pnl-section-header">
-                                    <span>EXPENSES</span>
+                            <!-- Expenses Section (Accordion) -->
+                            <div class="pnl-accordion-section" data-section="expenses">
+                                <div class="pnl-section-header expense" onclick="togglePnlSection('expenses')">
+                                    <div class="pnl-section-toggle">
+                                        <svg class="pnl-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
+                                        <span>EXPENSES</span>
+                                    </div>
                                     <span id="pnl-expenses-total">$0.00</span>
                                 </div>
-                                <div class="pnl-items" id="pnl-expense-items">
-                                    <!-- Expense items will be populated here -->
+                                <div class="pnl-section-content" id="pnl-expense-items">
+                                    <!-- Expense accordion items will be populated here -->
                                 </div>
                             </div>
 
