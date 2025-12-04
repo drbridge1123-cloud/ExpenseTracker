@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profit and Loss Detail Report</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles/pnl-detail.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <div class="pnl-report">
+        <!-- Configuration Panel -->
+        <div class="pnl-config-panel">
+            <div class="pnl-config-row">
+                <div class="pnl-config-item">
+                    <label for="pnl-start-date">From:</label>
+                    <input type="date" id="pnl-start-date">
+                </div>
+                <div class="pnl-config-item">
+                    <label for="pnl-end-date">To:</label>
+                    <input type="date" id="pnl-end-date">
+                </div>
+                <div class="pnl-config-item">
+                    <label for="pnl-basis">Basis:</label>
+                    <select id="pnl-basis">
+                        <option value="accrual">Accrual</option>
+                        <option value="cash">Cash</option>
+                    </select>
+                </div>
+                <div class="pnl-config-item">
+                    <input type="checkbox" id="pnl-show-payee" checked>
+                    <label for="pnl-show-payee">Show Name</label>
+                </div>
+                <div class="pnl-config-item">
+                    <input type="checkbox" id="pnl-show-memo" checked>
+                    <label for="pnl-show-memo">Show Memo</label>
+                </div>
+                <div class="pnl-config-item">
+                    <input type="checkbox" id="pnl-show-zero">
+                    <label for="pnl-show-zero">Include Zero Balance</label>
+                </div>
+                <div class="pnl-config-item">
+                    <button class="btn-primary" onclick="loadPnLDetailReport()">Run Report</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pnl-actions">
+            <button onclick="printReport()">Print</button>
+            <button onclick="exportToPdf()">Export PDF</button>
+            <button onclick="exportToCsv()">Export CSV</button>
+            <button onclick="exportToExcel()">Export Excel</button>
+        </div>
+
+        <!-- Report Container -->
+        <div id="pnl-report-container">
+            <div class="pnl-loading" id="pnl-loading" style="display: none;">
+                <div class="pnl-loading-spinner"></div>
+            </div>
+
+            <div class="pnl-empty" id="pnl-empty">
+                <div class="pnl-empty-icon">📊</div>
+                <div class="pnl-empty-message">Select a date range and click "Run Report"</div>
+                <div class="pnl-empty-hint">The report will display income and expense details grouped by account</div>
+            </div>
+
+            <div id="pnl-content" style="display: none;">
+                <!-- Report Header -->
+                <div class="pnl-header">
+                    <h1 class="company-name" id="pnl-company-name">Company Name</h1>
+                    <h2 class="report-title">Profit and Loss Detail</h2>
+                    <p class="date-range" id="pnl-date-range">January 1, 2024 through December 31, 2024</p>
+                    <p class="accounting-basis" id="pnl-basis-display">Accrual Basis</p>
+                </div>
+
+                <!-- Report Table -->
+                <table class="pnl-table">
+                    <thead>
+                        <tr>
+                            <th class="col-date">Date</th>
+                            <th class="col-type">Type</th>
+                            <th class="col-num">Num</th>
+                            <th class="col-name" id="th-name">Name</th>
+                            <th class="col-memo" id="th-memo">Memo/Description</th>
+                            <th class="col-amount">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pnl-table-body">
+                        <!-- Dynamically populated -->
+                    </tbody>
+                </table>
+
+                <!-- Report Footer -->
+                <div class="pnl-footer">
+                    <p class="generated-at" id="pnl-generated-at">Generated: </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // CONFIGURATION
+        // =========================================================================
+        const API_BASE = '/api/v1/reports';
+        let currentReportData = null;
+        let config = {
+            showPayee: true,
+            showMemo: true,
+            currencySymbol: '$',
+            dateFormat: 'MM/DD/YYYY'
+        };
+
+        // =========================================================================
+        // INITIALIZATION
+        // =========================================================================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set default dates (current year)
+            const today = new Date();
+            const startOfYear = new Date(today.getFullYear(), 0, 1);
+
+            document.getElementById('pnl-start-date').value = formatDateForInput(startOfYear);
+            document.getElementById('pnl-end-date').value = formatDateForInput(today);
+
+            // Event listeners for show/hide columns
+            document.getElementById('pnl-show-payee').addEventListener('change', updateColumnVisibility);
+            document.getElementById('pnl-show-memo').addEventListener('change', updateColumnVisibility);
+        });
+
+        // =========================================================================
+        // REPORT LOADING
+        // =========================================================================
+        async function loadPnLDetailReport() {
+            const startDate = document.getElementById('pnl-start-date').value;
+            const endDate = document.getElementById('pnl-end-date').value;
+            const basis = document.getElementById('pnl-basis').value;
+            const showPayee = document.getElementById('pnl-show-payee').checked ? 1 : 0;
+            const showMemo = document.getElementById('pnl-show-memo').checked ? 1 : 0;
+            const includeZero = document.getElementById('pnl-show-zero').checked ? 1 : 0;
+
+            if (!startDate || !endDate) {
+                alert('Please select a date range');
+                return;
+            }
+
+            showLoading(true);
+
+            try {
+                const params = new URLSearchParams({
+                    user_id: 1,  // TODO: Get from session
+                    start_date: startDate,
+                    end_date: endDate,
+                    accounting_basis: basis,
+                    show_payee: showPayee,
+                    show_memo: showMemo,
+                    include_zero_balance: includeZero
+                });
+
+                const response = await fetch(`${API_BASE}/profit-loss-detail.php?${params}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    currentReportData = result.data;
+                    config.showPayee = showPayee === 1;
+                    config.showMemo = showMemo === 1;
+                    renderReport(result.data);
+                } else {
+                    alert('Error loading report: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error loading report:', error);
+                alert('Error loading report. Please try again.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // =========================================================================
+        // REPORT RENDERING
+        // =========================================================================
+        function renderReport(data) {
+            // Update header
+            document.getElementById('pnl-company-name').textContent = data.config.company_name;
+            document.getElementById('pnl-date-range').textContent =
+                `${data.config.date_range.start_formatted} through ${data.config.date_range.end_formatted}`;
+            document.getElementById('pnl-basis-display').textContent = data.config.accounting_basis + ' Basis';
+            document.getElementById('pnl-generated-at').textContent = 'Generated: ' + data.config.generated_at;
+
+            // Update column visibility
+            updateColumnVisibility();
+
+            // Render table body
+            const tbody = document.getElementById('pnl-table-body');
+            tbody.innerHTML = '';
+
+            const sectionOrder = ['income', 'cogs', 'expense', 'other_income', 'other_expense'];
+
+            sectionOrder.forEach(sectionKey => {
+                const section = data.sections[sectionKey];
+                if (!section || Object.keys(section.accounts).length === 0) return;
+
+                // Section header
+                tbody.innerHTML += `
+                    <tr class="section-header">
+                        <td colspan="${getColSpan()}">${section.title.toUpperCase()}</td>
+                    </tr>
+                `;
+
+                // Render accounts
+                Object.values(section.accounts).forEach(account => {
+                    renderAccount(tbody, account, 1);
+                });
+
+                // Section total
+                tbody.innerHTML += `
+                    <tr class="section-total">
+                        <td colspan="${getColSpan() - 1}">Total ${section.title}</td>
+                        <td class="amount">${formatCurrency(section.total)}</td>
+                    </tr>
+                `;
+
+                // Computed totals after specific sections
+                if (sectionKey === 'cogs') {
+                    tbody.innerHTML += `
+                        <tr class="computed-total gross-profit">
+                            <td colspan="${getColSpan() - 1}">Gross Profit</td>
+                            <td class="amount">${data.summary.gross_profit.formatted}</td>
+                        </tr>
+                    `;
+                }
+
+                if (sectionKey === 'expense') {
+                    tbody.innerHTML += `
+                        <tr class="computed-total net-operating">
+                            <td colspan="${getColSpan() - 1}">Net Operating Income</td>
+                            <td class="amount">${data.summary.net_operating_income.formatted}</td>
+                        </tr>
+                    `;
+                }
+
+                if (sectionKey === 'other_expense') {
+                    tbody.innerHTML += `
+                        <tr class="computed-total net-other">
+                            <td colspan="${getColSpan() - 1}">Net Other Income</td>
+                            <td class="amount">${data.summary.net_other_income.formatted}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            // Net Income (final row)
+            tbody.innerHTML += `
+                <tr class="net-income">
+                    <td colspan="${getColSpan() - 1}">Net Income</td>
+                    <td class="amount">${data.summary.net_income.formatted}</td>
+                </tr>
+            `;
+
+            // Show content, hide empty state
+            document.getElementById('pnl-empty').style.display = 'none';
+            document.getElementById('pnl-content').style.display = 'block';
+        }
+
+        function renderAccount(tbody, account, depth) {
+            const indent = '&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(depth);
+
+            // Account header
+            tbody.innerHTML += `
+                <tr class="account-header depth-${depth}">
+                    <td colspan="${getColSpan()}">${indent}${escapeHtml(account.account_name)}</td>
+                </tr>
+            `;
+
+            // Direct transactions
+            if (account.direct_transactions) {
+                account.direct_transactions.forEach(txn => {
+                    renderTransaction(tbody, txn, depth + 1);
+                });
+            }
+
+            // Sub-accounts
+            if (account.sub_accounts) {
+                Object.values(account.sub_accounts).forEach(subAccount => {
+                    const subIndent = '&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(depth + 1);
+
+                    // Sub-account header
+                    tbody.innerHTML += `
+                        <tr class="account-header depth-${depth + 1}">
+                            <td colspan="${getColSpan()}">${subIndent}${escapeHtml(subAccount.account_name)}</td>
+                        </tr>
+                    `;
+
+                    // Sub-account transactions
+                    subAccount.transactions.forEach(txn => {
+                        renderTransaction(tbody, txn, depth + 2);
+                    });
+
+                    // Sub-account total
+                    tbody.innerHTML += `
+                        <tr class="account-total depth-${depth + 1}">
+                            <td colspan="${getColSpan() - 1}">${subIndent}Total ${escapeHtml(subAccount.account_name)}</td>
+                            <td class="amount">${formatCurrency(subAccount.total)}</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            // Account total (if has sub-accounts)
+            if (account.sub_accounts && Object.keys(account.sub_accounts).length > 0) {
+                tbody.innerHTML += `
+                    <tr class="account-total depth-${depth}">
+                        <td colspan="${getColSpan() - 1}">${indent}Total ${escapeHtml(account.account_name)}</td>
+                        <td class="amount">${formatCurrency(account.total)}</td>
+                    </tr>
+                `;
+            }
+        }
+
+        function renderTransaction(tbody, txn, depth) {
+            const indent = '&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(depth);
+            const showPayee = config.showPayee;
+            const showMemo = config.showMemo;
+
+            let row = `
+                <tr class="transaction-row depth-${depth}">
+                    <td class="col-date">${indent}${txn.date_formatted}</td>
+                    <td class="col-type">${escapeHtml(txn.type)}</td>
+                    <td class="col-num">${escapeHtml(txn.num)}</td>
+            `;
+
+            if (showPayee) {
+                row += `<td class="col-name">${escapeHtml(txn.name)}</td>`;
+            }
+
+            if (showMemo) {
+                row += `<td class="col-memo">${escapeHtml(txn.memo)}</td>`;
+            }
+
+            row += `
+                    <td class="col-amount amount">${txn.amount_formatted}</td>
+                </tr>
+            `;
+
+            tbody.innerHTML += row;
+        }
+
+        // =========================================================================
+        // EXPORT FUNCTIONS
+        // =========================================================================
+        function printReport() {
+            window.print();
+        }
+
+        function exportToPdf() {
+            if (!currentReportData) {
+                alert('Please run the report first');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'letter');
+
+            // Header
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text(currentReportData.config.company_name, 105, 15, { align: 'center' });
+
+            doc.setFontSize(12);
+            doc.text('Profit and Loss Detail', 105, 22, { align: 'center' });
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text(
+                `${currentReportData.config.date_range.start_formatted} through ${currentReportData.config.date_range.end_formatted}`,
+                105, 28, { align: 'center' }
+            );
+
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'italic');
+            doc.text(`${currentReportData.config.accounting_basis} Basis`, 105, 33, { align: 'center' });
+
+            // Build table data
+            const tableData = [];
+            const sectionOrder = ['income', 'cogs', 'expense', 'other_income', 'other_expense'];
+
+            sectionOrder.forEach(sectionKey => {
+                const section = currentReportData.sections[sectionKey];
+                if (!section || Object.keys(section.accounts).length === 0) return;
+
+                // Section header
+                tableData.push([{ content: section.title.toUpperCase(), colSpan: 6, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }]);
+
+                // Accounts and transactions
+                Object.values(section.accounts).forEach(account => {
+                    addAccountToPdfData(tableData, account, 1);
+                });
+
+                // Section total
+                tableData.push([
+                    { content: `Total ${section.title}`, colSpan: 5, styles: { fontStyle: 'bold' } },
+                    { content: formatCurrency(section.total), styles: { fontStyle: 'bold', halign: 'right' } }
+                ]);
+            });
+
+            // Net Income
+            tableData.push([
+                { content: 'NET INCOME', colSpan: 5, styles: { fontStyle: 'bold', fillColor: [51, 51, 51], textColor: [255, 255, 255] } },
+                { content: currentReportData.summary.net_income.formatted, styles: { fontStyle: 'bold', halign: 'right', fillColor: [51, 51, 51], textColor: [255, 255, 255] } }
+            ]);
+
+            // Generate table
+            doc.autoTable({
+                head: [['Date', 'Type', 'Num', 'Name', 'Memo', 'Amount']],
+                body: tableData,
+                startY: 38,
+                styles: { fontSize: 8, cellPadding: 1 },
+                headStyles: { fillColor: [100, 100, 100], fontSize: 8 },
+                columnStyles: {
+                    0: { cellWidth: 22 },
+                    1: { cellWidth: 15 },
+                    2: { cellWidth: 20 },
+                    3: { cellWidth: 35 },
+                    4: { cellWidth: 'auto' },
+                    5: { cellWidth: 25, halign: 'right' }
+                }
+            });
+
+            // Save
+            doc.save(`PnL_Detail_${currentReportData.config.date_range.start}_${currentReportData.config.date_range.end}.pdf`);
+        }
+
+        function addAccountToPdfData(tableData, account, depth) {
+            const indent = '  '.repeat(depth);
+
+            // Account header
+            tableData.push([{ content: indent + account.account_name, colSpan: 6, styles: { fontStyle: 'bold', fontSize: 9 } }]);
+
+            // Direct transactions
+            if (account.direct_transactions) {
+                account.direct_transactions.forEach(txn => {
+                    tableData.push([
+                        indent + '  ' + txn.date_formatted,
+                        txn.type,
+                        txn.num,
+                        txn.name,
+                        txn.memo,
+                        { content: txn.amount_formatted, styles: { halign: 'right' } }
+                    ]);
+                });
+            }
+
+            // Sub-accounts
+            if (account.sub_accounts) {
+                Object.values(account.sub_accounts).forEach(subAccount => {
+                    const subIndent = '  '.repeat(depth + 1);
+
+                    tableData.push([{ content: subIndent + subAccount.account_name, colSpan: 6, styles: { fontSize: 8 } }]);
+
+                    subAccount.transactions.forEach(txn => {
+                        tableData.push([
+                            subIndent + '  ' + txn.date_formatted,
+                            txn.type,
+                            txn.num,
+                            txn.name,
+                            txn.memo,
+                            { content: txn.amount_formatted, styles: { halign: 'right' } }
+                        ]);
+                    });
+
+                    tableData.push([
+                        { content: subIndent + `Total ${subAccount.account_name}`, colSpan: 5, styles: { fontSize: 8 } },
+                        { content: formatCurrency(subAccount.total), styles: { halign: 'right', fontSize: 8 } }
+                    ]);
+                });
+            }
+
+            // Account total
+            if (account.sub_accounts && Object.keys(account.sub_accounts).length > 0) {
+                tableData.push([
+                    { content: indent + `Total ${account.account_name}`, colSpan: 5 },
+                    { content: formatCurrency(account.total), styles: { halign: 'right' } }
+                ]);
+            }
+        }
+
+        function exportToCsv() {
+            if (!currentReportData) {
+                alert('Please run the report first');
+                return;
+            }
+
+            const startDate = document.getElementById('pnl-start-date').value;
+            const endDate = document.getElementById('pnl-end-date').value;
+
+            // Redirect to CSV export
+            const params = new URLSearchParams({
+                user_id: 1,
+                start_date: startDate,
+                end_date: endDate,
+                format: 'csv',
+                show_payee: config.showPayee ? 1 : 0,
+                show_memo: config.showMemo ? 1 : 0
+            });
+
+            window.location.href = `${API_BASE}/profit-loss-detail.php?${params}`;
+        }
+
+        function exportToExcel() {
+            // For Excel, we use the same CSV but with .xlsx extension handling
+            exportToCsv();
+        }
+
+        // =========================================================================
+        // UTILITY FUNCTIONS
+        // =========================================================================
+        function showLoading(show) {
+            document.getElementById('pnl-loading').style.display = show ? 'flex' : 'none';
+            if (show) {
+                document.getElementById('pnl-empty').style.display = 'none';
+                document.getElementById('pnl-content').style.display = 'none';
+            }
+        }
+
+        function updateColumnVisibility() {
+            config.showPayee = document.getElementById('pnl-show-payee').checked;
+            config.showMemo = document.getElementById('pnl-show-memo').checked;
+
+            document.getElementById('th-name').style.display = config.showPayee ? '' : 'none';
+            document.getElementById('th-memo').style.display = config.showMemo ? '' : 'none';
+
+            document.querySelectorAll('.col-name').forEach(el => {
+                el.style.display = config.showPayee ? '' : 'none';
+            });
+
+            document.querySelectorAll('.col-memo').forEach(el => {
+                el.style.display = config.showMemo ? '' : 'none';
+            });
+        }
+
+        function getColSpan() {
+            let span = 4; // date, type, num, amount
+            if (config.showPayee) span++;
+            if (config.showMemo) span++;
+            return span;
+        }
+
+        function formatDateForInput(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function formatCurrency(amount) {
+            const absAmount = Math.abs(amount);
+            const formatted = absAmount.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+            return (amount < 0 ? '-' : '') + config.currencySymbol + formatted;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,556 @@
+/**
+ * =========================================================================
+ * QuickBooks-Style Profit & Loss Detail Report Stylesheet
+ * =========================================================================
+ * Matches QuickBooks Desktop/Online P&L Detail visual styling exactly
+ */
+
+/* =========================================================================
+   CSS RESET & BASE STYLES
+   ========================================================================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #333333;
+    background-color: #ffffff;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* =========================================================================
+   REPORT CONTAINER
+   ========================================================================= */
+
+.pnl-report {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px 30px;
+    background-color: #ffffff;
+}
+
+/* Print-friendly styling */
+@media print {
+    .pnl-report {
+        max-width: 100%;
+        padding: 0;
+        margin: 0;
+    }
+
+    body {
+        font-size: 9pt;
+    }
+
+    .pnl-footer,
+    .no-print {
+        display: none !important;
+    }
+
+    .pnl-table {
+        page-break-inside: auto;
+    }
+
+    .pnl-table tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+
+    .section-header,
+    .section-total,
+    .net-income {
+        page-break-after: avoid;
+    }
+}
+
+/* =========================================================================
+   REPORT HEADER (QuickBooks Style)
+   ========================================================================= */
+
+.pnl-header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #000000;
+}
+
+.company-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #000000;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.report-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #000000;
+    margin-bottom: 4px;
+}
+
+.date-range {
+    font-size: 11px;
+    font-weight: 400;
+    color: #333333;
+    margin-bottom: 2px;
+}
+
+.accounting-basis {
+    font-size: 10px;
+    font-weight: 400;
+    color: #666666;
+    font-style: italic;
+}
+
+/* =========================================================================
+   MAIN TABLE (QuickBooks P&L Detail Layout)
+   ========================================================================= */
+
+.pnl-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-bottom: 20px;
+}
+
+/* Column Widths - QuickBooks proportions */
+.pnl-table .col-date {
+    width: 80px;
+}
+
+.pnl-table .col-type {
+    width: 50px;
+}
+
+.pnl-table .col-num {
+    width: 70px;
+}
+
+.pnl-table .col-name {
+    width: 150px;
+}
+
+.pnl-table .col-memo {
+    width: auto; /* Takes remaining space */
+}
+
+.pnl-table .col-amount {
+    width: 100px;
+    text-align: right;
+}
+
+/* Table Header */
+.pnl-table thead {
+    background-color: #f5f5f5;
+}
+
+.pnl-table thead th {
+    font-size: 10px;
+    font-weight: 600;
+    color: #333333;
+    text-align: left;
+    padding: 8px 6px;
+    border-bottom: 2px solid #000000;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+
+.pnl-table thead th.col-amount {
+    text-align: right;
+}
+
+/* =========================================================================
+   TABLE ROWS - SECTION HEADERS
+   ========================================================================= */
+
+.section-header td {
+    font-size: 12px;
+    font-weight: 700;
+    color: #000000;
+    padding: 12px 6px 6px 6px;
+    background-color: #ffffff;
+    border-bottom: 1px solid #cccccc;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* =========================================================================
+   TABLE ROWS - ACCOUNT HEADERS (Hierarchical)
+   ========================================================================= */
+
+.account-header td {
+    font-size: 11px;
+    font-weight: 600;
+    color: #000000;
+    padding: 6px;
+    background-color: #fafafa;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.account-header.depth-1 td {
+    padding-left: 16px;
+    font-weight: 600;
+}
+
+.account-header.depth-2 td {
+    padding-left: 32px;
+    font-weight: 500;
+    font-size: 10px;
+}
+
+.account-header.depth-3 td {
+    padding-left: 48px;
+    font-weight: 400;
+    font-size: 10px;
+}
+
+/* =========================================================================
+   TABLE ROWS - TRANSACTION DETAILS
+   ========================================================================= */
+
+.transaction-row td {
+    font-size: 10px;
+    font-weight: 400;
+    color: #333333;
+    padding: 4px 6px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: top;
+    background-color: #ffffff;
+}
+
+.transaction-row:hover td {
+    background-color: #f8f9fa;
+}
+
+.transaction-row.depth-1 td:first-child {
+    padding-left: 16px;
+}
+
+.transaction-row.depth-2 td:first-child {
+    padding-left: 32px;
+}
+
+.transaction-row.depth-3 td:first-child {
+    padding-left: 48px;
+}
+
+/* Text overflow handling */
+.transaction-row td.col-memo {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.transaction-row td.col-name {
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* =========================================================================
+   TABLE ROWS - ACCOUNT TOTALS
+   ========================================================================= */
+
+.account-total td {
+    font-size: 10px;
+    font-weight: 600;
+    color: #000000;
+    padding: 4px 6px;
+    border-bottom: 1px solid #e0e0e0;
+    border-top: 1px solid #cccccc;
+    background-color: #fafafa;
+}
+
+.account-total.depth-1 td:first-child {
+    padding-left: 16px;
+}
+
+.account-total.depth-2 td:first-child {
+    padding-left: 32px;
+}
+
+/* =========================================================================
+   TABLE ROWS - SECTION TOTALS
+   ========================================================================= */
+
+.section-total td {
+    font-size: 11px;
+    font-weight: 700;
+    color: #000000;
+    padding: 8px 6px;
+    background-color: #f0f0f0;
+    border-top: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+}
+
+/* =========================================================================
+   TABLE ROWS - COMPUTED TOTALS (Gross Profit, Net Operating Income, etc.)
+   ========================================================================= */
+
+.computed-total td {
+    font-size: 11px;
+    font-weight: 700;
+    color: #000000;
+    padding: 10px 6px;
+    background-color: #e8e8e8;
+    border-top: 1px solid #999999;
+    border-bottom: 1px solid #999999;
+}
+
+.computed-total.gross-profit td {
+    background-color: #e6f3e6;
+}
+
+.computed-total.net-operating td {
+    background-color: #e6e6f3;
+}
+
+.computed-total.net-other td {
+    background-color: #f3e6e6;
+}
+
+/* =========================================================================
+   TABLE ROWS - NET INCOME (Final Total)
+   ========================================================================= */
+
+.net-income td {
+    font-size: 13px;
+    font-weight: 700;
+    color: #000000;
+    padding: 12px 6px;
+    background-color: #333333;
+    color: #ffffff;
+    border-top: 3px solid #000000;
+}
+
+.net-income td.amount {
+    color: #ffffff;
+}
+
+/* =========================================================================
+   AMOUNT COLUMN STYLING
+   ========================================================================= */
+
+td.amount,
+th.col-amount {
+    text-align: right;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 10px;
+}
+
+/* Negative amounts in red */
+td.amount.negative {
+    color: #cc0000;
+}
+
+/* =========================================================================
+   REPORT FOOTER
+   ========================================================================= */
+
+.pnl-footer {
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 1px solid #cccccc;
+    text-align: right;
+}
+
+.generated-at {
+    font-size: 9px;
+    color: #999999;
+    font-style: italic;
+}
+
+/* =========================================================================
+   RESPONSIVE ADJUSTMENTS
+   ========================================================================= */
+
+@media screen and (max-width: 768px) {
+    .pnl-report {
+        padding: 10px 15px;
+    }
+
+    .pnl-table {
+        font-size: 9px;
+    }
+
+    .pnl-table .col-memo,
+    .pnl-table .col-name {
+        display: none;
+    }
+
+    .pnl-table .col-date {
+        width: 70px;
+    }
+
+    .pnl-table .col-amount {
+        width: 80px;
+    }
+
+    .company-name {
+        font-size: 14px;
+    }
+
+    .report-title {
+        font-size: 12px;
+    }
+}
+
+/* =========================================================================
+   EXPORT/ACTION BUTTONS (for interactive HTML version)
+   ========================================================================= */
+
+.pnl-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.pnl-actions button {
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #333333;
+    background-color: #f5f5f5;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pnl-actions button:hover {
+    background-color: #e8e8e8;
+    border-color: #999999;
+}
+
+.pnl-actions button.btn-primary {
+    background-color: #2e7d32;
+    color: #ffffff;
+    border-color: #2e7d32;
+}
+
+.pnl-actions button.btn-primary:hover {
+    background-color: #1b5e20;
+}
+
+@media print {
+    .pnl-actions {
+        display: none !important;
+    }
+}
+
+/* =========================================================================
+   CONFIGURATION PANEL (for interactive version)
+   ========================================================================= */
+
+.pnl-config-panel {
+    background-color: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+}
+
+.pnl-config-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: center;
+}
+
+.pnl-config-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pnl-config-item label {
+    font-size: 11px;
+    font-weight: 500;
+    color: #555555;
+}
+
+.pnl-config-item input[type="date"],
+.pnl-config-item select {
+    padding: 6px 10px;
+    font-size: 11px;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    background-color: #ffffff;
+}
+
+.pnl-config-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+@media print {
+    .pnl-config-panel {
+        display: none !important;
+    }
+}
+
+/* =========================================================================
+   LOADING STATE
+   ========================================================================= */
+
+.pnl-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}
+
+.pnl-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #f0f0f0;
+    border-top-color: #333333;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* =========================================================================
+   EMPTY STATE
+   ========================================================================= */
+
+.pnl-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666666;
+}
+
+.pnl-empty-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+    opacity: 0.5;
+}
+
+.pnl-empty-message {
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.pnl-empty-hint {
+    font-size: 11px;
+    color: #999999;
+}
