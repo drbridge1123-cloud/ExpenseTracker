@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE = '/ExpenseTracker/api/v1';
+const API_BASE = '/ExpensesTracker/api/v1';
 
 // API Helpers
 async function apiGet(endpoint, params = {}) {
