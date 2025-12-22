@@ -77,8 +77,9 @@ const menuConfigs = {
                 label: 'TRUST',
                 items: [
                     { page: 'trust-operations', icon: '💼', label: 'Operations' },
-                    { page: 'client-ledger', icon: '📄', label: 'Client Ledger' },
-                    { page: 'trust-staging', icon: '📦', label: 'Import & Post' }
+                    { page: 'client-ledger', icon: '📄', label: 'Client Ledger' }
+                    // Import & Post removed - now integrated into Client Ledger
+                    // { page: 'trust-staging', icon: '📦', label: 'Import & Post' }
                 ]
             },
             {

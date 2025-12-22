@@ -12123,3 +12123,281 @@ window.openMatchModal = openMatchModal;
 window.closeMatchModal = closeMatchModal;
 window.selectMatchOption = selectMatchOption;
 window.confirmMatch = confirmMatch;
+
+// =====================================================
+// Client Ledger CSV Import & Auto-Match
+// =====================================================
+
+/**
+ * Handle CSV import from Client Ledger page
+ */
+async function handleLedgerCsvImport(input) {
+    if (!input.files || !input.files[0]) return;
+
+    const file = input.files[0];
+    const userId = state.currentUser || localStorage.getItem('currentUser');
+
+    // Get trust account
+    const accounts = await apiGet('/accounts/index.php', { user_id: userId, type: 'bank' });
+    const trustAccount = accounts.data?.accounts?.find(a => a.account_type === 'iolta');
+
+    if (!trustAccount) {
+        showToast('No IOLTA account found', 'error');
+        input.value = '';
+        return;
+    }
+
+    // Show loading
+    showToast('Importing CSV...', 'info');
+
+    const formData = new FormData();
+    formData.append('csv_file', file);
+    formData.append('user_id', userId);
+    formData.append('account_id', trustAccount.id);
+
+    try {
+        const response = await fetch('/expensetracker/api/v1/trust/staging.php', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+
+        input.value = ''; // Reset file input
+
+        if (result.success) {
+            const imported = result.data?.imported || 0;
+            const skipped = result.data?.skipped || 0;
+
+            showToast(`Imported ${imported} records${skipped ? `, ${skipped} skipped` : ''}`, 'success');
+
+            // Now find auto-matches
+            await findAutoMatches(userId, trustAccount.id);
+
+        } else {
+            showToast(result.message || 'Import failed', 'error');
+        }
+    } catch (error) {
+        console.error('Import error:', error);
+        showToast('Import failed: ' + error.message, 'error');
+        input.value = '';
+    }
+}
+
+/**
+ * Find automatic matches after import
+ */
+async function findAutoMatches(userId, accountId) {
+    try {
+        const response = await apiPost('/trust/staging.php', {
+            action: 'auto_match',
+            user_id: userId,
+            account_id: accountId
+        });
+
+        if (response.success && response.data) {
+            const matches = response.data.matches || [];
+            const unmatched = response.data.unmatched || [];
+
+            if (matches.length > 0 || unmatched.length > 0) {
+                // Show Review Matches Modal
+                openReviewMatchesModal(matches, unmatched, userId);
+            } else {
+                // No matches found, just refresh the view
+                if (typeof IoltaUI !== 'undefined') {
+                    await IoltaUI.refreshData();
+                }
+                showToast('No pending items to match', 'info');
+            }
+        }
+    } catch (error) {
+        console.error('Auto-match error:', error);
+        // Still refresh the view
+        if (typeof IoltaUI !== 'undefined') {
+            await IoltaUI.refreshData();
+        }
+    }
+}
+
+/**
+ * Open Review Matches Modal
+ */
+function openReviewMatchesModal(matches, unmatched, userId) {
+    // Store for later use
+    window._reviewMatchesData = { matches, unmatched, userId };
+
+    let matchesHtml = '';
+
+    // Matched items
+    matches.forEach((item, idx) => {
+        const score = item.match_score || 0;
+        const scoreColor = score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#94a3b8';
+        const stagingDate = new Date(item.staging.transaction_date).toLocaleDateString();
+        const txDate = new Date(item.transaction.transaction_date).toLocaleDateString();
+
+        matchesHtml += `
+            <div class="match-item" style="padding: 16px; border-bottom: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; align-items: start; gap: 16px;">
+                    <div style="flex: 1;">
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Bank Import</div>
+                        <div style="font-weight: 500; color: #1e293b;">${escapeHtml(item.staging.description)}</div>
+                        <div style="font-size: 13px; color: #64748b;">${stagingDate} • ${formatCurrency(item.staging.amount)}</div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Matched To</div>
+                        <div style="font-weight: 500; color: #1e293b;">${escapeHtml(item.transaction.description)}</div>
+                        <div style="font-size: 13px; color: #64748b;">${txDate} • ${item.transaction.check_number ? 'Check #' + item.transaction.check_number : ''}</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 18px; font-weight: 700; color: ${scoreColor};">${score}%</div>
+                        <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; margin-top: 4px;">
+                            <input type="checkbox" class="match-checkbox" data-idx="${idx}" checked style="width: 16px; height: 16px;">
+                            <span style="font-size: 12px; color: #64748b;">Approve</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    // Unmatched items
+    if (unmatched.length > 0) {
+        matchesHtml += `
+            <div style="padding: 12px 16px; background: #fef3c7; border-bottom: 1px solid #e2e8f0;">
+                <div style="font-weight: 600; color: #92400e;">Unmatched Items (${unmatched.length})</div>
+                <div style="font-size: 12px; color: #92400e;">These need to be assigned to clients manually</div>
+            </div>
+        `;
+
+        unmatched.forEach(item => {
+            const stagingDate = new Date(item.transaction_date).toLocaleDateString();
+            matchesHtml += `
+                <div style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; background: #fffbeb;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 500; color: #1e293b;">${escapeHtml(item.description)}</div>
+                            <div style="font-size: 13px; color: #64748b;">${stagingDate}</div>
+                        </div>
+                        <div style="font-weight: 600; color: ${parseFloat(item.amount) >= 0 ? '#10b981' : '#ef4444'};">
+                            ${formatCurrency(item.amount)}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    const modalHtml = `
+        <div id="review-matches-modal" class="modal-overlay" style="display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 12px; max-width: 800px; width: 90%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+                <div style="padding: 20px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #1e293b;">Review Bank Matches</h3>
+                        <p style="margin: 4px 0 0; font-size: 13px; color: #64748b;">${matches.length} matches found, ${unmatched.length} unmatched</p>
+                    </div>
+                    <button onclick="closeReviewMatchesModal()" style="background: none; border: none; font-size: 24px; color: #64748b; cursor: pointer;">&times;</button>
+                </div>
+                <div style="flex: 1; overflow-y: auto;">
+                    ${matchesHtml || '<div style="padding: 40px; text-align: center; color: #64748b;">No items to review</div>'}
+                </div>
+                <div style="padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+                    <button onclick="closeReviewMatchesModal()" style="padding: 10px 20px; background: #f1f5f9; color: #475569; border: none; border-radius: 8px; font-weight: 500; cursor: pointer;">
+                        Cancel
+                    </button>
+                    <div style="display: flex; gap: 12px;">
+                        ${matches.length > 0 ? `
+                            <button onclick="approveSelectedMatches()" style="padding: 10px 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer;">
+                                Approve Selected
+                            </button>
+                        ` : ''}
+                        ${unmatched.length > 0 ? `
+                            <button onclick="goToUnassigned()" style="padding: 10px 20px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer;">
+                                View Unassigned
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    const existing = document.getElementById('review-matches-modal');
+    if (existing) existing.remove();
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeReviewMatchesModal() {
+    const modal = document.getElementById('review-matches-modal');
+    if (modal) modal.remove();
+    window._reviewMatchesData = null;
+
+    // Refresh data
+    if (typeof IoltaUI !== 'undefined') {
+        IoltaUI.refreshData();
+    }
+}
+
+async function approveSelectedMatches() {
+    const data = window._reviewMatchesData;
+    if (!data || !data.matches.length) return;
+
+    const checkboxes = document.querySelectorAll('.match-checkbox:checked');
+    const selectedIndices = Array.from(checkboxes).map(cb => parseInt(cb.dataset.idx));
+
+    if (selectedIndices.length === 0) {
+        showToast('No matches selected', 'warning');
+        return;
+    }
+
+    showToast('Approving matches...', 'info');
+
+    let approved = 0;
+    let failed = 0;
+
+    for (const idx of selectedIndices) {
+        const match = data.matches[idx];
+        if (!match) continue;
+
+        try {
+            const result = await apiPost('/trust/staging.php', {
+                action: 'match',
+                staging_id: match.staging.id,
+                transaction_id: match.transaction.id,
+                user_id: data.userId
+            });
+
+            if (result.success) {
+                approved++;
+            } else {
+                failed++;
+            }
+        } catch (e) {
+            failed++;
+        }
+    }
+
+    closeReviewMatchesModal();
+
+    if (approved > 0) {
+        showToast(`${approved} match${approved > 1 ? 'es' : ''} approved${failed ? `, ${failed} failed` : ''}`, 'success');
+    } else {
+        showToast('Failed to approve matches', 'error');
+    }
+}
+
+function goToUnassigned() {
+    closeReviewMatchesModal();
+    // Select General/Unassigned in sidebar
+    if (typeof IoltaUI !== 'undefined') {
+        IoltaUI.selectClient('general');
+    }
+}
+
+// Export new functions
+window.handleLedgerCsvImport = handleLedgerCsvImport;
+window.findAutoMatches = findAutoMatches;
+window.openReviewMatchesModal = openReviewMatchesModal;
+window.closeReviewMatchesModal = closeReviewMatchesModal;
+window.approveSelectedMatches = approveSelectedMatches;
+window.goToUnassigned = goToUnassigned;

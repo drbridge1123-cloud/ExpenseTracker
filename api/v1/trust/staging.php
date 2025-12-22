@@ -195,6 +195,9 @@ function handlePost(Database $db, PDO $pdo): void {
             case 'match':
                 handleMatch($db, $pdo, $input);
                 return;
+            case 'auto_match':
+                handleAutoMatch($db, $pdo, $input);
+                return;
         }
     }
 
@@ -1248,4 +1251,181 @@ function handleMatch(Database $db, PDO $pdo, array $input): void {
         $pdo->rollBack();
         errorResponse('Failed to match transaction: ' . $e->getMessage());
     }
+}
+
+/**
+ * Auto-match all unassigned/assigned staging records
+ * Returns matches (with candidates) and unmatched items
+ */
+function handleAutoMatch(Database $db, PDO $pdo, array $input): void {
+    $userId = !empty($input['user_id']) ? (int)$input['user_id'] : null;
+    $accountId = !empty($input['account_id']) ? (int)$input['account_id'] : null;
+
+    if (!$userId) {
+        errorResponse('user_id is required');
+    }
+
+    // Get all unposted staging records (unassigned or assigned)
+    $where = ['s.user_id = :user_id', "s.status IN ('unassigned', 'assigned')"];
+    $params = ['user_id' => $userId];
+
+    if ($accountId) {
+        $where[] = 's.account_id = :account_id';
+        $params['account_id'] = $accountId;
+    }
+
+    $whereClause = implode(' AND ', $where);
+
+    $sql = "SELECT s.*, tc.client_name
+            FROM trust_staging s
+            LEFT JOIN trust_clients tc ON s.client_id = tc.id
+            WHERE $whereClause
+            ORDER BY s.transaction_date DESC";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $stagingRecords = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $matches = [];
+    $unmatched = [];
+
+    foreach ($stagingRecords as $staging) {
+        $match = findBestMatch($db, $pdo, $staging);
+
+        if ($match) {
+            $matches[] = [
+                'staging' => $staging,
+                'transaction' => $match['transaction'],
+                'match_score' => $match['score'],
+                'match_type' => $match['type']
+            ];
+        } else {
+            $unmatched[] = $staging;
+        }
+    }
+
+    successResponse([
+        'matches' => $matches,
+        'unmatched' => $unmatched,
+        'total_staging' => count($stagingRecords),
+        'match_count' => count($matches),
+        'unmatched_count' => count($unmatched)
+    ]);
+}
+
+/**
+ * Find best matching transaction for a staging record
+ */
+function findBestMatch(Database $db, PDO $pdo, array $staging): ?array {
+    $amount = (float)$staging['amount'];
+    $txDate = $staging['transaction_date'];
+    $checkNumber = $staging['check_number'] ?? null;
+    $accountId = $staging['account_id'];
+
+    // Priority 1: Check number match (100% confidence)
+    if ($checkNumber) {
+        $sql = "SELECT t.*, l.client_id, tc.client_name
+                FROM trust_transactions t
+                JOIN trust_ledger l ON t.ledger_id = l.id
+                JOIN trust_clients tc ON l.client_id = tc.id
+                WHERE l.account_id = :account_id
+                  AND t.check_number = :check_number
+                  AND t.status = 'pending'
+                  AND (t.staging_id IS NULL OR t.staging_id = 0)
+                LIMIT 1";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            'account_id' => $accountId,
+            'check_number' => $checkNumber
+        ]);
+        $match = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($match) {
+            return [
+                'transaction' => $match,
+                'score' => 100,
+                'type' => 'check_number'
+            ];
+        }
+    }
+
+    // Priority 2: Amount + date range match (if staging has client assigned)
+    if ($staging['client_id']) {
+        $sql = "SELECT t.*, l.client_id, tc.client_name,
+                       ABS(DATEDIFF(t.transaction_date, :tx_date)) as days_diff
+                FROM trust_transactions t
+                JOIN trust_ledger l ON t.ledger_id = l.id
+                JOIN trust_clients tc ON l.client_id = tc.id
+                WHERE l.client_id = :client_id
+                  AND l.account_id = :account_id
+                  AND t.amount = :amount
+                  AND t.status = 'pending'
+                  AND (t.staging_id IS NULL OR t.staging_id = 0)
+                  AND t.transaction_date BETWEEN DATE_SUB(:tx_date2, INTERVAL 14 DAY)
+                                             AND DATE_ADD(:tx_date3, INTERVAL 14 DAY)
+                ORDER BY days_diff ASC
+                LIMIT 1";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            'client_id' => $staging['client_id'],
+            'account_id' => $accountId,
+            'amount' => $amount,
+            'tx_date' => $txDate,
+            'tx_date2' => $txDate,
+            'tx_date3' => $txDate
+        ]);
+        $match = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($match) {
+            // Calculate score based on date difference
+            $daysDiff = (int)$match['days_diff'];
+            $score = max(50, 100 - ($daysDiff * 5));
+
+            return [
+                'transaction' => $match,
+                'score' => $score,
+                'type' => 'amount_date'
+            ];
+        }
+    }
+
+    // Priority 3: Amount match only (any client, lower confidence)
+    $sql = "SELECT t.*, l.client_id, tc.client_name,
+                   ABS(DATEDIFF(t.transaction_date, :tx_date)) as days_diff
+            FROM trust_transactions t
+            JOIN trust_ledger l ON t.ledger_id = l.id
+            JOIN trust_clients tc ON l.client_id = tc.id
+            WHERE l.account_id = :account_id
+              AND t.amount = :amount
+              AND t.status = 'pending'
+              AND (t.staging_id IS NULL OR t.staging_id = 0)
+              AND t.transaction_date BETWEEN DATE_SUB(:tx_date2, INTERVAL 7 DAY)
+                                         AND DATE_ADD(:tx_date3, INTERVAL 7 DAY)
+            ORDER BY days_diff ASC
+            LIMIT 1";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        'account_id' => $accountId,
+        'amount' => $amount,
+        'tx_date' => $txDate,
+        'tx_date2' => $txDate,
+        'tx_date3' => $txDate
+    ]);
+    $match = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($match) {
+        $daysDiff = (int)$match['days_diff'];
+        $score = max(40, 90 - ($daysDiff * 7));
+
+        return [
+            'transaction' => $match,
+            'score' => $score,
+            'type' => 'amount_only'
+        ];
+    }
+
+    return null;
 }
