@@ -17,7 +17,8 @@ try {
 
     // Get query parameters
     $page = max(1, (int)($_GET['page'] ?? 1));
-    $limit = min(10000, max(10, (int)($_GET['limit'] ?? 50)));
+    $all = !empty($_GET['all']);
+    $limit = $all ? 10000 : min(10000, max(10, (int)($_GET['limit'] ?? 50)));
     $offset = ($page - 1) * $limit;
 
     // Build WHERE conditions
@@ -38,22 +39,64 @@ try {
         $params['shared_user_id'] = $userId;
     }
 
-    // Filter by account
+    // Filter by account (include transfers where this account is the source)
     if (!empty($_GET['account_id'])) {
-        $conditions[] = 't.account_id = :account_id';
+        $conditions[] = '(t.account_id = :account_id OR t.transfer_account_id = :transfer_account_id)';
         $params['account_id'] = (int)$_GET['account_id'];
+        $params['transfer_account_id'] = (int)$_GET['account_id'];
     }
 
-    // Filter by category
+    // Filter by category (include child categories if this is a parent)
     if (!empty($_GET['category_id'])) {
-        $conditions[] = 't.category_id = :category_id';
-        $params['category_id'] = (int)$_GET['category_id'];
+        $categoryId = (int)$_GET['category_id'];
+
+        // Check if include_children parameter is set (default: true for parent categories)
+        $includeChildren = !isset($_GET['include_children']) || $_GET['include_children'] !== 'false';
+
+        if ($includeChildren) {
+            // Get all child category IDs recursively
+            $childIds = [$categoryId];
+            $toCheck = [$categoryId];
+
+            while (!empty($toCheck)) {
+                $parentId = array_shift($toCheck);
+                $children = $db->fetchAll(
+                    "SELECT id FROM categories WHERE parent_id = :parent_id",
+                    ['parent_id' => $parentId]
+                );
+                foreach ($children as $child) {
+                    $childIds[] = $child['id'];
+                    $toCheck[] = $child['id'];
+                }
+            }
+
+            // Use IN clause for category and all children
+            $placeholders = implode(',', array_map(fn($i) => ":cat_$i", array_keys($childIds)));
+            $conditions[] = "t.category_id IN ($placeholders)";
+            foreach ($childIds as $i => $id) {
+                $params["cat_$i"] = $id;
+            }
+        } else {
+            $conditions[] = 't.category_id = :category_id';
+            $params['category_id'] = $categoryId;
+        }
     }
 
     // Filter by transaction type
     if (!empty($_GET['type'])) {
         $conditions[] = 't.transaction_type = :type';
         $params['type'] = $_GET['type'];
+    }
+
+    // Filter by transaction type (checks or deposits - for account sub-filters)
+    if (!empty($_GET['transaction_type'])) {
+        if ($_GET['transaction_type'] === 'checks') {
+            // Checks: has check_number OR description contains 'CHECK'
+            $conditions[] = "(t.check_number IS NOT NULL AND t.check_number != '' OR t.description LIKE '%CHECK%')";
+        } elseif ($_GET['transaction_type'] === 'deposits') {
+            // Deposits: positive amounts (credits)
+            $conditions[] = "t.amount > 0";
+        }
     }
 
     // Filter by status
@@ -127,11 +170,15 @@ try {
                  WHERE $whereClause";
     $totalCount = $db->fetchColumn($countSql, $params);
 
+    // Check if filtering by specific account (for transfer amount flip)
+    $filterAccountId = !empty($_GET['account_id']) ? (int)$_GET['account_id'] : null;
+
     // Get transactions with joins
     $sql = "SELECT
                 t.id,
                 t.user_id,
                 t.account_id,
+                t.transfer_account_id,
                 t.category_id,
                 t.transaction_date,
                 t.post_date,
@@ -161,21 +208,33 @@ try {
                 c.category_type,
                 u.username,
                 u.display_name,
-                (SELECT COUNT(*) FROM receipts r WHERE r.transaction_id = t.id) AS has_receipt
+                (SELECT COUNT(*) FROM receipts r WHERE r.transaction_id = t.id) AS has_receipt,
+                ta.account_name AS transfer_account_name,
+                ch.status AS check_status
             FROM transactions t
             LEFT JOIN accounts a ON t.account_id = a.id
+            LEFT JOIN accounts ta ON t.transfer_account_id = ta.id
             LEFT JOIN categories c ON t.category_id = c.id
             LEFT JOIN users u ON t.user_id = u.id
+            LEFT JOIN checks ch ON ch.transaction_id = t.id
             WHERE $whereClause
             ORDER BY t.$sortColumn $sortDir, t.id DESC
             LIMIT $limit OFFSET $offset";
 
     $transactions = $db->fetchAll($sql, $params);
 
-    // Parse JSON fields
+    // Parse JSON fields and adjust transfer amounts
     foreach ($transactions as &$t) {
         $t['tags'] = $t['tags'] ? json_decode($t['tags'], true) : [];
         $t['amount'] = (float)$t['amount'];
+
+        // For transfers viewed from the bank account perspective, flip the amount
+        // Transfer is stored with positive amount on credit card (debt reduction)
+        // But from bank account view, it should be negative (money going out)
+        if ($filterAccountId && $t['transfer_account_id'] == $filterAccountId && $t['transaction_type'] === 'transfer') {
+            $t['amount'] = -$t['amount'];
+            $t['is_transfer_view'] = true; // Flag to indicate this is viewed from transfer account side
+        }
     }
 
     // Calculate pagination info

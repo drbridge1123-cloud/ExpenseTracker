@@ -25,6 +25,7 @@ $userId = !empty($input['user_id']) ? (int)$input['user_id'] : null;
 $transactionIds = $input['transaction_ids'] ?? [];
 $categoryId = !empty($input['category_id']) ? (int)$input['category_id'] : null;
 $createRule = !empty($input['create_rule']);
+$ruleData = $input['rule_data'] ?? null; // Custom rule settings from UI
 
 // Debug log
 appLog('Bulk categorize request', 'debug', [
@@ -85,75 +86,114 @@ try {
 
     appLog('Bulk categorize result', 'debug', ['updated' => $updated]);
 
-    // Create rules if requested - one rule per unique pattern
+    // Create rules if requested
     $rulesCreated = 0;
-    $patternsProcessed = [];
+    $ruleCreated = false;
 
     if ($createRule && $updated > 0) {
-        // Get descriptions from updated transactions
-        $transactions = $db->fetchAll(
-            "SELECT description, vendor_name FROM transactions WHERE id IN ($idList)"
-        );
+        // If custom rule data provided, use it directly
+        if ($ruleData && !empty($ruleData['rule_name']) && !empty($ruleData['match_value'])) {
+            $ruleName = trim($ruleData['rule_name']);
+            $matchField = $ruleData['match_field'] ?? 'description';
+            $matchType = $ruleData['match_type'] ?? 'contains';
+            $matchValue = trim($ruleData['match_value']);
+            $priority = (int)($ruleData['priority'] ?? 50);
 
-        // Generic patterns to skip (too common to be useful)
-        $skipPatterns = ['STORE', 'PAYMENT', 'PURCHASE', 'DEBIT', 'CREDIT', 'ACH', 'POS',
-                         'CHECKCARD', 'TRANSFER', 'DEPOSIT', 'WITHDRAWAL', 'FEE', 'CHARGE',
-                         'THANK', 'YOU', 'THE', 'AND', 'FOR', 'INC', 'LLC', 'CORP'];
+            // Validate match_field
+            $validFields = ['description', 'vendor_name', 'amount'];
+            if (!in_array($matchField, $validFields)) {
+                $matchField = 'description';
+            }
 
-        foreach ($transactions as $txn) {
-            // Use vendor_name if available, otherwise extract from description
-            $pattern = $txn['vendor_name'] ?: $txn['description'];
+            // Validate match_type
+            $validTypes = ['contains', 'exact', 'starts_with', 'regex'];
+            if (!in_array($matchType, $validTypes)) {
+                $matchType = 'contains';
+            }
 
-            if (!$pattern) continue;
+            // Check if exact rule already exists
+            $existingRule = $db->fetch(
+                "SELECT id FROM categorization_rules
+                 WHERE UPPER(match_value) = UPPER(:match_value)
+                 AND match_type = :match_type
+                 AND match_field = :match_field
+                 AND user_id = :user_id",
+                [
+                    'match_value' => $matchValue,
+                    'match_type' => $matchType,
+                    'match_field' => $matchField,
+                    'user_id' => $userId
+                ]
+            );
 
-            // Clean up pattern - remove common prefixes
-            $pattern = preg_replace('/^(PURCHASE|DEBIT|CREDIT|ACH|POS|CHECKCARD|SQ \*|TST\*|DD \*|SP |PY \*)\s*/i', '', $pattern);
+            if (!$existingRule) {
+                $db->insert('categorization_rules', [
+                    'user_id' => $userId,
+                    'category_id' => $categoryId,
+                    'rule_name' => $ruleName,
+                    'match_field' => $matchField,
+                    'match_type' => $matchType,
+                    'match_value' => $matchValue,
+                    'priority' => $priority,
+                    'is_active' => 1
+                ]);
+                $rulesCreated = 1;
+                $ruleCreated = true;
+            }
+        } else {
+            // Fallback: auto-generate rules based on patterns (legacy behavior)
+            $patternsProcessed = [];
+            $transactions = $db->fetchAll(
+                "SELECT description, vendor_name FROM transactions WHERE id IN ($idList)"
+            );
 
-            // Take first 1-2 significant words as pattern
-            $parts = preg_split('/[\s\*#\-]+/', trim($pattern));
-            $patternParts = [];
-            foreach ($parts as $part) {
-                $part = trim($part);
-                // Skip if too short, is a number, or is a generic word
-                if (strlen($part) < 3 || is_numeric($part) || in_array(strtoupper($part), $skipPatterns)) {
-                    continue;
+            $skipPatterns = ['STORE', 'PAYMENT', 'PURCHASE', 'DEBIT', 'CREDIT', 'ACH', 'POS',
+                             'CHECKCARD', 'TRANSFER', 'DEPOSIT', 'WITHDRAWAL', 'FEE', 'CHARGE',
+                             'THANK', 'YOU', 'THE', 'AND', 'FOR', 'INC', 'LLC', 'CORP'];
+
+            foreach ($transactions as $txn) {
+                $pattern = $txn['vendor_name'] ?: $txn['description'];
+                if (!$pattern) continue;
+
+                $pattern = preg_replace('/^(PURCHASE|DEBIT|CREDIT|ACH|POS|CHECKCARD|SQ \*|TST\*|DD \*|SP |PY \*)\s*/i', '', $pattern);
+                $parts = preg_split('/[\s\*#\-]+/', trim($pattern));
+                $patternParts = [];
+                foreach ($parts as $part) {
+                    $part = trim($part);
+                    if (strlen($part) < 3 || is_numeric($part) || in_array(strtoupper($part), $skipPatterns)) {
+                        continue;
+                    }
+                    $patternParts[] = $part;
+                    if (count($patternParts) >= 2) break;
                 }
-                $patternParts[] = $part;
-                // Take up to 2 significant words
-                if (count($patternParts) >= 2) break;
-            }
 
-            if (empty($patternParts)) continue;
+                if (empty($patternParts)) continue;
 
-            $cleanPattern = implode(' ', $patternParts);
-            $upperPattern = strtoupper($cleanPattern);
+                $cleanPattern = implode(' ', $patternParts);
+                $upperPattern = strtoupper($cleanPattern);
 
-            // Skip if we already processed this pattern in this batch
-            if (in_array($upperPattern, $patternsProcessed)) {
-                continue;
-            }
-            $patternsProcessed[] = $upperPattern;
+                if (in_array($upperPattern, $patternsProcessed)) continue;
+                $patternsProcessed[] = $upperPattern;
 
-            // Only create rule if pattern is meaningful (at least 3 chars)
-            if (strlen($cleanPattern) >= 3) {
-                // Check if similar rule exists (any category)
-                $existingRule = $db->fetch(
-                    "SELECT id FROM categorization_rules WHERE UPPER(match_value) = UPPER(:pattern)",
-                    ['pattern' => $cleanPattern]
-                );
+                if (strlen($cleanPattern) >= 3) {
+                    $existingRule = $db->fetch(
+                        "SELECT id FROM categorization_rules WHERE UPPER(match_value) = UPPER(:pattern)",
+                        ['pattern' => $cleanPattern]
+                    );
 
-                if (!$existingRule) {
-                    $db->insert('categorization_rules', [
-                        'user_id' => $userId,
-                        'category_id' => $categoryId,
-                        'rule_name' => $cleanPattern,
-                        'match_field' => 'description',
-                        'match_type' => 'contains',
-                        'match_value' => $cleanPattern,
-                        'priority' => 50,
-                        'is_active' => 1
-                    ]);
-                    $rulesCreated++;
+                    if (!$existingRule) {
+                        $db->insert('categorization_rules', [
+                            'user_id' => $userId,
+                            'category_id' => $categoryId,
+                            'rule_name' => $cleanPattern,
+                            'match_field' => 'description',
+                            'match_type' => 'contains',
+                            'match_value' => $cleanPattern,
+                            'priority' => 50,
+                            'is_active' => 1
+                        ]);
+                        $rulesCreated++;
+                    }
                 }
             }
         }

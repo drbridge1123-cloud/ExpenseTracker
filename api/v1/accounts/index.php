@@ -105,7 +105,7 @@ function handlePost(Database $db): void {
         }
     }
 
-    $validTypes = ['checking', 'savings', 'credit_card', 'investment', 'cash', 'loan', 'other'];
+    $validTypes = ['checking', 'savings', 'credit_card', 'investment', 'cash', 'loan', 'trust', 'iolta', 'other'];
     if (!in_array($input['account_type'], $validTypes)) {
         errorResponse('Invalid account type');
     }

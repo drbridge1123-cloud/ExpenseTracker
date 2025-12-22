@@ -55,7 +55,7 @@ function handleGet() {
 
         $users = $db->fetchAll(
             "SELECT u.id, u.username, u.email, u.display_name, u.is_active, u.is_admin,
-                    u.default_currency, u.timezone, u.created_at, u.last_login,
+                    u.role_id, u.default_currency, u.timezone, u.created_at, u.last_login,
                     (SELECT COUNT(*) FROM transactions WHERE user_id = u.id) as transaction_count,
                     (SELECT COUNT(*) FROM accounts WHERE user_id = u.id) as account_count
              FROM users u
@@ -92,6 +92,7 @@ function handleCreateUpdate() {
     $displayName = trim($input['display_name'] ?? '');
     $isActive = isset($input['is_active']) ? (int)$input['is_active'] : 1;
     $isAdmin = isset($input['is_admin']) ? (int)$input['is_admin'] : 0;
+    $roleId = isset($input['role_id']) ? (int)$input['role_id'] : 3; // Default to staff
 
     try {
         $db = Database::getInstance();
@@ -142,6 +143,9 @@ function handleCreateUpdate() {
             $updates[] = "is_admin = :is_admin";
             $params['is_admin'] = $isAdmin;
 
+            $updates[] = "role_id = :role_id";
+            $params['role_id'] = $roleId;
+
             if (!empty($updates)) {
                 $sql = "UPDATE users SET " . implode(', ', $updates) . " WHERE id = :id";
                 $db->query($sql, $params);
@@ -178,7 +182,8 @@ function handleCreateUpdate() {
                 'password_hash' => password_hash($password, PASSWORD_DEFAULT),
                 'display_name' => $displayName ?: $username,
                 'is_active' => $isActive,
-                'is_admin' => $isAdmin
+                'is_admin' => $isAdmin,
+                'role_id' => $roleId
             ]);
 
             successResponse(['id' => $userId], 'User created successfully');

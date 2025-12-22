@@ -2,8 +2,8 @@
 const API_BASE = (() => {
     // Get the base path from current location
     const pathParts = window.location.pathname.split('/');
-    // Find the app folder (first non-empty path segment that's not 'public')
-    const appFolder = pathParts.find((part, index) => index > 0 && part !== '' && part !== 'public');
+    // Find the app folder (first non-empty path segment that's not 'public' and not a file)
+    const appFolder = pathParts.find((part, index) => index > 0 && part !== '' && part !== 'public' && !part.includes('.'));
     // Return the API base path
     return appFolder ? '/' + appFolder + '/api/v1' : '/api/v1';
 })();

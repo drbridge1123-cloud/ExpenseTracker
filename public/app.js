@@ -59,6 +59,11 @@ async function showMainApp() {
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
 
+    // Initialize account type system (now async - loads permissions)
+    if (typeof initAccountType === 'function') {
+        await initAccountType();
+    }
+
     // Set current date
     const dateEl = document.getElementById('current-date');
     if (dateEl) {
@@ -199,7 +204,13 @@ async function loadPageData(page) {
     try {
         switch (page) {
             case 'dashboard':
-                await loadDashboard();
+                // Check account type for dashboard
+                const accountType = typeof getAccountType === 'function' ? getAccountType() : 'personal';
+                if (accountType === 'iolta') {
+                    await loadIoltaDashboard();
+                } else {
+                    await loadDashboard();
+                }
                 break;
             case 'transactions':
                 await loadTransactions();
@@ -245,6 +256,65 @@ async function loadPageData(page) {
             case 'data-management':
                 loadDataManagementPage();
                 break;
+            // IOLTA Pages
+            case 'client-ledger':
+                if (typeof loadClientLedgerPage === 'function') await loadClientLedgerPage();
+                break;
+            case 'trust-disburse':
+                if (typeof loadTrustDisburse === 'function') await loadTrustDisburse();
+                break;
+            case 'trust-transfer':
+                if (typeof loadTrustTransfer === 'function') await loadTrustTransfer();
+                break;
+            case 'trust-fee':
+                if (typeof loadTrustFee === 'function') await loadTrustFee();
+                break;
+            case 'trust-operations':
+                if (typeof loadTrustOperations === 'function') await loadTrustOperations();
+                break;
+            case 'trust-staging':
+                if (typeof loadStagingPage === 'function') await loadStagingPage();
+                break;
+            case 'trust-reconcile':
+                if (typeof loadTrustReconcile === 'function') await loadTrustReconcile();
+                break;
+            case 'trust-audit':
+                if (typeof loadTrustAuditLog === 'function') await loadTrustAuditLog();
+                break;
+            case 'trust-reports':
+                if (typeof loadTrustReports === 'function') await loadTrustReports();
+                break;
+            case 'trust-statements':
+                if (typeof loadTrustStatements === 'function') await loadTrustStatements();
+                break;
+            case 'trust-data-management':
+                if (typeof loadTrustDataManagement === 'function') await loadTrustDataManagement();
+                break;
+            // Cost Account Pages (mirrors IOLTA structure)
+            case 'cost-client-ledger':
+                if (typeof loadCostClientLedgerPage === 'function') await loadCostClientLedgerPage();
+                break;
+            case 'cost-operations':
+                if (typeof loadCostOperations === 'function') await loadCostOperations();
+                break;
+            case 'cost-reconcile':
+                if (typeof loadCostReconcile === 'function') await loadCostReconcile();
+                break;
+            case 'cost-data-management':
+                if (typeof loadCostDataManagement === 'function') await loadCostDataManagement();
+                break;
+            case 'cost-reports':
+                if (typeof loadCostReports === 'function') await loadCostReports();
+                break;
+            case 'vendors':
+                if (typeof loadVendorsPage === 'function') await loadVendorsPage();
+                break;
+            case 'customers':
+                if (typeof loadCustomersPage === 'function') await loadCustomersPage();
+                break;
+            case 'employees':
+                if (typeof loadEmployeesPage === 'function') await loadEmployeesPage();
+                break;
         }
     } catch (error) {
         showToast('Error loading data: ' + error.message, 'error');
@@ -264,62 +334,21 @@ function setupMobileMenu() {
 // =====================================================
 
 async function loadUsers() {
-    const userSelect = document.getElementById('user-select');
-    const switcher = document.querySelector('.user-switcher');
+    // Display current logged-in user name only (no user switching allowed)
+    const userNameEl = document.getElementById('current-user-name');
 
-    if (!userSelect) return;
-
-    let users = [];
-
-    // Admin can see all users
-    if (state.isAdmin) {
-        try {
-            const result = await apiGet('/admin/');
-            if (result.success && result.data.users) {
-                users = result.data.users.filter(u => u.is_active);
-            }
-        } catch (error) {
-            // Silently fail - session issue
-            console.log('Admin API not accessible');
-        }
+    if (userNameEl && state.userData) {
+        userNameEl.textContent = state.userData.display_name || state.userData.username;
     }
 
-    // Fallback: use logged in user only
-    if (users.length === 0 && state.userData) {
-        users = [state.userData];
-    }
-
-    if (users.length > 0) {
-        userSelect.innerHTML = users.map(u =>
-            `<option value="${u.id}" ${u.id == state.currentUser ? 'selected' : ''}>${u.display_name || u.username}</option>`
-        ).join('');
-    }
-
-    state.users = users;
-
-    // Hide switcher if only one user
-    if (switcher) {
-        switcher.style.display = users.length > 1 ? 'flex' : 'none';
-    }
+    // Store current user in state
+    state.users = state.userData ? [state.userData] : [];
 }
 
+// User switching is disabled for security - each user can only see their own data
 async function switchUser(userId) {
-    if (!userId) return;
-
-    state.currentUser = parseInt(userId);
-    console.log('Switched to user:', state.currentUser);
-
-    // Update sidebar user info
-    const selectedUser = state.users?.find(u => u.id == userId);
-    if (selectedUser) {
-        const nameEl = document.getElementById('current-user-name');
-        const avatarEl = document.getElementById('user-avatar');
-        if (nameEl) nameEl.textContent = selectedUser.display_name || selectedUser.username;
-        if (avatarEl) avatarEl.textContent = (selectedUser.display_name || selectedUser.username).charAt(0).toUpperCase();
-    }
-
-    // Reload current page data
-    await loadPageData(state.currentPage);
+    // Function disabled - users cannot switch accounts
+    console.log('User switching is disabled');
 }
 
 // =====================================================
@@ -453,6 +482,11 @@ function renderReport(data, type) {
 // =====================================================
 
 function setupSearch() {
+    // Global search was removed - function kept for compatibility
+    if (!elements.globalSearch) {
+        return;
+    }
+
     let debounceTimer;
 
     elements.globalSearch.addEventListener('input', (e) => {

@@ -82,7 +82,7 @@ function handleGet(Database $db): void {
 
     $categories = $db->fetchAll($sql, $params);
 
-    // Add real bank accounts under Assets category
+    // Add real bank accounts under Assets category (hierarchical)
     if ($userId) {
         // Find Assets category for this user
         $assetsCategory = null;
@@ -94,28 +94,42 @@ function handleGet(Database $db): void {
         }
 
         if ($assetsCategory) {
-            // Get user's actual bank accounts
-            $accounts = $db->fetchAll(
-                "SELECT id, account_name, account_type, current_balance, color
+            // Get user's actual bank accounts (parent accounts only - no parent_account_id)
+            $parentAccounts = $db->fetchAll(
+                "SELECT id, account_name, account_type, current_balance, color, parent_account_id
                  FROM accounts
-                 WHERE user_id = :user_id AND is_active = 1
-                 ORDER BY account_name",
+                 WHERE user_id = :user_id AND is_active = 1 AND parent_account_id IS NULL
+                 ORDER BY account_type DESC, account_name",
                 ['user_id' => $userId]
             );
 
-            // Add accounts as virtual sub-categories under Assets
-            foreach ($accounts as $account) {
-                $iconMap = [
-                    'checking' => '💳',
-                    'savings' => '💰',
-                    'credit_card' => '💳',
-                    'investment' => '📈',
-                    'cash' => '💵',
-                    'other' => '🏦'
-                ];
+            $iconMap = [
+                'checking' => '💳',
+                'savings' => '💰',
+                'credit_card' => '💳',
+                'investment' => '📈',
+                'cash' => '💵',
+                'iolta' => '⚖️',
+                'trust' => '👤',
+                'other' => '🏦'
+            ];
+
+            // Add parent accounts as virtual sub-categories under Assets
+            foreach ($parentAccounts as $account) {
+                $accountVirtualId = 'account_' . $account['id'];
+
+                // For IOLTA accounts, calculate total from sub-account balances (from trust_ledger)
+                $accountBalance = (float)$account['current_balance'];
+                if ($account['account_type'] === 'iolta') {
+                    $subBalanceResult = $db->fetch(
+                        "SELECT COALESCE(SUM(current_balance), 0) as total FROM trust_ledger WHERE user_id = :user_id AND is_active = 1",
+                        ['user_id' => $userId]
+                    );
+                    $accountBalance = (float)($subBalanceResult['total'] ?? 0);
+                }
 
                 $categories[] = [
-                    'id' => 'account_' . $account['id'],
+                    'id' => $accountVirtualId,
                     'user_id' => $userId,
                     'parent_id' => $assetsCategory['id'],
                     'name' => $account['account_name'],
@@ -129,12 +143,55 @@ function handleGet(Database $db): void {
                     'parent_slug' => 'assets',
                     'is_account' => true,
                     'account_type' => $account['account_type'],
-                    'current_balance' => (float)$account['current_balance'],
+                    'current_balance' => $accountBalance,
                     'transaction_count' => 0,
                     'month_total' => 0,
                     'last_month_total' => 0,
-                    'total_amount' => (float)$account['current_balance']
+                    'total_amount' => $accountBalance,
+                    'real_account_id' => $account['id']
                 ];
+
+                // If this is an IOLTA account, add client sub-accounts under it
+                if ($account['account_type'] === 'iolta') {
+                    $subAccounts = $db->fetchAll(
+                        "SELECT a.id, a.account_name, a.account_type, a.current_balance, a.color, a.linked_client_id,
+                                COALESCE(l.current_balance, 0) as ledger_balance
+                         FROM accounts a
+                         LEFT JOIN trust_ledger l ON a.linked_client_id = l.client_id AND l.is_active = 1
+                         WHERE a.user_id = :user_id AND a.is_active = 1 AND a.parent_account_id = :parent_id
+                         ORDER BY a.account_name",
+                        ['user_id' => $userId, 'parent_id' => $account['id']]
+                    );
+
+                    foreach ($subAccounts as $subAccount) {
+                        $subBalance = (float)($subAccount['ledger_balance'] ?: $subAccount['current_balance']);
+
+                        $categories[] = [
+                            'id' => 'account_' . $subAccount['id'],
+                            'user_id' => $userId,
+                            'parent_id' => $accountVirtualId,  // Parent is the IOLTA account
+                            'name' => $subAccount['account_name'],
+                            'slug' => 'account-' . $subAccount['id'],
+                            'icon' => '👤',
+                            'color' => $subAccount['color'] ?? '#6B7280',
+                            'category_type' => 'other',
+                            'is_system' => 0,
+                            'sort_order' => 0,
+                            'parent_name' => $account['account_name'],
+                            'parent_slug' => 'account-' . $account['id'],
+                            'is_account' => true,
+                            'is_trust_sub_account' => true,
+                            'account_type' => 'trust',
+                            'current_balance' => $subBalance,
+                            'transaction_count' => 0,
+                            'month_total' => 0,
+                            'last_month_total' => 0,
+                            'total_amount' => $subBalance,
+                            'real_account_id' => $subAccount['id'],
+                            'linked_client_id' => $subAccount['linked_client_id']
+                        ];
+                    }
+                }
             }
         }
     }
@@ -166,9 +223,10 @@ function handleGet(Database $db): void {
             );
             $categories[$i]['transaction_count'] = (int)($countResult['cnt'] ?? 0);
 
-            // Month total
+            // Month total - use ABS of SUM (not SUM of ABS) to handle refunds correctly
+            // Expenses are negative, refunds are positive. SUM gives net expense, ABS makes it positive for display
             $monthResult = $db->fetch(
-                "SELECT COALESCE(SUM(ABS(amount)), 0) as total FROM transactions
+                "SELECT ABS(COALESCE(SUM(amount), 0)) as total FROM transactions
                  WHERE category_id = :category_id AND user_id = :user_id
                  AND transaction_date >= DATE_FORMAT(NOW(), '%Y-%m-01')",
                 $statsParams
@@ -177,7 +235,7 @@ function handleGet(Database $db): void {
 
             // Last month total
             $lastMonthResult = $db->fetch(
-                "SELECT COALESCE(SUM(ABS(amount)), 0) as total FROM transactions
+                "SELECT ABS(COALESCE(SUM(amount), 0)) as total FROM transactions
                  WHERE category_id = :category_id AND user_id = :user_id
                  AND transaction_date >= DATE_FORMAT(NOW() - INTERVAL 1 MONTH, '%Y-%m-01')
                  AND transaction_date < DATE_FORMAT(NOW(), '%Y-%m-01')",
@@ -187,7 +245,7 @@ function handleGet(Database $db): void {
 
             // All time total
             $allTimeResult = $db->fetch(
-                "SELECT COALESCE(SUM(ABS(amount)), 0) as total FROM transactions
+                "SELECT ABS(COALESCE(SUM(amount), 0)) as total FROM transactions
                  WHERE category_id = :category_id AND user_id = :user_id",
                 $statsParams
             );

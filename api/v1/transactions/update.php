@@ -41,7 +41,7 @@ try {
         'category_id', 'description', 'vendor_name', 'memo',
         'tags', 'is_reviewed', 'status', 'transaction_date',
         'amount', 'transaction_type', 'reimbursement_status',
-        'reimbursement_notes'
+        'reimbursement_notes', 'transfer_account_id'
     ];
 
     $updateData = [];
@@ -84,8 +84,36 @@ try {
         $updateData['reviewed_at'] = date('Y-m-d H:i:s');
     }
 
+    // Handle transfer_account_id change - update account balances
+    $transferAccountChanged = isset($updateData['transfer_account_id']) &&
+                              $updateData['transfer_account_id'] != $transaction['transfer_account_id'];
+
     // Perform update
     $db->update('transactions', $updateData, 'id = :id', ['id' => $id]);
+
+    // Recalculate balances if transfer_account_id changed
+    if ($transferAccountChanged) {
+        // Update old transfer account balance (if existed)
+        if ($transaction['transfer_account_id']) {
+            $oldTransferTotal = $db->fetch(
+                "SELECT SUM(amount) as total FROM transactions WHERE transfer_account_id = :id AND transaction_type = 'transfer'",
+                ['id' => $transaction['transfer_account_id']]
+            );
+            $oldTransferBalance = -($oldTransferTotal['total'] ?? 0);
+            $db->query(
+                "UPDATE accounts SET current_balance = current_balance - :adjustment WHERE id = :id",
+                ['adjustment' => -$transaction['amount'], 'id' => $transaction['transfer_account_id']]
+            );
+        }
+
+        // Update new transfer account balance (if set)
+        if (!empty($updateData['transfer_account_id'])) {
+            $db->query(
+                "UPDATE accounts SET current_balance = current_balance + :adjustment WHERE id = :id",
+                ['adjustment' => -$transaction['amount'], 'id' => $updateData['transfer_account_id']]
+            );
+        }
+    }
 
     // Create categorization rule if category changed and requested
     $newRule = null;

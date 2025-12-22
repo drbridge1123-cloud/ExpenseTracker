@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Management - Expense Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .data-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .page-header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin-bottom: 16px;
+        }
+
+        .back-link:hover {
+            color: var(--text-primary);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-secondary);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .section-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .section-card h2 {
+            margin: 0 0 16px 0;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-card h2 span {
+            font-size: 24px;
+        }
+
+        .section-card p {
+            color: var(--text-secondary);
+            margin: 0 0 20px 0;
+            font-size: 14px;
+        }
+
+        .export-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .export-option {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .export-option:hover {
+            border-color: var(--accent-color);
+            background: var(--bg-secondary);
+        }
+
+        .export-option.selected {
+            border-color: var(--accent-color);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .export-option input[type="checkbox"] {
+            margin-right: 10px;
+        }
+
+        .import-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-select, .form-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--bg-primary);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-btn {
+            padding: 10px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .file-name {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #4f46e5;
+        }
+
+        .btn-primary:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-primary);
+        }
+
+        .btn-block {
+            width: 100%;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin: 16px 0;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .radio-option input {
+            margin: 0;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .warning-box strong {
+            color: #92400e;
+        }
+
+        .result-box {
+            margin-top: 20px;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .result-box.success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+            display: block;
+        }
+
+        .result-box.error {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-secondary);
+        }
+
+        .loading.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .stat-item {
+            background: var(--bg-secondary);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-item .label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .stat-item .value {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                flex-direction: column;
+            }
+
+            .export-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="data-container">
+        <a href="index.html" class="back-link">← Back to Transactions</a>
+
+        <div class="page-header">
+            <h1>Data Management</h1>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="export">Export</button>
+            <button class="tab-btn" data-tab="import">Import</button>
+            <button class="tab-btn" data-tab="backup">Full Backup</button>
+            <button class="tab-btn" data-tab="restore">Restore</button>
+        </div>
+
+        <!-- Export Tab -->
+        <div id="export-tab" class="tab-content active">
+            <div class="section-card">
+                <h2><span>📤</span> Export Data</h2>
+                <p>Download your data as CSV files for external use or backup.</p>
+
+                <div class="export-grid">
+                    <label class="export-option">
+                        <input type="checkbox" name="export" value="transactions" checked>
+                        Transactions
+                    </label>
+                    <label class="export-option">
+                        <input type="checkbox" name="export" value="categories">
+                        Categories
+                    </label>
+                    <label class="export-option">
+                        <input type="checkbox" name="export" value="accounts">
+                        Accounts
+                    </label>
+                    <label class="export-option">
+                        <input type="checkbox" name="export" value="rules">
+                        Categorization Rules
+                    </label>
+                    <label class="export-option">
+                        <input type="checkbox" name="export" value="recurring">
+                        Recurring Transactions
+                    </label>
+                    <label class="export-option">
+                        <input type="checkbox" name="export" value="budgets">
+                        Budgets
+                    </label>
+                </div>
+
+                <button class="btn btn-primary" onclick="exportSelected()">
+                    Download Selected CSV Files
+                </button>
+
+                <div class="loading" id="export-loading">
+                    <div class="spinner"></div>
+                    <span>Preparing download...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Tab -->
+        <div id="import-tab" class="tab-content">
+            <div class="section-card">
+                <h2><span>📥</span> Import Data</h2>
+                <p>Upload CSV files to import data into your account.</p>
+
+                <div class="import-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Data Type</label>
+                            <select class="form-select" id="import-type" onchange="onImportTypeChange()">
+                                <option value="chase-reserve">Chase Reserve (Credit Card CSV)</option>
+                                <option value="categories">Categories</option>
+                                <option value="accounts">Accounts</option>
+                                <option value="rules">Categorization Rules</option>
+                                <option value="recurring">Recurring Transactions</option>
+                                <option value="budgets">Budgets</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row" id="account-select-row">
+                        <div class="form-group">
+                            <label>Import to Account (optional)</label>
+                            <select class="form-select" id="import-account">
+                                <option value="">Auto-detect or create new</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>CSV File</label>
+                        <div class="file-input-wrapper">
+                            <span class="file-btn">Choose File</span>
+                            <span class="file-name" id="import-file-name">No file chosen</span>
+                            <input type="file" id="import-file" accept=".csv" onchange="updateFileName(this, 'import-file-name')">
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="importData()">
+                        Import Data
+                    </button>
+
+                    <div class="loading" id="import-loading">
+                        <div class="spinner"></div>
+                        <span>Importing data...</span>
+                    </div>
+
+                    <div class="result-box" id="import-result"></div>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <h2>CSV Format Requirements</h2>
+                <p>Each CSV file must include a header row. Required columns vary by data type:</p>
+                <ul style="margin: 16px 0; padding-left: 20px; color: var(--text-secondary); font-size: 14px;">
+                    <li><strong>Chase Reserve:</strong> Transaction Date<span style="color:#dc2626">*</span>, Description<span style="color:#dc2626">*</span>, Amount<span style="color:#dc2626">*</span> (standard Chase CSV export)</li>
+                    <li><strong>Categories:</strong> Name<span style="color:#dc2626">*</span>, Type<span style="color:#dc2626">*</span> (income/expense/transfer)</li>
+                    <li><strong>Accounts:</strong> Account Name<span style="color:#dc2626">*</span>, Type (checking/savings/credit_card)</li>
+                    <li><strong>Rules:</strong> Match Value<span style="color:#dc2626">*</span>, Category<span style="color:#dc2626">*</span></li>
+                    <li><strong>Recurring:</strong> Description<span style="color:#dc2626">*</span>, Amount<span style="color:#dc2626">*</span></li>
+                    <li><strong>Budgets:</strong> Amount<span style="color:#dc2626">*</span>, Category (optional)</li>
+                </ul>
+                <p style="color: #dc2626; font-size: 12px; margin-top: 8px;"><span style="color:#dc2626">*</span> Required field</p>
+            </div>
+        </div>
+
+        <!-- Backup Tab -->
+        <div id="backup-tab" class="tab-content">
+            <div class="section-card">
+                <h2><span>💾</span> Full Backup</h2>
+                <p>Create a complete backup of all your data and files as a ZIP archive.</p>
+
+                <p style="margin-bottom: 20px;">The backup includes:</p>
+                <ul style="margin: 0 0 20px 0; padding-left: 20px; color: var(--text-secondary); font-size: 14px;">
+                    <li>All transactions, categories, accounts</li>
+                    <li>Categorization rules and budgets</li>
+                    <li>Recurring transactions</li>
+                    <li>Uploaded bank statements</li>
+                    <li>Receipt images</li>
+                </ul>
+
+                <button class="btn btn-primary" onclick="createBackup()">
+                    Download Full Backup (ZIP)
+                </button>
+
+                <div class="loading" id="backup-loading">
+                    <div class="spinner"></div>
+                    <span>Creating backup...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Restore Tab -->
+        <div id="restore-tab" class="tab-content">
+            <div class="section-card">
+                <h2><span>🔄</span> Restore from Backup</h2>
+                <p>Restore your data from a previously created backup ZIP file.</p>
+
+                <div class="warning-box">
+                    <strong>Warning:</strong> Restoring in "Replace" mode will delete all existing data before importing the backup. Make sure to create a backup first if needed.
+                </div>
+
+                <div class="import-form">
+                    <div class="form-group">
+                        <label>Restore Mode</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="restore-mode" value="merge" checked>
+                                <span>Merge (keep existing, add new)</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="restore-mode" value="replace">
+                                <span>Replace (delete existing first)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Backup ZIP File</label>
+                        <div class="file-input-wrapper">
+                            <span class="file-btn">Choose File</span>
+                            <span class="file-name" id="restore-file-name">No file chosen</span>
+                            <input type="file" id="restore-file" accept=".zip" onchange="updateFileName(this, 'restore-file-name')">
+                        </div>
+                    </div>
+
+                    <button class="btn btn-danger" onclick="restoreBackup()">
+                        Restore Backup
+                    </button>
+
+                    <div class="loading" id="restore-loading">
+                        <div class="spinner"></div>
+                        <span>Restoring data...</span>
+                    </div>
+
+                    <div class="result-box" id="restore-result"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-detect API base path
+        const API_BASE = (() => {
+            const pathParts = window.location.pathname.split('/');
+            const appFolder = pathParts.find((part, index) => index > 0 && part !== '' && part !== 'public');
+            return appFolder ? '/' + appFolder + '/api/v1' : '/api/v1';
+        })();
+        const USER_ID = 1; // TODO: Get from session
+
+        // Load accounts for Chase import
+        async function loadAccounts() {
+            try {
+                const response = await fetch(`${API_BASE}/accounts.php?user_id=${USER_ID}`);
+                const result = await response.json();
+                if (result.success && result.data) {
+                    const select = document.getElementById('import-account');
+                    select.innerHTML = '<option value="">Auto-detect or create new</option>';
+                    result.data.forEach(account => {
+                        const option = document.createElement('option');
+                        option.value = account.id;
+                        option.textContent = account.account_name;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load accounts:', error);
+            }
+        }
+
+        function onImportTypeChange() {
+            const type = document.getElementById('import-type').value;
+            const accountRow = document.getElementById('account-select-row');
+            // Show account selector only for Chase imports
+            accountRow.style.display = type === 'chase-reserve' ? 'flex' : 'none';
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAccounts();
+            onImportTypeChange();
+        });
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab + '-tab').classList.add('active');
+            });
+        });
+
+        // Export option styling
+        document.querySelectorAll('.export-option input').forEach(input => {
+            input.addEventListener('change', function() {
+                this.closest('.export-option').classList.toggle('selected', this.checked);
+            });
+            // Initialize
+            if (input.checked) {
+                input.closest('.export-option').classList.add('selected');
+            }
+        });
+
+        function updateFileName(input, labelId) {
+            const label = document.getElementById(labelId);
+            label.textContent = input.files[0] ? input.files[0].name : 'No file chosen';
+        }
+
+        async function exportSelected() {
+            const selected = Array.from(document.querySelectorAll('input[name="export"]:checked'))
+                .map(cb => cb.value);
+
+            if (selected.length === 0) {
+                alert('Please select at least one data type to export');
+                return;
+            }
+
+            const loading = document.getElementById('export-loading');
+            loading.classList.add('active');
+
+            try {
+                for (const type of selected) {
+                    const url = `${API_BASE}/export/${type}.php?user_id=${USER_ID}`;
+
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `export_${type}_${new Date().toISOString().split('T')[0]}.csv`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    // Small delay between downloads
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Export failed: ' + error.message);
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        async function importData() {
+            const type = document.getElementById('import-type').value;
+            const fileInput = document.getElementById('import-file');
+            const resultBox = document.getElementById('import-result');
+
+            if (!fileInput.files[0]) {
+                alert('Please select a CSV file');
+                return;
+            }
+
+            const loading = document.getElementById('import-loading');
+            loading.classList.add('active');
+            resultBox.className = 'result-box';
+            resultBox.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('user_id', USER_ID);
+            formData.append('csv_file', fileInput.files[0]);
+
+            // Add account_id for Chase imports
+            if (type === 'chase-reserve') {
+                const accountId = document.getElementById('import-account').value;
+                if (accountId) {
+                    formData.append('account_id', accountId);
+                }
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/import/${type}.php`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    resultBox.className = 'result-box success';
+                    resultBox.innerHTML = `
+                        <strong>Import successful!</strong><br>
+                        Imported: ${result.data.imported}<br>
+                        Skipped: ${result.data.skipped}
+                        ${result.data.errors?.length ? '<br>Errors: ' + result.data.errors.slice(0, 3).join(', ') : ''}
+                    `;
+                } else {
+                    resultBox.className = 'result-box error';
+                    resultBox.textContent = result.message || 'Import failed';
+                }
+            } catch (error) {
+                console.error('Import error:', error);
+                resultBox.className = 'result-box error';
+                resultBox.textContent = 'Import failed: ' + error.message;
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        async function createBackup() {
+            const loading = document.getElementById('backup-loading');
+            loading.classList.add('active');
+
+            try {
+                const response = await fetch(`${API_BASE}/backup/create.php`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ user_id: USER_ID })
+                });
+
+                if (response.ok) {
+                    // Get filename from Content-Disposition header
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'backup.zip';
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename="(.+)"/);
+                        if (match) filename = match[1];
+                    }
+
+                    // Download the file
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    const result = await response.json();
+                    alert('Backup failed: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Backup error:', error);
+                alert('Backup failed: ' + error.message);
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        async function restoreBackup() {
+            const fileInput = document.getElementById('restore-file');
+            const mode = document.querySelector('input[name="restore-mode"]:checked').value;
+            const resultBox = document.getElementById('restore-result');
+
+            if (!fileInput.files[0]) {
+                alert('Please select a backup ZIP file');
+                return;
+            }
+
+            if (mode === 'replace') {
+                if (!confirm('WARNING: This will delete ALL your existing data before restoring. Are you sure?')) {
+                    return;
+                }
+            }
+
+            const loading = document.getElementById('restore-loading');
+            loading.classList.add('active');
+            resultBox.className = 'result-box';
+            resultBox.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('user_id', USER_ID);
+            formData.append('mode', mode);
+            formData.append('backup_file', fileInput.files[0]);
+
+            try {
+                const response = await fetch(`${API_BASE}/restore/upload.php`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    resultBox.className = 'result-box success';
+
+                    let statsHtml = '<div class="stats-grid">';
+                    if (result.data.stats?.data) {
+                        for (const [table, stat] of Object.entries(result.data.stats.data)) {
+                            statsHtml += `
+                                <div class="stat-item">
+                                    <div class="label">${table}</div>
+                                    <div class="value">${stat.imported || 0}</div>
+                                </div>
+                            `;
+                        }
+                    }
+                    statsHtml += '</div>';
+
+                    resultBox.innerHTML = `
+                        <strong>Restore successful!</strong><br>
+                        Mode: ${result.data.mode}<br>
+                        Backup created: ${result.data.backup_created}
+                        ${statsHtml}
+                    `;
+                } else {
+                    resultBox.className = 'result-box error';
+                    resultBox.textContent = result.message || 'Restore failed';
+                }
+            } catch (error) {
+                console.error('Restore error:', error);
+                resultBox.className = 'result-box error';
+                resultBox.textContent = 'Restore failed: ' + error.message;
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -79,6 +79,22 @@ function buildHierarchicalCategoryOptionsWithSelected(selectedId, includeUncateg
     return options;
 }
 
+// Build transfer account options (checking/savings only) with selection
+function buildTransferAccountOptions(selectedId) {
+    // Filter to only checking and savings accounts
+    const transferAccounts = state.accounts.filter(a =>
+        a.account_type === 'checking' || a.account_type === 'savings'
+    );
+
+    let options = '';
+    transferAccounts.forEach(account => {
+        const isSelected = account.id == selectedId;
+        options += `<option value="${account.id}" ${isSelected ? 'selected' : ''}>${account.account_name}</option>`;
+    });
+
+    return options;
+}
+
 // Build grouped account options for dropdowns
 function buildGroupedAccountOptions() {
     // Define account type labels and icons
@@ -117,7 +133,7 @@ function buildGroupedAccountOptions() {
         options += `<optgroup label="${label}">`;
         accounts.sort((a, b) => a.account_name.localeCompare(b.account_name));
         accounts.forEach(account => {
-            options += `<option value="${account.id}">${account.account_name}</option>`;
+            options += `<option value="${account.id}" data-type="${type}">${account.account_name}</option>`;
         });
         options += '</optgroup>';
     });
@@ -258,15 +274,61 @@ function setupTransactionFilters() {
         fetchTransactions();
     };
 
-    document.getElementById('txn-account-filter').addEventListener('change', applyFilters);
+    const accountFilter = document.getElementById('txn-account-filter');
+    accountFilter.addEventListener('change', () => {
+        // Show/hide transaction type toggle based on account type
+        updateTransactionTypeToggle();
+        applyFilters();
+    });
     document.getElementById('txn-category-filter').addEventListener('change', applyFilters);
     document.getElementById('txn-start-date').addEventListener('change', applyFilters);
     document.getElementById('txn-end-date').addEventListener('change', applyFilters);
+
+    // Setup transaction type toggle buttons
+    setupTransactionTypeToggle();
 
     document.getElementById('close-detail').addEventListener('click', () => {
         document.getElementById('transaction-detail-panel').classList.remove('open');
         state.selectedTransaction = null;
     });
+}
+
+function setupTransactionTypeToggle() {
+    const toggleGroup = document.getElementById('txn-type-toggle');
+    if (!toggleGroup) return;
+
+    toggleGroup.querySelectorAll('.btn-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Update active state
+            toggleGroup.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Update filter and fetch
+            state.filters.transactionType = btn.dataset.type || '';
+            state.pagination.page = 1;
+            fetchTransactions();
+        });
+    });
+}
+
+function updateTransactionTypeToggle() {
+    const accountFilter = document.getElementById('txn-account-filter');
+    const toggleGroup = document.getElementById('txn-type-toggle');
+    if (!toggleGroup) return;
+
+    const selectedOption = accountFilter.options[accountFilter.selectedIndex];
+    const accountType = selectedOption?.dataset?.type;
+
+    // Show toggle only for checking accounts
+    if (accountType === 'checking') {
+        toggleGroup.style.display = 'inline-flex';
+    } else {
+        toggleGroup.style.display = 'none';
+        // Reset transaction type filter when hiding
+        state.filters.transactionType = '';
+        toggleGroup.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
+        toggleGroup.querySelector('.btn-toggle[data-type=""]')?.classList.add('active');
+    }
 }
 
 async function fetchTransactions() {
@@ -277,6 +339,7 @@ async function fetchTransactions() {
     };
 
     if (state.filters.accountId) params.account_id = state.filters.accountId;
+    if (state.filters.transactionType) params.transaction_type = state.filters.transactionType;
     if (state.filters.categoryId) params.category_id = state.filters.categoryId;
     if (state.filters.startDate) params.start_date = state.filters.startDate;
     if (state.filters.endDate) params.end_date = state.filters.endDate;
@@ -365,7 +428,7 @@ function renderTransactionsTable() {
                 ${reimbursementIcon}
             </td>
             <td onclick="showTransactionDetail(${txn.id})">
-                <span class="status-badge status-${txn.status}">${txn.status}</span>
+                <span class="status-badge status-${txn.check_status ? txn.check_status : txn.status}">${txn.check_status ? txn.check_status : txn.status}</span>
             </td>
         </tr>
     `}).join('');
@@ -576,9 +639,22 @@ async function showTransactionDetail(id) {
             <div class="detail-field">
                 <div class="detail-label">Category</div>
                 <div class="detail-value">
-                    <select id="detail-category" class="form-select" onchange="updateTransactionCategory(${txn.id})">
-                        ${buildHierarchicalCategoryOptionsWithSelected(txn.category_id)}
-                    </select>
+                    <div class="category-dropdown-wrapper" id="txn-category-dropdown">
+                        <input type="hidden" id="detail-category" value="${txn.category_id || ''}">
+                        <div class="category-trigger" onclick="toggleTxnCategoryDropdown()">
+                            <span class="category-trigger-text ${txn.category_id ? '' : 'placeholder'}" id="txn-category-trigger-text">
+                                ${txn.category_id ? (txn.category_icon || '📁') + ' ' + (txn.category_name || 'Select category') : 'Select category'}
+                            </span>
+                        </div>
+                        <div class="category-menu" id="txn-category-menu">
+                            <div class="category-list-panel" id="txn-category-list-panel">
+                                <!-- Parent categories rendered by JS -->
+                            </div>
+                            <div class="subcategory-panel" id="txn-subcategory-panel">
+                                <div class="subcategory-empty">Select a category</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -587,10 +663,22 @@ async function showTransactionDetail(id) {
                 <div class="detail-value">${txn.account_name}</div>
             </div>
 
+            ${txn.transaction_type === 'transfer' ? `
+            <div class="detail-field">
+                <div class="detail-label">Transfer From (Bank Account)</div>
+                <div class="detail-value">
+                    <select id="detail-transfer-account" class="form-select" onchange="updateTransactionTransferAccount(${txn.id})">
+                        <option value="">Select bank account...</option>
+                        ${buildTransferAccountOptions(txn.transfer_account_id)}
+                    </select>
+                </div>
+            </div>
+            ` : ''}
+
             <div class="detail-field">
                 <div class="detail-label">Status</div>
                 <div class="detail-value">
-                    <span class="status-badge status-${txn.status}">${txn.status}</span>
+                    <span class="status-badge status-${txn.check_status ? txn.check_status : txn.status}">${txn.check_status ? txn.check_status : txn.status}</span>
                 </div>
             </div>
 
@@ -623,6 +711,13 @@ async function showTransactionDetail(id) {
         `;
 
         panel.classList.add('open');
+
+        // Set current transaction ID for category dropdown
+        currentTxnIdForCategory = txn.id;
+        // Initialize category dropdown after DOM is updated
+        setTimeout(() => {
+            renderTxnCategoryDropdown(txn.category_id);
+        }, 0);
     } else {
         const categoryIcon = getCategoryIcon(txn.category_icon);
 
@@ -662,7 +757,7 @@ async function showTransactionDetail(id) {
                     <div class="detail-row">
                         <span class="detail-label">Status</span>
                         <span class="detail-value">
-                            <span class="status-badge status-${txn.status}">${txn.status}</span>
+                            <span class="status-badge status-${txn.check_status ? txn.check_status : txn.status}">${txn.check_status ? txn.check_status : txn.status}</span>
                         </span>
                     </div>
                     ${txn.memo ? `
@@ -685,9 +780,140 @@ async function showTransactionDetail(id) {
 // Transaction Actions
 // =====================================================
 
+// ===== Two-Column Category Dropdown for Transaction Detail =====
+let txnActiveCategoryId = null;
+let txnSelectedCategoryId = null;
+let currentTxnIdForCategory = null;
+
+function renderTxnCategoryDropdown(selectedCategoryId) {
+    txnSelectedCategoryId = selectedCategoryId ? parseInt(selectedCategoryId) : null;
+
+    // Get parent categories (no parent_id)
+    const parentCategories = state.categories.filter(c => !c.parent_id || c.parent_id == 0);
+    const panel = document.getElementById('txn-category-list-panel');
+    if (!panel) return;
+
+    panel.innerHTML = parentCategories.map(cat => `
+        <button type="button" class="category-btn" data-id="${cat.id}" onclick="selectTxnParentCategory(${cat.id}, event)">
+            <span class="category-btn-icon">${cat.icon || '📁'}</span>
+            <span>${cat.name}</span>
+        </button>
+    `).join('');
+
+    // If we have a selected category, find its parent and select it
+    if (txnSelectedCategoryId) {
+        const selectedCat = state.categories.find(c => c.id === txnSelectedCategoryId);
+        if (selectedCat) {
+            const parentId = selectedCat.parent_id || selectedCat.id;
+            selectTxnParentCategory(parentId);
+        }
+    }
+}
+
+function selectTxnParentCategory(parentId, event) {
+    if (event) event.stopPropagation();
+
+    txnActiveCategoryId = parentId;
+
+    // Update button states
+    document.querySelectorAll('#txn-category-list-panel .category-btn').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.id) === parentId);
+    });
+
+    // Get children of this parent
+    const children = state.categories.filter(c => c.parent_id === parentId);
+    const parent = state.categories.find(c => c.id === parentId);
+    const subPanel = document.getElementById('txn-subcategory-panel');
+    if (!subPanel) return;
+
+    if (children.length === 0) {
+        // No children - show parent as selectable option
+        subPanel.innerHTML = `
+            <div class="subcategory-header">${parent?.name || 'Category'}</div>
+            <div class="subcategory-option ${txnSelectedCategoryId === parentId ? 'selected' : ''}"
+                 data-id="${parentId}"
+                 onclick="selectTxnSubcategory(${parentId}, '${(parent?.icon || '📁').replace(/'/g, "\\'")}', '${(parent?.name || '').replace(/'/g, "\\'")}')">
+                <span class="subcategory-option-icon">${parent?.icon || '📁'}</span>
+                <span>${parent?.name}</span>
+            </div>
+        `;
+    } else {
+        // Has children - show them
+        subPanel.innerHTML = `
+            <div class="subcategory-header">${parent?.name || 'Subcategories'}</div>
+            ${children.map(child => `
+                <div class="subcategory-option ${txnSelectedCategoryId === child.id ? 'selected' : ''}"
+                     data-id="${child.id}"
+                     onclick="selectTxnSubcategory(${child.id}, '${(child.icon || '📁').replace(/'/g, "\\'")}', '${(child.name || '').replace(/'/g, "\\'")}')">
+                    <span class="subcategory-option-icon">${child.icon || '📁'}</span>
+                    <span>${child.name}</span>
+                </div>
+            `).join('')}
+        `;
+    }
+}
+
+function selectTxnSubcategory(categoryId, icon, name) {
+    txnSelectedCategoryId = categoryId;
+    document.getElementById('detail-category').value = categoryId;
+
+    // Update trigger text
+    const triggerText = document.getElementById('txn-category-trigger-text');
+    if (triggerText) {
+        triggerText.textContent = `${icon} ${name}`;
+        triggerText.classList.remove('placeholder');
+    }
+
+    // Update selected state
+    document.querySelectorAll('#txn-subcategory-panel .subcategory-option').forEach(opt => {
+        opt.classList.toggle('selected', parseInt(opt.dataset.id) === categoryId);
+    });
+
+    // Close dropdown and update
+    closeTxnCategoryDropdown();
+
+    // Trigger category update
+    if (currentTxnIdForCategory) {
+        updateTransactionCategory(currentTxnIdForCategory);
+    }
+}
+
+function toggleTxnCategoryDropdown() {
+    const trigger = document.querySelector('#txn-category-dropdown .category-trigger');
+    const menu = document.getElementById('txn-category-menu');
+    if (!trigger || !menu) return;
+
+    const isOpen = menu.classList.contains('open');
+
+    if (isOpen) {
+        closeTxnCategoryDropdown();
+    } else {
+        trigger.classList.add('open');
+        menu.classList.add('open');
+        // Initialize dropdown content
+        renderTxnCategoryDropdown(document.getElementById('detail-category')?.value);
+    }
+}
+
+function closeTxnCategoryDropdown() {
+    const trigger = document.querySelector('#txn-category-dropdown .category-trigger');
+    const menu = document.getElementById('txn-category-menu');
+    if (trigger) trigger.classList.remove('open');
+    if (menu) menu.classList.remove('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    const dropdown = document.getElementById('txn-category-dropdown');
+    if (dropdown && !dropdown.contains(e.target)) {
+        closeTxnCategoryDropdown();
+    }
+});
+
 async function updateTransactionCategory(txnId) {
     const categoryId = document.getElementById('detail-category').value;
-    const createRule = document.getElementById('create-rule-checkbox').checked;
+    const createRuleCheckbox = document.getElementById('create-rule-checkbox');
+    const createRule = createRuleCheckbox ? createRuleCheckbox.checked : false;
 
     const result = await apiPost('/transactions/update.php', {
         id: txnId,
@@ -703,6 +929,24 @@ async function updateTransactionCategory(txnId) {
         await fetchTransactions();
     } else {
         showToast('Error updating transaction', 'error');
+    }
+}
+
+async function updateTransactionTransferAccount(txnId) {
+    const transferAccountId = document.getElementById('detail-transfer-account').value;
+
+    const result = await apiPost('/transactions/update.php', {
+        id: txnId,
+        transfer_account_id: transferAccountId ? parseInt(transferAccountId) : null
+    });
+
+    if (result.success) {
+        showToast('Transfer account updated', 'success');
+        await fetchTransactions();
+        // Refresh detail panel to show updated info
+        await showTransactionDetail(txnId);
+    } else {
+        showToast(result.error || 'Error updating transfer account', 'error');
     }
 }
 
@@ -1105,6 +1349,7 @@ async function handleReimbAction(transactionId, action, event) {
 // Expose Functions Globally
 // =====================================================
 window.buildHierarchicalCategoryOptionsWithSelected = buildHierarchicalCategoryOptionsWithSelected;
+window.buildTransferAccountOptions = buildTransferAccountOptions;
 window.buildGroupedAccountOptions = buildGroupedAccountOptions;
 window.loadTransactions = loadTransactions;
 window.loadFilterOptions = loadFilterOptions;
@@ -1120,6 +1365,7 @@ window.renderPagination = renderPagination;
 window.goToPage = goToPage;
 window.showTransactionDetail = showTransactionDetail;
 window.updateTransactionCategory = updateTransactionCategory;
+window.updateTransactionTransferAccount = updateTransactionTransferAccount;
 window.deleteTransaction = deleteTransaction;
 window.deleteSelectedTransactions = deleteSelectedTransactions;
 window.uploadReceiptForTransaction = uploadReceiptForTransaction;

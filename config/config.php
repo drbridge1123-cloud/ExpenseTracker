@@ -107,13 +107,16 @@ spl_autoload_register(function ($class) {
  */
 
 /**
- * Sanitize input
+ * Sanitize input for database storage
+ * Note: Do NOT use htmlspecialchars here - that's for output only
+ * PDO prepared statements handle SQL injection prevention
  */
 function sanitize($input) {
     if (is_array($input)) {
         return array_map('sanitize', $input);
     }
-    return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
+    // Just trim whitespace - SQL injection is prevented by prepared statements
+    return trim($input);
 }
 
 /**

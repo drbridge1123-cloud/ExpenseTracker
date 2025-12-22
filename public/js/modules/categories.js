@@ -208,19 +208,52 @@ window.buildHierarchicalCategoryOptionsWithSelected = buildHierarchicalCategoryO
 // Main Functions
 // =====================================================
 
-async function loadCategories() {
+// Cache to prevent redundant API calls
+let categoriesCache = {
+    data: null,
+    timestamp: 0,
+    userId: null
+};
+const CACHE_TTL = 30000; // 30 seconds
+
+async function loadCategories(forceRefresh = false) {
+    const userId = state.currentUser;
+    const now = Date.now();
+
+    // Use cache if valid and not forcing refresh
+    if (!forceRefresh &&
+        categoriesCache.data &&
+        categoriesCache.userId === userId &&
+        (now - categoriesCache.timestamp) < CACHE_TTL) {
+        state.categories = categoriesCache.data;
+        renderChartOfAccounts();
+        setupCoaEventListeners();
+        return;
+    }
+
     const data = await apiGet('/categories/', {
-        user_id: state.currentUser,
+        user_id: userId,
         include_stats: '1'
     });
 
     if (data.success) {
         state.categories = data.data.categories;
+        // Update cache
+        categoriesCache = {
+            data: data.data.categories,
+            timestamp: now,
+            userId: userId
+        };
         renderChartOfAccounts();
     }
 
     // Setup event listeners
     setupCoaEventListeners();
+}
+
+// Invalidate cache when data changes
+function invalidateCategoriesCache() {
+    categoriesCache.timestamp = 0;
 }
 
 function setupCoaEventListeners() {
@@ -328,8 +361,29 @@ function renderChartOfAccounts() {
     const container = document.getElementById('coa-content');
     if (!container) return;
 
+    // Check if we're in IOLTA mode - only show IOLTA account and its sub-accounts
+    const isIoltaMode = typeof getAccountType === 'function' && getAccountType() === 'iolta';
+
+    // In IOLTA mode, auto-expand IOLTA account
+    if (isIoltaMode) {
+        const ioltaAccount = state.categories.find(c => c.account_type === 'iolta');
+        if (ioltaAccount) {
+            coaState.expandedCategories.add(String(ioltaAccount.id));
+        }
+    }
+
     // First, filter by type only
     let typeFilteredCategories = state.categories.filter(cat => {
+        // IOLTA mode: only show IOLTA account and trust sub-accounts (no Assets folder)
+        if (isIoltaMode) {
+            // Keep IOLTA account
+            if (cat.account_type === 'iolta') return true;
+            // Keep trust sub-accounts only
+            if (cat.is_trust_sub_account) return true;
+            // Hide everything else (Assets, Income, Housing, other bank accounts, etc.)
+            return false;
+        }
+
         if (coaState.typeFilter && cat.category_type !== coaState.typeFilter) {
             return false;
         }
@@ -346,9 +400,14 @@ function renderChartOfAccounts() {
         typeFilteredCategories.forEach(cat => {
             if (cat.name.toLowerCase().includes(coaState.searchTerm)) {
                 matchingIds.add(cat.id);
-                // If this is a child, also include its parent
+                // If this is a child, also include its parent (and grandparent)
                 if (cat.parent_id && cat.parent_id != 0) {
                     parentIdsToInclude.add(cat.parent_id);
+                    // Find grandparent
+                    const parent = typeFilteredCategories.find(p => p.id === cat.parent_id || p.id == cat.parent_id);
+                    if (parent && parent.parent_id) {
+                        parentIdsToInclude.add(parent.parent_id);
+                    }
                 }
             }
         });
@@ -366,13 +425,26 @@ function renderChartOfAccounts() {
         filteredCategories = typeFilteredCategories;
     }
 
-    // Separate parents and children
-    let parentCategories = filteredCategories.filter(c => !c.parent_id || c.parent_id == 0);
-    const childCategories = filteredCategories.filter(c => c.parent_id && c.parent_id != 0);
+    // Separate parents (no parent_id) and children (has parent_id)
+    // In IOLTA mode, treat IOLTA account as top-level parent
+    let parentCategories = filteredCategories.filter(c => {
+        if (isIoltaMode) {
+            // IOLTA account is the top-level parent
+            return c.account_type === 'iolta';
+        }
+        return !c.parent_id || c.parent_id == 0;
+    });
+    const childCategories = filteredCategories.filter(c => {
+        if (isIoltaMode) {
+            // Trust sub-accounts are children of IOLTA
+            return c.is_trust_sub_account;
+        }
+        return c.parent_id && c.parent_id != 0;
+    });
 
-    // Sort parent categories: Assets first, then by category_type and sort_order
+    // Sort parent categories: Assets first (normal mode), then by category_type and sort_order
     parentCategories.sort((a, b) => {
-        // Assets always first
+        // Assets always first (in normal mode)
         if (a.slug === 'assets') return -1;
         if (b.slug === 'assets') return 1;
         // Then by category_type
@@ -384,7 +456,7 @@ function renderChartOfAccounts() {
         return (a.sort_order || 0) - (b.sort_order || 0);
     });
 
-    // Group children by parent
+    // Group children by parent (multi-level support)
     const childrenByParent = {};
     childCategories.forEach(child => {
         const parentKey = String(child.parent_id);
@@ -393,6 +465,74 @@ function renderChartOfAccounts() {
         }
         childrenByParent[parentKey].push(child);
     });
+
+    // Helper function to render sub-items recursively
+    const renderSubItems = (children, level = 1) => {
+        let subHtml = '';
+        children.forEach(child => {
+            const childId = String(child.id);
+            const grandChildren = childrenByParent[childId] || [];
+            const hasGrandChildren = grandChildren.length > 0;
+            const isGrandExpanded = coaState.expandedCategories.has(childId);
+
+            // For bank accounts, show current_balance; for categories, show total_amount
+            let childBalance = child.is_account ? (child.current_balance || 0) : (child.total_amount || 0);
+
+            // For IOLTA parent accounts, sum up child balances
+            if (child.account_type === 'iolta' && hasGrandChildren) {
+                childBalance = grandChildren.reduce((sum, gc) => sum + (gc.current_balance || 0), 0);
+            }
+
+            const childBalanceClass = childBalance === 0 ? 'zero' : (childBalance >= 0 ? 'positive' : 'negative');
+            const isChildSelected = selectedCategoryId === child.id;
+            const isAccount = child.is_account;
+            const isTrustSubAccount = child.is_trust_sub_account;
+            const isIoltaParent = child.account_type === 'iolta';
+            const indent = level * 16;
+
+            // For IOLTA accounts with sub-accounts, make them expandable
+            if (isIoltaParent && hasGrandChildren) {
+                subHtml += `
+                    <div class="sub-item iolta-parent ${isChildSelected ? 'selected' : ''}"
+                         data-category-id="${child.id}"
+                         style="padding-left: ${indent}px;"
+                         onclick="toggleIoltaExpand(event, '${childId}')">
+                        <span class="iolta-toggle">${isGrandExpanded ? '▼' : '▶'}</span>
+                        <span class="sub-icon">⚖️</span>
+                        <span class="sub-name">${child.name}</span>
+                        <span class="sub-count">[${grandChildren.length}]</span>
+                        <span class="sub-balance ${childBalanceClass}">${formatCurrency(Math.abs(childBalance))}</span>
+                    </div>
+                `;
+
+                // Render grandchildren (trust sub-accounts)
+                if (hasGrandChildren) {
+                    subHtml += `<div class="trust-sub-items ${isGrandExpanded ? '' : 'collapsed'}" data-trust-subs="${childId}">`;
+                    subHtml += renderSubItems(grandChildren, level + 1);
+                    subHtml += `</div>`;
+                }
+            } else {
+                // Regular sub-item (categories or trust sub-accounts)
+                const subItemClass = isTrustSubAccount ? 'trust-sub-account' : '';
+
+                // Trust sub-accounts should be clickable to show details
+                const clickHandler = isTrustSubAccount
+                    ? `selectTrustSubAccount('${child.id}', event)`
+                    : (isAccount ? '' : `selectCategory(${child.id}, event)`);
+
+                subHtml += `
+                    <div class="sub-item ${isChildSelected ? 'selected' : ''} ${isAccount ? 'is-bank-account' : ''} ${subItemClass}"
+                         data-category-id="${child.id}"
+                         style="padding-left: ${indent}px;"
+                         onclick="${clickHandler}">
+                        <span class="sub-name" ${isAccount ? '' : `ondblclick="startInlineEdit(event, ${child.id}, '${child.name.replace(/'/g, "\\'")}')"`}>${child.name}</span>
+                        <span class="sub-balance ${childBalanceClass}">${formatCurrency(Math.abs(childBalance))}</span>
+                    </div>
+                `;
+            }
+        });
+        return subHtml;
+    };
 
     // Build HTML for 2-panel sidebar list
     let html = '';
@@ -461,30 +601,10 @@ function renderChartOfAccounts() {
             </div>
         `;
 
-        // Sub items
+        // Sub items (with recursive support for trust sub-accounts)
         if (hasChildren) {
             html += `<div class="sub-items ${isExpanded ? '' : 'collapsed'}" data-subs="${catId}">`;
-
-            children.forEach(child => {
-                // For bank accounts, show current_balance; for categories, show total_amount
-                const childBalance = child.is_account ? (child.current_balance || 0) : (child.total_amount || 0);
-                const childBalanceClass = childBalance === 0 ? 'zero' : (childBalance >= 0 ? 'positive' : 'negative');
-                const isChildSelected = selectedCategoryId === child.id;
-                accountCount++;
-
-                // Bank accounts are not editable inline and not clickable for transactions
-                const isAccount = child.is_account;
-
-                html += `
-                    <div class="sub-item ${isChildSelected ? 'selected' : ''} ${isAccount ? 'is-bank-account' : ''}"
-                         data-category-id="${child.id}"
-                         onclick="${isAccount ? '' : `selectCategory(${child.id}, event)`}">
-                        <span class="sub-name" ${isAccount ? '' : `ondblclick="startInlineEdit(event, ${child.id}, '${child.name.replace(/'/g, "\\'")}')"`}>${child.name}</span>
-                        <span class="sub-balance ${childBalanceClass}">${formatCurrency(Math.abs(childBalance))}</span>
-                    </div>
-                `;
-            });
-
+            html += renderSubItems(children, 1);
             html += `</div>`;
         }
     });
@@ -502,9 +622,16 @@ function renderChartOfAccounts() {
     container.innerHTML = html;
 
     // Set initial max-height for expanded wrappers
-    document.querySelectorAll('.sub-items:not(.collapsed)').forEach(wrapper => {
+    // Must set child heights first, then parent heights (bottom-up)
+    document.querySelectorAll('.trust-sub-items:not(.collapsed)').forEach(wrapper => {
         wrapper.style.maxHeight = wrapper.scrollHeight + 'px';
     });
+    // Use setTimeout to ensure child heights are calculated first
+    setTimeout(() => {
+        document.querySelectorAll('.sub-items:not(.collapsed)').forEach(wrapper => {
+            wrapper.style.maxHeight = wrapper.scrollHeight + 'px';
+        });
+    }, 10);
 
     // Update footer stats
     const countEl = document.getElementById('coa-count');
@@ -514,6 +641,49 @@ function renderChartOfAccounts() {
     if (countEl) countEl.textContent = accountCount;
     if (incomeEl) incomeEl.textContent = formatCurrency(totalIncome);
     if (expenseEl) expenseEl.textContent = formatCurrency(totalExpense);
+}
+
+// Toggle IOLTA sub-accounts expansion
+function toggleIoltaExpand(event, ioltaId) {
+    event.stopPropagation();
+
+    const subItems = document.querySelector(`[data-trust-subs="${ioltaId}"]`);
+    const parentRow = event.target.closest('.iolta-parent');
+    const toggleIcon = parentRow?.querySelector('.iolta-toggle');
+
+    if (subItems) {
+        const isCollapsed = subItems.classList.contains('collapsed');
+
+        if (isCollapsed) {
+            // Expand
+            subItems.classList.remove('collapsed');
+            subItems.style.maxHeight = subItems.scrollHeight + 'px';
+            coaState.expandedCategories.add(ioltaId);
+            if (toggleIcon) toggleIcon.textContent = '▼';
+
+            // Update parent wrapper height to accommodate expanded children
+            const parentWrapper = subItems.closest('.sub-items');
+            if (parentWrapper) {
+                setTimeout(() => {
+                    parentWrapper.style.maxHeight = parentWrapper.scrollHeight + 'px';
+                }, 20);
+            }
+        } else {
+            // Collapse
+            subItems.classList.add('collapsed');
+            subItems.style.maxHeight = '0';
+            coaState.expandedCategories.delete(ioltaId);
+            if (toggleIcon) toggleIcon.textContent = '▶';
+
+            // Update parent wrapper height
+            const parentWrapper = subItems.closest('.sub-items');
+            if (parentWrapper) {
+                setTimeout(() => {
+                    parentWrapper.style.maxHeight = parentWrapper.scrollHeight + 'px';
+                }, 250); // Wait for collapse animation
+            }
+        }
+    }
 }
 
 // =====================================================
@@ -675,7 +845,7 @@ async function updateCategoryName(categoryId, newName) {
 
         if (data.success) {
             showToast('Category renamed', 'success');
-            await loadCategories();
+            await loadCategories(true);
             if (selectedCategoryId) {
                 selectCategory(selectedCategoryId);
             }
@@ -740,6 +910,138 @@ function selectCategory(categoryId, event) {
 
     // Load and show detail panel
     loadCategoryDetail(categoryId);
+}
+
+/**
+ * Select a trust sub-account and show its details
+ */
+function selectTrustSubAccount(accountId, event) {
+    if (event) event.stopPropagation();
+
+    selectedCategoryId = accountId;
+
+    // Update selection UI
+    document.querySelectorAll('.category-parent, .sub-item').forEach(el => {
+        el.classList.remove('selected');
+    });
+
+    const selectedEl = document.querySelector(`[data-category-id="${accountId}"]`);
+    if (selectedEl) {
+        selectedEl.classList.add('selected');
+    }
+
+    // Load and show detail panel for trust sub-account
+    loadTrustSubAccountDetail(accountId);
+}
+
+/**
+ * Load detail panel for a trust sub-account (client ledger)
+ */
+async function loadTrustSubAccountDetail(accountId) {
+    const emptyState = document.getElementById('coa-detail-empty');
+    const detailContent = document.getElementById('coa-detail-content');
+
+    if (!emptyState || !detailContent) return;
+
+    // Find account data from state.categories
+    const account = state.categories.find(c => c.id === accountId);
+    if (!account) return;
+
+    // Hide empty state, show detail
+    emptyState.style.display = 'none';
+    detailContent.style.display = 'flex';
+
+    // Populate header
+    document.getElementById('detail-icon').textContent = '👤';
+    document.getElementById('detail-name').textContent = account.name;
+
+    const typeBadge = document.getElementById('detail-type');
+    typeBadge.textContent = 'Trust';
+    typeBadge.className = 'detail-type-badge trust';
+
+    // Get linked client ID for fetching transactions
+    const clientId = account.linked_client_id;
+
+    // Populate stats - for trust accounts, show balance info
+    document.getElementById('detail-this-month').textContent = formatCurrency(account.current_balance || 0);
+    document.getElementById('detail-last-month').textContent = '-';
+    document.getElementById('detail-all-time').textContent = formatCurrency(account.current_balance || 0);
+    document.getElementById('detail-txn-count').textContent = '-';
+
+    // Populate info
+    document.getElementById('detail-parent').textContent = 'IOLTA';
+    document.getElementById('detail-system').textContent = 'No';
+
+    // Hide edit/delete buttons for trust accounts
+    const editBtn = document.getElementById('detail-edit-btn');
+    const deleteBtn = document.getElementById('detail-delete-btn');
+    editBtn.style.display = 'none';
+    deleteBtn.style.display = 'none';
+
+    // Load trust transactions for this client
+    await loadTrustTransactions(clientId, accountId);
+
+    // Setup view all button
+    document.getElementById('detail-view-all-btn').onclick = () => {
+        // Could open client ledger modal in the future
+        console.log('View all transactions for client:', clientId);
+    };
+}
+
+/**
+ * Load trust transactions for a client
+ */
+async function loadTrustTransactions(clientId, accountId) {
+    const container = document.getElementById('detail-txn-list');
+    if (!container) return;
+
+    if (!clientId) {
+        container.innerHTML = '<div class="empty-state">No client linked</div>';
+        return;
+    }
+
+    container.innerHTML = '<div class="loading">Loading transactions...</div>';
+
+    try {
+        const userId = window.currentUserId || 1;
+        const response = await fetch(`/expensetracker/api/v1/trust/transactions.php?user_id=${userId}&client_id=${clientId}&limit=10`);
+        const data = await response.json();
+
+        if (!data.success || !data.data.transactions || data.data.transactions.length === 0) {
+            container.innerHTML = '<div class="empty-state">No transactions yet</div>';
+            // Update transaction count
+            document.getElementById('detail-txn-count').textContent = '0';
+            return;
+        }
+
+        const transactions = data.data.transactions;
+        document.getElementById('detail-txn-count').textContent = data.data.total_count || transactions.length;
+
+        let html = '';
+        transactions.forEach(txn => {
+            const isDeposit = parseFloat(txn.amount) > 0;
+            const amountClass = isDeposit ? 'positive' : 'negative';
+            const typeIcon = isDeposit ? '↓' : '↑';
+
+            html += `
+                <div class="detail-txn-item">
+                    <div class="txn-info">
+                        <span class="txn-type-icon ${amountClass}">${typeIcon}</span>
+                        <div class="txn-details">
+                            <div class="txn-desc">${txn.description || txn.transaction_type}</div>
+                            <div class="txn-date">${formatDate(txn.transaction_date)}</div>
+                        </div>
+                    </div>
+                    <div class="txn-amount ${amountClass}">${formatCurrency(Math.abs(txn.amount))}</div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading trust transactions:', error);
+        container.innerHTML = '<div class="empty-state">Error loading transactions</div>';
+    }
 }
 
 async function loadCategoryDetail(categoryId) {
@@ -1049,7 +1351,7 @@ async function deleteSelectedDetailTransactions() {
             const currentSortBy = detailPanelState.sortBy;
             const currentSortOrder = detailPanelState.sortOrder;
 
-            await loadCategories();
+            await loadCategories(true);
 
             if (currentCategoryId) {
                 selectCategory(currentCategoryId);
@@ -1086,10 +1388,44 @@ function openBulkCategorizeModal() {
         detailPanelState.selectedIds.has(txn.id)
     );
 
-    document.getElementById('bulk-cat-pattern').textContent = `${selectedCount} selected`;
-    document.getElementById('bulk-cat-count').textContent = selectedTxns.map(t => t.description || t.vendor_name).slice(0, 3).join(', ') + (selectedCount > 3 ? '...' : '');
+    // Update count badge
+    document.getElementById('bulk-cat-count-badge').textContent = selectedCount;
 
+    // Render selected transaction items
+    const itemsContainer = document.getElementById('bulk-cat-items');
+    itemsContainer.innerHTML = selectedTxns.map(txn => {
+        const amount = parseFloat(txn.amount) || 0;
+        const amountClass = amount < 0 ? 'negative' : 'positive';
+        const amountText = amount < 0 ? `-$${Math.abs(amount).toFixed(2)}` : `$${amount.toFixed(2)}`;
+        return `
+            <div class="bulk-cat-item">
+                <span class="bulk-cat-item-desc">${txn.description || txn.vendor_name || 'No description'}</span>
+                <span class="bulk-cat-item-amount ${amountClass}">${amountText}</span>
+            </div>
+        `;
+    }).join('');
+
+    // Populate category select
     populateBulkCategorySelect();
+
+    // Pre-fill rule settings based on first selected transaction
+    if (selectedTxns.length > 0) {
+        const firstTxn = selectedTxns[0];
+        const description = firstTxn.description || firstTxn.vendor_name || '';
+
+        document.getElementById('bulk-rule-name').value = description.substring(0, 30).toUpperCase();
+        document.getElementById('bulk-rule-value').value = description;
+        document.getElementById('bulk-rule-priority').value = 50;
+
+        // Reset match type to 'contains'
+        document.querySelector('input[name="bulk-match-type"][value="contains"]').checked = true;
+    }
+
+    // Show rule settings if checkbox is checked
+    toggleRuleSettings();
+
+    // Reset existing rule warning
+    document.getElementById('existing-rule-warning').style.display = 'none';
 
     document.getElementById('bulk-categorize-overlay').classList.add('open');
 }
@@ -1098,9 +1434,37 @@ function closeBulkCategorizeModal() {
     document.getElementById('bulk-categorize-overlay').classList.remove('open');
 }
 
+function toggleRuleSettings() {
+    const checkbox = document.getElementById('bulk-cat-create-rule');
+    const settings = document.getElementById('bulk-cat-rule-settings');
+    if (settings) {
+        settings.style.display = checkbox.checked ? 'block' : 'none';
+    }
+}
+
 function populateBulkCategorySelect() {
     const select = document.getElementById('bulk-cat-select');
     select.innerHTML = '<option value="">Select category...</option>' + buildHierarchicalCategoryOptions(false);
+}
+
+// Check for existing similar rules
+async function checkExistingRules(matchValue) {
+    try {
+        const response = await fetch(`${API_BASE}/rules/?user_id=${state.currentUser}&search=${encodeURIComponent(matchValue)}`);
+        const data = await response.json();
+
+        if (data.success && data.data.rules && data.data.rules.length > 0) {
+            const warning = document.getElementById('existing-rule-warning');
+            const text = document.getElementById('existing-rule-text');
+            const similarRule = data.data.rules[0];
+            text.textContent = `Similar rule exists: "${similarRule.rule_name}" → ${similarRule.category_name}`;
+            warning.style.display = 'flex';
+        } else {
+            document.getElementById('existing-rule-warning').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error checking rules:', error);
+    }
 }
 
 async function executeBulkCategorize() {
@@ -1118,18 +1482,48 @@ async function executeBulkCategorize() {
         return;
     }
 
+    // Build rule data if creating rule
+    let ruleData = null;
+    if (createRule) {
+        const ruleName = document.getElementById('bulk-rule-name').value.trim();
+        const matchField = document.getElementById('bulk-rule-field').value;
+        const matchType = document.querySelector('input[name="bulk-match-type"]:checked')?.value || 'contains';
+        const matchValue = document.getElementById('bulk-rule-value').value.trim();
+        const priority = parseInt(document.getElementById('bulk-rule-priority').value) || 50;
+
+        if (!ruleName || !matchValue) {
+            showToast('Please fill in rule name and match value', 'error');
+            return;
+        }
+
+        ruleData = {
+            rule_name: ruleName,
+            match_field: matchField,
+            match_type: matchType,
+            match_value: matchValue,
+            priority: priority
+        };
+    }
+
     try {
         showLoading();
+
+        const requestBody = {
+            user_id: state.currentUser,
+            transaction_ids: selectedIds,
+            category_id: parseInt(categoryId),
+            create_rule: createRule
+        };
+
+        // Add rule data if provided
+        if (ruleData) {
+            requestBody.rule_data = ruleData;
+        }
 
         const response = await fetch(`${API_BASE}/transactions/bulk-categorize.php`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                user_id: state.currentUser,
-                transaction_ids: selectedIds,
-                category_id: parseInt(categoryId),
-                create_rule: createRule
-            })
+            body: JSON.stringify(requestBody)
         });
 
         const data = await response.json();
@@ -1153,7 +1547,7 @@ async function executeBulkCategorize() {
             const currentSortBy = detailPanelState.sortBy;
             const currentSortOrder = detailPanelState.sortOrder;
 
-            await loadCategories();
+            await loadCategories(true);
 
             if (currentCategoryId) {
                 selectCategory(currentCategoryId);
@@ -1312,7 +1706,7 @@ async function deleteCategory(categoryId, categoryName, transactionCount) {
 
     if (result.success) {
         showToast('Category deleted', 'success');
-        await loadCategories();
+        await loadCategories(true);
     } else {
         showToast('Error: ' + result.message, 'error');
     }
@@ -1328,7 +1722,7 @@ async function showCategoryDetail(categoryId, categoryName, icon, canDelete = fa
     const data = await apiGet('/transactions/', {
         user_id: state.currentUser,
         category_id: categoryId,
-        limit: 500
+        all: 1
     });
 
     hideLoading();
@@ -1685,10 +2079,18 @@ async function showEditTransaction(transactionId) {
             </div>
             <div class="form-group">
                 <label>Type</label>
-                <select class="form-control" id="edit-txn-type">
+                <select class="form-control" id="edit-txn-type" onchange="toggleTransferAccountField()">
                     <option value="debit" ${transaction.transaction_type === 'debit' ? 'selected' : ''}>Expense (Debit)</option>
                     <option value="credit" ${transaction.transaction_type === 'credit' ? 'selected' : ''}>Income (Credit)</option>
+                    <option value="transfer" ${transaction.transaction_type === 'transfer' ? 'selected' : ''}>Transfer</option>
                 </select>
+            </div>
+            <div class="form-group" id="transfer-account-group" style="display: ${transaction.transaction_type === 'transfer' ? 'block' : 'none'};">
+                <label>Transfer From (Bank Account)</label>
+                <select class="form-control" id="edit-txn-transfer-account">
+                    <option value="">Select bank account...</option>
+                </select>
+                <small style="color: var(--text-secondary); font-size: 12px;">Select the bank account this payment came from</small>
             </div>
             <div class="form-group">
                 <label>Category</label>
@@ -1727,6 +2129,46 @@ async function showEditTransaction(transactionId) {
             </div>
         </form>
     `);
+
+    // Load bank accounts for transfer dropdown
+    loadTransferAccountsForEdit(transaction.transfer_account_id);
+}
+
+// Load bank accounts for transfer dropdown in edit modal
+async function loadTransferAccountsForEdit(currentTransferAccountId) {
+    try {
+        const response = await apiGet('/accounts/', { user_id: state.currentUser, include_inactive: 1 });
+        if (response.success && response.data.accounts) {
+            const select = document.getElementById('edit-txn-transfer-account');
+            if (select) {
+                select.innerHTML = '<option value="">Select bank account...</option>';
+                // Only show checking/savings accounts
+                const bankAccounts = response.data.accounts.filter(a =>
+                    a.account_type === 'checking' || a.account_type === 'savings'
+                );
+                bankAccounts.forEach(account => {
+                    const option = document.createElement('option');
+                    option.value = account.id;
+                    option.textContent = account.account_name + (account.is_active == 1 ? '' : ' (inactive)');
+                    if (currentTransferAccountId && account.id == currentTransferAccountId) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load transfer accounts:', error);
+    }
+}
+
+// Toggle transfer account field visibility based on transaction type
+function toggleTransferAccountField() {
+    const type = document.getElementById('edit-txn-type')?.value;
+    const transferGroup = document.getElementById('transfer-account-group');
+    if (transferGroup) {
+        transferGroup.style.display = type === 'transfer' ? 'block' : 'none';
+    }
 }
 
 async function saveTransaction(event, transactionId) {
@@ -1739,19 +2181,27 @@ async function saveTransaction(event, transactionId) {
     const categoryId = parseInt(document.getElementById('edit-txn-category').value);
     const memo = document.getElementById('edit-txn-memo').value;
     const reimbursementStatus = document.getElementById('edit-txn-reimbursement')?.value || null;
+    const transferAccountId = document.getElementById('edit-txn-transfer-account')?.value || null;
 
     showLoading();
 
-    const result = await apiPost('/transactions/update.php', {
+    const updateData = {
         id: transactionId,
         transaction_date: date,
         description: description,
-        amount: type === 'debit' ? -Math.abs(amount) : Math.abs(amount),
+        amount: type === 'debit' || type === 'transfer' ? -Math.abs(amount) : Math.abs(amount),
         transaction_type: type,
         category_id: categoryId,
         memo: memo,
         reimbursement_status: reimbursementStatus
-    });
+    };
+
+    // Include transfer_account_id for transfer transactions
+    if (type === 'transfer') {
+        updateData.transfer_account_id = transferAccountId ? parseInt(transferAccountId) : null;
+    }
+
+    const result = await apiPost('/transactions/update.php', updateData);
 
     hideLoading();
 
@@ -2090,15 +2540,13 @@ function showAddCategoryModal(parentId = null, parentType = null, editCategory =
             if (result.success) {
                 showToast('Account updated successfully', 'success');
                 closeModal();
-                await loadCategories();
+                await loadCategories(true);
             } else {
                 showToast('Error updating account', 'error');
             }
         } else {
-            const categoryUserId = (state.currentUser === 3) ? state.currentUser : null;
-
             const result = await apiPost('/categories/', {
-                user_id: categoryUserId,
+                user_id: state.currentUser,
                 name: formData.get('name'),
                 category_type: formData.get('category_type'),
                 color: formData.get('color'),
@@ -2108,7 +2556,7 @@ function showAddCategoryModal(parentId = null, parentType = null, editCategory =
             if (result.success) {
                 showToast('Account created successfully', 'success');
                 closeModal();
-                await loadCategories();
+                await loadCategories(true);
             } else {
                 showToast('Error creating account', 'error');
             }
@@ -2133,6 +2581,9 @@ window.startInlineEdit = startInlineEdit;
 window.updateCategoryName = updateCategoryName;
 window.handleCategoryParentClick = handleCategoryParentClick;
 window.selectCategory = selectCategory;
+window.selectTrustSubAccount = selectTrustSubAccount;
+window.loadTrustSubAccountDetail = loadTrustSubAccountDetail;
+window.loadTrustTransactions = loadTrustTransactions;
 window.loadCategoryDetail = loadCategoryDetail;
 window.loadDetailTransactions = loadDetailTransactions;
 window.renderDetailTransactions = renderDetailTransactions;
@@ -2148,6 +2599,8 @@ window.openBulkCategorizeModal = openBulkCategorizeModal;
 window.closeBulkCategorizeModal = closeBulkCategorizeModal;
 window.populateBulkCategorySelect = populateBulkCategorySelect;
 window.executeBulkCategorize = executeBulkCategorize;
+window.toggleRuleSettings = toggleRuleSettings;
+window.checkExistingRules = checkExistingRules;
 window.handleParentRowClick = handleParentRowClick;
 window.handleCoaParentClick = handleCoaParentClick;
 window.handleCoaParentDblClick = handleCoaParentDblClick;
@@ -2167,6 +2620,8 @@ window.buildSmartSuggestions = buildSmartSuggestions;
 window.showQuickCategorize = showQuickCategorize;
 window.showEditTransaction = showEditTransaction;
 window.saveTransaction = saveTransaction;
+window.loadTransferAccountsForEdit = loadTransferAccountsForEdit;
+window.toggleTransferAccountField = toggleTransferAccountField;
 window.deleteTransactionFromCategories = deleteTransactionFromCategories;
 window.showMoveCategory = showMoveCategory;
 window.applyMoveCategory = applyMoveCategory;
@@ -2178,6 +2633,7 @@ window.applyBulkCategorize = applyBulkCategorize;
 window.applySuggestion = applySuggestion;
 window.applySuggestionCategory = applySuggestionCategory;
 window.showAddCategoryModal = showAddCategoryModal;
+window.toggleIoltaExpand = toggleIoltaExpand;
 
 // Export state for external access
 window.coaState = coaState;

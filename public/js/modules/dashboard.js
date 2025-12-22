@@ -43,6 +43,12 @@ function initDashboardMonthSelector() {
 // =====================================================
 
 async function loadDashboard() {
+    // Toggle dashboard wrappers (show personal, hide iolta)
+    const ioltaWrapper = document.getElementById('iolta-dashboard-wrapper');
+    const personalWrapper = document.getElementById('personal-dashboard-wrapper');
+    if (ioltaWrapper) ioltaWrapper.style.display = 'none';
+    if (personalWrapper) personalWrapper.style.display = 'block';
+
     const monthSelect = document.getElementById('dashboard-month');
     if (!monthSelect) return;
 
@@ -96,9 +102,107 @@ async function loadDashboard() {
         if (txnData.success) {
             updateRecentTransactions(txnData.data.transactions);
         }
+
+        // Load pending checks
+        loadPendingChecksForDashboard();
     } catch (error) {
         console.error('Dashboard error:', error);
     }
+}
+
+// =====================================================
+// Pending Checks for Dashboard
+// =====================================================
+
+async function loadPendingChecksForDashboard() {
+    try {
+        const result = await apiGet('/checks/', {
+            user_id: state.currentUser,
+            status: 'pending'
+        });
+
+        const card = document.getElementById('pending-checks-card');
+        const row = card?.parentElement;
+
+        if (result.success) {
+            const checks = result.data.checks || [];
+
+            // Always show the card and use two-column layout
+            if (card) card.style.display = 'block';
+            if (row) row.classList.remove('single-col');
+
+            if (checks.length === 0) {
+                // Show empty state
+                const countEl = document.getElementById('pending-checks-count');
+                if (countEl) countEl.textContent = '0';
+                const totalEl = document.getElementById('pending-checks-total');
+                if (totalEl) totalEl.textContent = '$0.00';
+                const listEl = document.getElementById('pending-checks-list');
+                if (listEl) {
+                    listEl.innerHTML = `
+                        <div class="pending-checks-empty">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span>No pending checks</span>
+                        </div>
+                    `;
+                }
+                return;
+            }
+
+            // Update count badge
+            const countEl = document.getElementById('pending-checks-count');
+            if (countEl) countEl.textContent = checks.length;
+
+            // Calculate total
+            const total = checks.reduce((sum, c) => sum + parseFloat(c.amount || 0), 0);
+            const totalEl = document.getElementById('pending-checks-total');
+            if (totalEl) totalEl.textContent = formatCurrency(total);
+
+            // Render list (show max 5)
+            const listEl = document.getElementById('pending-checks-list');
+            if (listEl) {
+                const displayChecks = checks.slice(0, 5);
+                listEl.innerHTML = displayChecks.map(check => `
+                    <div class="pending-check-item" onclick="goToPendingCheck(${check.id})">
+                        <div class="pending-check-info">
+                            <span class="pending-check-number">#${check.check_number}</span>
+                            <span class="pending-check-payee">${check.payee}</span>
+                            <span class="pending-check-date">${formatDate(check.check_date)}</span>
+                        </div>
+                        <span class="pending-check-amount">-${formatCurrency(check.amount)}</span>
+                    </div>
+                `).join('');
+
+                if (checks.length > 5) {
+                    listEl.innerHTML += `
+                        <div class="pending-check-item" style="justify-content:center;color:var(--text-secondary);font-size:12px;">
+                            +${checks.length - 5} more pending checks
+                        </div>
+                    `;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading pending checks:', error);
+    }
+}
+
+function goToPendingCheck(checkId) {
+    navigateTo('checks');
+    // Wait for page to load then edit - retry if function not ready
+    let attempts = 0;
+    const maxAttempts = 20;
+    const tryEdit = () => {
+        attempts++;
+        if (typeof editCheck === 'function') {
+            editCheck(checkId);
+        } else if (attempts < maxAttempts) {
+            setTimeout(tryEdit, 100);
+        }
+    };
+    setTimeout(tryEdit, 100);
 }
 
 function updateDashboardSummary(report) {
@@ -347,12 +451,17 @@ function updateAccountsSummary(accounts) {
     const container = document.getElementById('accounts-summary');
     if (!container) return;
 
-    if (!accounts || accounts.length === 0) {
+    // Filter out IOLTA/Trust accounts - they have their own section
+    const filteredAccounts = (accounts || []).filter(acc =>
+        acc.account_type !== 'iolta' && acc.account_type !== 'trust'
+    );
+
+    if (!filteredAccounts || filteredAccounts.length === 0) {
         container.innerHTML = '<p class="text-muted text-center">No accounts found</p>';
         return;
     }
 
-    container.innerHTML = accounts.map(acc => {
+    container.innerHTML = filteredAccounts.map(acc => {
         const balance = parseFloat(acc.current_balance);
         const balanceClass = balance < 0 ? 'negative' : '';
         const color = acc.color || '#6b7280';
@@ -385,7 +494,9 @@ function updateRecentTransactions(transactions) {
     container.innerHTML = `
         <table class="transactions-table">
             <tbody>
-                ${transactions.map(txn => `
+                ${transactions.map(txn => {
+                    const status = txn.check_status ? txn.check_status : txn.status;
+                    return `
                     <tr onclick="showTransactionDetail(${txn.id})">
                         <td>${formatDate(txn.transaction_date)}</td>
                         <td>${txn.description}</td>
@@ -397,8 +508,11 @@ function updateRecentTransactions(transactions) {
                         <td class="text-right ${txn.amount >= 0 ? 'amount-credit' : 'amount-debit'}">
                             ${formatCurrency(txn.amount)}
                         </td>
+                        <td>
+                            <span class="status-badge status-${status}">${status}</span>
+                        </td>
                     </tr>
-                `).join('')}
+                `}).join('')}
             </tbody>
         </table>
     `;
@@ -488,3 +602,5 @@ window.updateAccountsSummary = updateAccountsSummary;
 window.updateRecentTransactions = updateRecentTransactions;
 window.getAccountIcon = getAccountIcon;
 window.formatAccountType = formatAccountType;
+window.loadPendingChecksForDashboard = loadPendingChecksForDashboard;
+window.goToPendingCheck = goToPendingCheck;

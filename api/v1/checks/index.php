@@ -146,22 +146,26 @@ function handlePost() {
             // Update existing check
             $db->query(
                 "UPDATE checks SET
-                    payee = :payee,
-                    amount = :amount,
-                    check_date = :check_date,
-                    memo = :memo,
-                    category_id = :category_id,
-                    status = :status
-                 WHERE id = :id AND user_id = :user_id",
+                    account_id = ?,
+                    check_number = ?,
+                    payee = ?,
+                    amount = ?,
+                    check_date = ?,
+                    memo = ?,
+                    category_id = ?,
+                    status = ?
+                 WHERE id = ? AND user_id = ?",
                 [
-                    'payee' => $payee,
-                    'amount' => $amount,
-                    'check_date' => $checkDate,
-                    'memo' => $memo,
-                    'category_id' => $categoryId,
-                    'status' => $status,
-                    'id' => $id,
-                    'user_id' => $userId
+                    $accountId,
+                    $checkNumber,
+                    $payee,
+                    $amount,
+                    $checkDate,
+                    $memo,
+                    $categoryId,
+                    $status,
+                    $id,
+                    $userId
                 ]
             );
             $checkId = $id;
@@ -180,9 +184,46 @@ function handlePost() {
 
             $checkId = $db->insert('checks', $data);
             $message = 'Check created';
+            $matchedTransaction = null;
 
-            // Create transaction if requested
-            if ($createTransaction) {
+            // Try to find matching transaction (reverse matching)
+            // Match by: account_id + check_number
+            if (!empty($checkNumber)) {
+                $existingTxn = $db->fetch(
+                    "SELECT t.id, t.amount, t.category_id FROM transactions t
+                     LEFT JOIN checks c ON c.transaction_id = t.id
+                     WHERE t.account_id = ? AND t.check_number = ? AND c.id IS NULL",
+                    [$accountId, $checkNumber]
+                );
+
+                if ($existingTxn) {
+                    // Verify amount matches (within 0.01 tolerance)
+                    $txnAmount = abs((float)$existingTxn['amount']);
+                    $checkAmount = abs($amount);
+
+                    if (abs($txnAmount - $checkAmount) < 0.01) {
+                        // Match found! Link check to existing transaction
+                        $db->query(
+                            "UPDATE checks SET transaction_id = ?, status = 'cleared' WHERE id = ?",
+                            [$existingTxn['id'], $checkId]
+                        );
+
+                        // Update transaction with check's category if set
+                        if ($categoryId) {
+                            $db->query(
+                                "UPDATE transactions SET category_id = ?, categorized_by = 'check' WHERE id = ?",
+                                [$categoryId, $existingTxn['id']]
+                            );
+                        }
+
+                        $matchedTransaction = $existingTxn['id'];
+                        $message = 'Check created and matched with existing transaction';
+                    }
+                }
+            }
+
+            // Create new transaction only if requested AND no match was found
+            if ($createTransaction && !$matchedTransaction) {
                 $txnId = $db->insert('transactions', [
                     'user_id' => $userId,
                     'account_id' => $accountId,
@@ -201,14 +242,14 @@ function handlePost() {
 
                 // Update check with transaction ID
                 $db->query(
-                    "UPDATE checks SET transaction_id = :txn_id WHERE id = :id",
-                    ['txn_id' => $txnId, 'id' => $checkId]
+                    "UPDATE checks SET transaction_id = ? WHERE id = ?",
+                    [$txnId, $checkId]
                 );
 
                 // Update account balance
                 $db->query(
-                    "UPDATE accounts SET current_balance = current_balance - :amount WHERE id = :id",
-                    ['amount' => abs($amount), 'id' => $accountId]
+                    "UPDATE accounts SET current_balance = current_balance - ? WHERE id = ?",
+                    [abs($amount), $accountId]
                 );
 
                 $message .= ' and transaction recorded';
@@ -216,7 +257,14 @@ function handlePost() {
         }
 
         $db->commit();
-        successResponse(['id' => $checkId], $message);
+
+        $response = ['id' => $checkId];
+        if (isset($matchedTransaction) && $matchedTransaction) {
+            $response['matched_transaction_id'] = $matchedTransaction;
+            $response['auto_cleared'] = true;
+        }
+
+        successResponse($response, $message);
 
     } catch (Exception $e) {
         if (isset($db)) $db->rollback();
@@ -235,21 +283,57 @@ function handleDelete() {
 
     try {
         $db = Database::getInstance();
+        $db->beginTransaction();
+
+        // Get check info before deleting
+        $check = $db->fetch(
+            "SELECT id, account_id, amount, transaction_id, status FROM checks WHERE id = ?",
+            [$id]
+        );
+
+        if (!$check) {
+            $db->rollback();
+            errorResponse('Check not found', 404);
+        }
 
         if ($void) {
             // Just mark as void
             $db->query(
-                "UPDATE checks SET status = 'void' WHERE id = :id",
-                ['id' => $id]
+                "UPDATE checks SET status = 'void' WHERE id = ?",
+                [$id]
             );
+            $db->commit();
             successResponse(['voided' => true], 'Check voided');
         } else {
+            // If check has a linked transaction, delete it and update balance
+            if (!empty($check['transaction_id'])) {
+                // Get transaction info
+                $txn = $db->fetch(
+                    "SELECT id, account_id, amount FROM transactions WHERE id = ?",
+                    [$check['transaction_id']]
+                );
+
+                if ($txn) {
+                    // Delete the transaction
+                    $db->query("DELETE FROM transactions WHERE id = ?", [$txn['id']]);
+
+                    // Reverse the balance adjustment (transaction amount was negative for checks)
+                    $db->query(
+                        "UPDATE accounts SET current_balance = current_balance - ? WHERE id = ?",
+                        [$txn['amount'], $txn['account_id']]
+                    );
+                }
+            }
+
             // Delete check
-            $db->query("DELETE FROM checks WHERE id = :id", ['id' => $id]);
+            $db->query("DELETE FROM checks WHERE id = ?", [$id]);
+
+            $db->commit();
             successResponse(['deleted' => true], 'Check deleted');
         }
 
     } catch (Exception $e) {
+        if (isset($db)) $db->rollback();
         appLog('Check delete error: ' . $e->getMessage(), 'error');
         errorResponse($e->getMessage(), 500);
     }

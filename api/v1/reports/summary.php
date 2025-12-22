@@ -2,12 +2,6 @@
 /**
  * Reports Summary API
  * GET /api/reports/summary.php
- *
- * Query params:
- *   - user_id: required
- *   - start_date: YYYY-MM-DD (optional, defaults to first of current month)
- *   - end_date: YYYY-MM-DD (optional, defaults to today)
- *   - period: 'month', 'quarter', 'year', 'custom' (optional)
  */
 
 require_once __DIR__ . '/../../../config/config.php';
@@ -30,6 +24,9 @@ if (!$userId) {
 // Calculate date range based on period
 if (!$startDate) {
     switch ($period) {
+        case 'all':
+            $startDate = '2000-01-01';
+            break;
         case 'month':
             $startDate = date('Y-m-01');
             break;
@@ -48,7 +45,6 @@ if (!$startDate) {
 try {
     $db = Database::getInstance();
 
-    // Get total income
     $income = $db->fetch(
         "SELECT COALESCE(SUM(amount), 0) as total
          FROM transactions t
@@ -59,7 +55,6 @@ try {
         ['user_id' => $userId, 'start_date' => $startDate, 'end_date' => $endDate]
     );
 
-    // Get total expenses
     $expenses = $db->fetch(
         "SELECT COALESCE(SUM(ABS(amount)), 0) as total
          FROM transactions t
@@ -70,7 +65,6 @@ try {
         ['user_id' => $userId, 'start_date' => $startDate, 'end_date' => $endDate]
     );
 
-    // Get expenses by category
     $expensesByCategory = $db->fetchAll(
         "SELECT c.id, c.name, c.icon, c.color,
                 COALESCE(SUM(ABS(t.amount)), 0) as total,
@@ -86,7 +80,6 @@ try {
         ['user_id' => $userId, 'start_date' => $startDate, 'end_date' => $endDate]
     );
 
-    // Get income by category
     $incomeByCategory = $db->fetchAll(
         "SELECT c.id, c.name, c.icon, c.color,
                 COALESCE(SUM(t.amount), 0) as total,
@@ -102,7 +95,6 @@ try {
         ['user_id' => $userId, 'start_date' => $startDate, 'end_date' => $endDate]
     );
 
-    // Get daily spending trend
     $dailyTrend = $db->fetchAll(
         "SELECT DATE(transaction_date) as date,
                 SUM(CASE WHEN c.category_type = 'expense' THEN ABS(amount) ELSE 0 END) as expenses,
@@ -116,9 +108,8 @@ try {
         ['user_id' => $userId, 'start_date' => $startDate, 'end_date' => $endDate]
     );
 
-    // Get top merchants by spending
     $topMerchants = $db->fetchAll(
-        "SELECT vendor_name,
+        "SELECT COALESCE(vendor_name, description) as vendor_name,
                 COUNT(*) as transaction_count,
                 SUM(ABS(amount)) as total_spent
          FROM transactions t
@@ -126,8 +117,8 @@ try {
          WHERE t.user_id = :user_id
            AND t.transaction_date BETWEEN :start_date AND :end_date
            AND c.category_type = 'expense'
-           AND vendor_name IS NOT NULL AND vendor_name != ''
-         GROUP BY vendor_name
+           AND (vendor_name IS NOT NULL AND vendor_name != '' OR description IS NOT NULL AND description != '')
+         GROUP BY COALESCE(vendor_name, description)
          ORDER BY total_spent DESC
          LIMIT 10",
         ['user_id' => $userId, 'start_date' => $startDate, 'end_date' => $endDate]

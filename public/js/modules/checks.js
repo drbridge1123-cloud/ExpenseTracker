@@ -42,11 +42,11 @@ async function loadChecksPage() {
 }
 
 async function loadChecks() {
-    let url = `/checks/?user_id=${state.currentUser}`;
-    if (currentCheckFilter) url += `&status=${currentCheckFilter}`;
+    const params = { user_id: state.currentUser };
+    if (currentCheckFilter) params.status = currentCheckFilter;
 
     try {
-        const result = await apiGet(url);
+        const result = await apiGet('/checks/', params);
         if (result.success) {
             checksData = result.data;
             checksState.checksData = checksData;
@@ -99,20 +99,30 @@ function renderChecks() {
     const checks = checksData.checks || [];
 
     if (checks.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>No checks found</p></div>';
+        container.innerHTML = `
+            <div class="register-empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#c9a962" stroke-width="1.5">
+                    <rect x="3" y="5" width="18" height="14" rx="2"/>
+                    <path d="M3 10h18"/>
+                </svg>
+                <p>No checks found</p>
+            </div>
+        `;
         return;
     }
 
+    // Render as register items for banking theme
     container.innerHTML = checks.map(check => `
-        <div class="check-list-item" onclick="editCheck(${check.id})">
-            <div class="check-list-header">
-                <span class="check-list-number">#${check.check_number}</span>
-                <span class="check-list-amount">${formatCurrency(check.amount)}</span>
+        <div class="register-item" onclick="editCheck(${check.id})">
+            <div class="register-item-number">#${check.check_number}</div>
+            <div class="register-item-details">
+                <div class="register-item-payee">${check.payee}</div>
+                <div class="register-item-memo">${check.memo || ''}</div>
             </div>
-            <div class="check-list-payee">${check.payee}</div>
-            <div class="check-list-meta">
-                <span>${formatDate(check.check_date)}</span>
-                <span class="check-status-badge ${check.status}">${check.status}</span>
+            <div>
+                <div class="register-item-amount">${formatCurrency(check.amount)}</div>
+                <div class="register-item-date">${formatDateShort(check.check_date)}</div>
+                <span class="register-item-status ${check.status}">${check.status}</span>
             </div>
         </div>
     `).join('');
@@ -131,7 +141,8 @@ function updateChecksSummary() {
 function filterChecks(status, element) {
     currentCheckFilter = status;
     checksState.currentCheckFilter = status;
-    document.querySelectorAll('.checks-filter-tab').forEach(t => t.classList.remove('active'));
+    // Support both old and new class names
+    document.querySelectorAll('.checks-filter-tab, .register-tab').forEach(t => t.classList.remove('active'));
     if (element) element.classList.add('active');
     loadChecks();
 }
@@ -147,25 +158,36 @@ function updateNextCheckNumber() {
 }
 
 function updateCheckPreview() {
-    const number = document.getElementById('check-number')?.value || '----';
-    const date = document.getElementById('check-date')?.value;
-    const payee = document.getElementById('check-payee')?.value || '';
     const amount = parseFloat(document.getElementById('check-amount')?.value) || 0;
-    const memo = document.getElementById('check-memo')?.value || '';
 
+    // Update amount in words (this element exists in new design)
+    const previewWords = document.getElementById('preview-amount-words');
+    if (previewWords) previewWords.textContent = numberToWords(amount);
+
+    // Legacy preview elements (for backwards compatibility)
     const previewNumber = document.getElementById('preview-number');
     const previewDate = document.getElementById('preview-date');
     const previewPayee = document.getElementById('preview-payee');
     const previewAmount = document.getElementById('preview-amount');
-    const previewWords = document.getElementById('preview-amount-words');
     const previewMemo = document.getElementById('preview-memo');
 
-    if (previewNumber) previewNumber.textContent = number;
-    if (previewDate) previewDate.textContent = date ? formatDateShort(date) : '--/--/----';
-    if (previewPayee) previewPayee.textContent = payee;
+    if (previewNumber) {
+        const number = document.getElementById('check-number')?.value || '----';
+        previewNumber.textContent = number;
+    }
+    if (previewDate) {
+        const date = document.getElementById('check-date')?.value;
+        previewDate.textContent = date ? formatDateShort(date) : '--/--/----';
+    }
+    if (previewPayee) {
+        const payee = document.getElementById('check-payee')?.value || '';
+        previewPayee.textContent = payee;
+    }
     if (previewAmount) previewAmount.textContent = amount.toFixed(2);
-    if (previewWords) previewWords.textContent = numberToWords(amount);
-    if (previewMemo) previewMemo.textContent = memo;
+    if (previewMemo) {
+        const memo = document.getElementById('check-memo')?.value || '';
+        previewMemo.textContent = memo;
+    }
 }
 
 function formatDateShort(dateStr) {
@@ -240,6 +262,9 @@ function resetCheckForm() {
     document.getElementById('check-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('create-transaction').checked = true;
     document.getElementById('check-status').value = 'pending';
+    // Hide delete button when creating new check
+    const deleteBtn = document.getElementById('delete-check-btn');
+    if (deleteBtn) deleteBtn.style.display = 'none';
     updateCheckPreview();
 }
 
@@ -257,12 +282,97 @@ function editCheck(id) {
     document.getElementById('check-category').value = check.category_id || '';
     document.getElementById('check-status').value = check.status || 'pending';
 
+    // Show delete button when editing
+    const deleteBtn = document.getElementById('delete-check-btn');
+    if (deleteBtn) deleteBtn.style.display = 'inline-flex';
+
     updateCheckPreview();
     document.querySelector('#page-checks .checks-form-card')?.scrollIntoView({ behavior: 'smooth' });
 }
 
+async function deleteCheck() {
+    const checkId = document.getElementById('check-id').value;
+    if (!checkId) return;
+
+    const check = checksData?.checks?.find(c => c.id === parseInt(checkId));
+    const checkNumber = check?.check_number || checkId;
+
+    if (!confirm(`Are you sure you want to delete Check #${checkNumber}?`)) {
+        return;
+    }
+
+    try {
+        const result = await apiDelete(`/checks/?id=${checkId}`);
+        if (result.success) {
+            showToast('Check deleted');
+            resetCheckForm();
+            loadChecks();
+        } else {
+            showToast(result.message || 'Error deleting check', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Error deleting check', 'error');
+    }
+}
+
 function printCheck() {
     window.print();
+}
+
+// Save check from button click (not form submit)
+async function saveCheckFromButton() {
+    const data = {
+        user_id: state.currentUser,
+        account_id: parseInt(document.getElementById('check-account').value),
+        check_number: document.getElementById('check-number').value,
+        payee: document.getElementById('check-payee').value,
+        amount: parseFloat(document.getElementById('check-amount').value),
+        check_date: document.getElementById('check-date').value,
+        memo: document.getElementById('check-memo').value,
+        category_id: document.getElementById('check-category').value || null,
+        status: document.getElementById('check-status').value,
+        create_transaction: document.getElementById('create-transaction').checked
+    };
+
+    // Validation
+    if (!data.account_id) {
+        showToast('Please select a bank account', 'error');
+        return;
+    }
+    if (!data.check_number) {
+        showToast('Please enter a check number', 'error');
+        return;
+    }
+    if (!data.payee) {
+        showToast('Please enter payee name', 'error');
+        return;
+    }
+    if (!data.amount || data.amount <= 0) {
+        showToast('Please enter a valid amount', 'error');
+        return;
+    }
+    if (!data.check_date) {
+        showToast('Please select a date', 'error');
+        return;
+    }
+
+    const checkId = document.getElementById('check-id').value;
+    if (checkId) data.id = parseInt(checkId);
+
+    try {
+        const result = await apiPost('/checks/', data);
+        if (result.success) {
+            showToast(result.message || 'Check saved');
+            resetCheckForm();
+            loadChecks();
+        } else {
+            showToast(result.message || 'Error saving check', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Error saving check', 'error');
+    }
 }
 
 // =====================================================
@@ -274,6 +384,8 @@ window.filterChecks = filterChecks;
 window.updateNextCheckNumber = updateNextCheckNumber;
 window.updateCheckPreview = updateCheckPreview;
 window.saveCheck = saveCheck;
+window.saveCheckFromButton = saveCheckFromButton;
 window.resetCheckForm = resetCheckForm;
 window.editCheck = editCheck;
+window.deleteCheck = deleteCheck;
 window.printCheck = printCheck;

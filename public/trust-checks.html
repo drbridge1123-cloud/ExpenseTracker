@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Write Trust Checks - ExpenseTracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-cream: #faf8f5;
+            --bg-white: #ffffff;
+            --bg-paper: #fffef9;
+            --border-gold: #c9a962;
+            --border-light: #e8e4dc;
+            --text-navy: #1a2744;
+            --text-dark: #2d3748;
+            --text-muted: #6b7280;
+            --accent-green: #1a5d3a;
+            --accent-burgundy: #7a2e3a;
+            --accent-blue: #1e40af;
+            --error-red: #dc2626;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-cream);
+            min-height: 100vh;
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d4cfc5' fill-opacity='0.15'%3E%3Cpath d='M20 0v40M0 20h40'/%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        /* Header */
+        .page-header {
+            background: var(--bg-white);
+            border-bottom: 3px solid var(--border-gold);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-navy);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .page-title::before { content: '⚖️'; font-size: 20px; }
+
+        .header-actions { display: flex; gap: 10px; }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-family: 'Source Sans 3', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 2px solid transparent;
+        }
+
+        .btn-primary { background: var(--accent-green); color: white; border-color: var(--accent-green); }
+        .btn-primary:hover { background: #155a30; }
+        .btn-outline { background: transparent; color: var(--text-navy); border-color: var(--text-navy); }
+        .btn-outline:hover { background: var(--text-navy); color: white; }
+        .btn-danger { background: var(--error-red); color: white; border-color: var(--error-red); }
+        .btn-blue { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        .btn-blue:hover { background: #1e3a8a; }
+
+        /* Main Layout */
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px 32px;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 32px;
+        }
+
+        /* Left Column */
+        .left-column { display: flex; flex-direction: column; gap: 20px; }
+
+        /* Workflow Steps */
+        .workflow-steps {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-white);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-light);
+        }
+
+        .workflow-step {
+            flex: 1;
+            text-align: center;
+            padding: 12px 8px;
+            border-radius: 6px;
+            position: relative;
+        }
+
+        .workflow-step::after {
+            content: '→';
+            position: absolute;
+            right: -12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--border-light);
+            font-size: 18px;
+        }
+
+        .workflow-step:last-child::after { display: none; }
+
+        .workflow-step.active { background: var(--accent-green); }
+        .workflow-step.active .step-label { color: white; }
+        .workflow-step.completed { background: #d1fae5; }
+        .workflow-step.completed .step-label { color: #059669; }
+
+        .step-number {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--border-light);
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 4px;
+        }
+
+        .workflow-step.active .step-number { background: white; color: var(--accent-green); }
+        .workflow-step.completed .step-number { background: #059669; color: white; }
+        .step-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+
+        /* Required Fields Notice */
+        .required-notice {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            padding: 10px 14px;
+            font-size: 13px;
+            color: #92400e;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Form Sections */
+        .form-section {
+            background: var(--bg-white);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .form-group { margin-bottom: 0; }
+        .form-group.full-width { grid-column: span 2; }
+
+        .form-group label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .form-group label .required { color: var(--error-red); margin-left: 2px; }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 14px;
+            font-family: 'Source Sans 3', sans-serif;
+            color: var(--text-navy);
+            background: var(--bg-cream);
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus { outline: none; border-color: var(--border-gold); }
+        .form-control.error { border-color: var(--error-red); background: #fef2f2; }
+
+        select.form-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231a2744' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 36px;
+        }
+
+        /* Entity Autocomplete */
+        .entity-input-wrapper { position: relative; }
+
+        .entity-input {
+            padding-left: 36px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='M21 21l-4.35-4.35'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: 10px center;
+        }
+
+        .entity-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            max-height: 280px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+
+        .entity-dropdown.open { display: block; }
+
+        .entity-option {
+            padding: 10px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background 0.1s;
+        }
+
+        .entity-option:hover { background: #f9fafb; }
+        .entity-option:last-child { border-bottom: none; }
+
+        .entity-option-name { font-weight: 600; color: var(--text-navy); }
+        .entity-option-type { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+        .entity-option-address { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+        .entity-create-new {
+            padding: 12px 14px;
+            background: #f0fdf4;
+            border-top: 1px solid #bbf7d0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: var(--accent-green);
+        }
+
+        .entity-create-new:hover { background: #dcfce7; }
+
+        /* Check Paper Preview */
+        .check-paper {
+            background: var(--bg-paper);
+            border: 2px solid var(--border-gold);
+            border-radius: 2px;
+            padding: 24px;
+            position: relative;
+        }
+
+        .check-paper::before {
+            content: '';
+            position: absolute;
+            top: 6px; left: 6px; right: 6px; bottom: 6px;
+            border: 1px solid var(--border-light);
+            pointer-events: none;
+        }
+
+        .check-header-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .check-bank-name { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 600; color: var(--text-navy); }
+        .check-number-date { display: flex; gap: 24px; font-size: 14px; }
+        .check-field-label { color: var(--text-muted); font-size: 11px; text-transform: uppercase; margin-right: 6px; }
+        .check-field-value { font-weight: 600; color: var(--text-navy); }
+
+        .payto-row { margin-bottom: 12px; }
+        .payto-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+        .payto-value { font-size: 16px; font-weight: 600; color: var(--text-navy); min-height: 24px; border-bottom: 1px solid var(--border-light); padding-bottom: 4px; }
+
+        .amount-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+
+        .amount-words {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 14px;
+            font-style: italic;
+            color: var(--text-dark);
+            flex: 1;
+            min-height: 20px;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 4px;
+            margin-right: 16px;
+        }
+
+        .amount-box {
+            border: 2px solid var(--text-navy);
+            padding: 6px 12px;
+            min-width: 100px;
+            text-align: right;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-navy);
+        }
+
+        .memo-row { margin-top: 16px; display: flex; gap: 8px; }
+        .memo-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+        .memo-value { flex: 1; font-size: 13px; color: var(--text-dark); border-bottom: 1px solid var(--border-light); min-height: 20px; }
+
+        /* Form Actions */
+        .form-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-light);
+            margin-top: 16px;
+        }
+
+        /* Sidebar */
+        .sidebar { display: flex; flex-direction: column; gap: 20px; }
+
+        .sidebar-card {
+            background: var(--bg-white);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            background: linear-gradient(135deg, var(--accent-burgundy), #5a1f2b);
+            color: white;
+            padding: 14px 18px;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 16px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .sidebar-body { padding: 16px; }
+
+        /* Print Queue */
+        .queue-item {
+            padding: 12px;
+            background: var(--bg-cream);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .queue-item:hover { background: #f3f4f6; }
+        .queue-item:last-child { margin-bottom: 0; }
+
+        .queue-item-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .queue-item-number { font-weight: 600; color: var(--text-navy); }
+        .queue-item-amount { font-weight: 600; color: var(--text-navy); }
+        .queue-item-payee { font-size: 13px; color: var(--text-dark); margin-bottom: 4px; }
+        .queue-item-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); }
+
+        .queue-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .queue-status.queued { background: #fef3c7; color: #d97706; }
+        .queue-status.printed { background: #dbeafe; color: #1d4ed8; }
+        .queue-status.confirmed { background: #d1fae5; color: #059669; }
+
+        .queue-empty {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-muted);
+        }
+
+        /* Account Balance */
+        .balance-display {
+            text-align: center;
+            padding: 16px;
+            background: var(--bg-cream);
+            border-radius: 6px;
+        }
+
+        .balance-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px; }
+        .balance-amount { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 700; color: var(--accent-green); }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+        }
+
+        .modal-overlay.open { opacity: 1; visibility: visible; }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow: auto;
+            transform: translateY(-20px);
+            transition: transform 0.2s;
+        }
+
+        .modal-overlay.open .modal { transform: translateY(0); }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title { font-size: 18px; font-weight: 600; color: var(--text-navy); }
+        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted); }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-light); display: flex; justify-content: flex-end; gap: 10px; }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--text-navy);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 2000;
+        }
+
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.error { background: var(--error-red); }
+        .toast.success { background: var(--accent-green); }
+
+        @media (max-width: 1100px) {
+            .main-container { grid-template-columns: 1fr; }
+            .sidebar { order: -1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="page-header">
+        <h1 class="page-title">Write Trust Check</h1>
+        <div class="header-actions">
+            <button class="btn btn-outline" onclick="window.location.href='index.html'">
+                ← Back to Dashboard
+            </button>
+            <button class="btn btn-primary" onclick="resetForm()">
+                + New Check
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-container">
+        <!-- Left Column -->
+        <div class="left-column">
+            <!-- Workflow Steps -->
+            <div class="workflow-steps">
+                <div class="workflow-step active" id="step-write">
+                    <div class="step-number">1</div>
+                    <div class="step-label">Write Check</div>
+                </div>
+                <div class="workflow-step" id="step-preview">
+                    <div class="step-number">2</div>
+                    <div class="step-label">Preview</div>
+                </div>
+                <div class="workflow-step" id="step-print">
+                    <div class="step-number">3</div>
+                    <div class="step-label">Print</div>
+                </div>
+                <div class="workflow-step" id="step-confirm">
+                    <div class="step-number">4</div>
+                    <div class="step-label">Confirm</div>
+                </div>
+                <div class="workflow-step" id="step-register">
+                    <div class="step-number">5</div>
+                    <div class="step-label">Register</div>
+                </div>
+            </div>
+
+            <!-- Required Fields Notice -->
+            <div class="required-notice">
+                <span>⚠️</span>
+                <span>All fields marked with <strong>*</strong> are required. Check will NOT be registered until confirmed after printing.</span>
+            </div>
+
+            <!-- Check Form -->
+            <form id="check-form">
+                <input type="hidden" id="queue-id">
+                <input type="hidden" id="entity-id">
+
+                <!-- Bank Account & Check Details -->
+                <div class="form-section">
+                    <div class="section-title">Check Details</div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Bank Account <span class="required">*</span></label>
+                            <select id="ledger-id" class="form-control" required onchange="updateLedgerBalance()">
+                                <option value="">Select client ledger...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Check Number <span class="required">*</span></label>
+                            <input type="text" id="check-number" class="form-control" placeholder="1001" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Check Date <span class="required">*</span></label>
+                            <input type="date" id="check-date" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount <span class="required">*</span></label>
+                            <input type="number" id="check-amount" class="form-control" placeholder="0.00" step="0.01" min="0.01" required oninput="updatePreview()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recipient (Entity) -->
+                <div class="form-section">
+                    <div class="section-title">Recipient (Pay To) <span class="required">*</span></div>
+                    <div class="form-group">
+                        <label>Search Vendor/Payee</label>
+                        <div class="entity-input-wrapper">
+                            <input type="text" id="entity-search" class="form-control entity-input"
+                                   placeholder="Type to search vendors, employees..."
+                                   autocomplete="off"
+                                   oninput="searchEntities(this.value)"
+                                   onfocus="showEntityDropdown()">
+                            <div class="entity-dropdown" id="entity-dropdown">
+                                <div class="entity-option" onclick="selectEntity(null)">
+                                    <div class="entity-option-name">Loading...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="selected-entity-display" style="display: none; margin-top: 12px; padding: 12px; background: #f0fdf4; border-radius: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <div style="font-weight: 600; color: var(--text-navy);" id="selected-entity-name"></div>
+                                <div style="font-size: 12px; color: var(--text-muted);" id="selected-entity-address"></div>
+                            </div>
+                            <button type="button" onclick="clearEntity()" style="background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-muted);">×</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Case & Category -->
+                <div class="form-section">
+                    <div class="section-title">Classification</div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Case/Matter <span class="required">*</span></label>
+                            <select id="case-id" class="form-control" required>
+                                <option value="">Select case...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Category <span class="required">*</span></label>
+                            <select id="category-id" class="form-control" required>
+                                <option value="">Select category...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Memo -->
+                <div class="form-section">
+                    <div class="section-title">Memo <span class="required">*</span></div>
+                    <div class="form-group">
+                        <textarea id="check-memo" class="form-control" rows="2" placeholder="Invoice number, description, purpose..." required oninput="updatePreview()"></textarea>
+                    </div>
+                </div>
+
+                <!-- Check Preview -->
+                <div class="check-paper">
+                    <div class="check-header-row">
+                        <div class="check-bank-name" id="preview-bank-name">Trust Account</div>
+                        <div class="check-number-date">
+                            <span><span class="check-field-label">No.</span><span class="check-field-value" id="preview-check-number">----</span></span>
+                            <span><span class="check-field-label">Date</span><span class="check-field-value" id="preview-date">--/--/----</span></span>
+                        </div>
+                    </div>
+                    <div class="payto-row">
+                        <div class="payto-label">Pay to the Order of</div>
+                        <div class="payto-value" id="preview-payee"></div>
+                    </div>
+                    <div class="amount-row">
+                        <div class="amount-words" id="preview-amount-words">Zero and 00/100 Dollars</div>
+                        <div class="amount-box">$<span id="preview-amount">0.00</span></div>
+                    </div>
+                    <div class="memo-row">
+                        <span class="memo-label">Memo</span>
+                        <div class="memo-value" id="preview-memo"></div>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="resetForm()">Cancel</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn btn-blue" id="btn-add-queue" onclick="addToQueue()">
+                            Add to Print Queue
+                        </button>
+                        <button type="button" class="btn btn-primary" id="btn-preview" onclick="previewCheck()" style="display: none;">
+                            Preview & Print
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Ledger Balance -->
+            <div class="sidebar-card">
+                <div class="sidebar-header">Ledger Balance</div>
+                <div class="sidebar-body">
+                    <div class="balance-display">
+                        <div class="balance-label">Available Balance</div>
+                        <div class="balance-amount" id="ledger-balance">$0.00</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Print Queue -->
+            <div class="sidebar-card">
+                <div class="sidebar-header">Print Queue</div>
+                <div class="sidebar-body">
+                    <div id="queue-list">
+                        <div class="queue-empty">No checks in queue</div>
+                    </div>
+                    <div style="margin-top: 12px; text-align: center;">
+                        <button class="btn btn-primary" id="btn-print-all" onclick="printAllQueued()" style="display: none;">
+                            Print All Queued
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Checks -->
+            <div class="sidebar-card">
+                <div class="sidebar-header">Recent Checks</div>
+                <div class="sidebar-body">
+                    <div id="recent-checks">
+                        <div class="queue-empty">No recent checks</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Print Confirmation Modal -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">Confirm Print & Register</div>
+                <button class="modal-close" onclick="closeModal('confirm-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 16px;">Did the check print correctly? Confirming will <strong>register this transaction</strong> and deduct from the client ledger.</p>
+                <div class="form-group">
+                    <label>Confirm Check Number</label>
+                    <input type="text" id="confirm-check-number" class="form-control" placeholder="Verify check number">
+                </div>
+                <div style="background: #fef3c7; padding: 12px; border-radius: 6px; margin-top: 12px;">
+                    <strong>Check Details:</strong>
+                    <div id="confirm-details" style="margin-top: 8px; font-size: 14px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="reprintCheck()">Reprint</button>
+                <button class="btn btn-danger" onclick="cancelCheck()">Cancel Check</button>
+                <button class="btn btn-primary" onclick="confirmAndRegister()">Confirm & Register</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // API Configuration
+        const API_BASE = (() => {
+            const pathParts = window.location.pathname.split('/');
+            const appFolder = pathParts.find((part, index) => index > 0 && part !== '' && part !== 'public');
+            return appFolder ? '/' + appFolder + '/api/v1' : '/api/v1';
+        })();
+        const USER_ID = localStorage.getItem('expense_tracker_user') || 1;
+
+        // State
+        let ledgers = [];
+        let entities = [];
+        let cases = [];
+        let categories = [];
+        let printQueue = [];
+        let currentQueueItem = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('check-date').value = new Date().toISOString().split('T')[0];
+            loadData();
+            setupEventListeners();
+        });
+
+        async function loadData() {
+            await Promise.all([
+                loadLedgers(),
+                loadEntities(),
+                loadCases(),
+                loadCategories(),
+                loadPrintQueue()
+            ]);
+        }
+
+        function setupEventListeners() {
+            // Close entity dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                const wrapper = document.querySelector('.entity-input-wrapper');
+                if (wrapper && !wrapper.contains(e.target)) {
+                    document.getElementById('entity-dropdown').classList.remove('open');
+                }
+            });
+
+            // Update preview on input changes
+            ['check-number', 'check-date', 'check-amount', 'check-memo'].forEach(id => {
+                document.getElementById(id)?.addEventListener('input', updatePreview);
+            });
+        }
+
+        // === Data Loading ===
+        async function loadLedgers() {
+            try {
+                const response = await fetch(`${API_BASE}/trust/ledger.php?user_id=${USER_ID}`);
+                const result = await response.json();
+                if (result.success) {
+                    ledgers = result.data.ledgers || [];
+                    const select = document.getElementById('ledger-id');
+                    select.innerHTML = '<option value="">Select client ledger...</option>' +
+                        ledgers.map(l => `<option value="${l.id}" data-balance="${l.current_balance}">${l.client_name} - ${l.account_name}</option>`).join('');
+                }
+            } catch (error) {
+                console.error('Error loading ledgers:', error);
+            }
+        }
+
+        async function loadEntities() {
+            try {
+                const response = await fetch(`${API_BASE}/entities/?user_id=${USER_ID}&payable=1`);
+                const result = await response.json();
+                if (result.success) {
+                    entities = result.data.entities || [];
+                    renderEntityDropdown(entities);
+                }
+            } catch (error) {
+                console.error('Error loading entities:', error);
+            }
+        }
+
+        async function loadCases() {
+            try {
+                const response = await fetch(`${API_BASE}/cases/?user_id=${USER_ID}`);
+                const result = await response.json();
+                if (result.success) {
+                    cases = result.data.cases || [];
+                    const select = document.getElementById('case-id');
+                    select.innerHTML = '<option value="">Select case...</option>' +
+                        cases.map(c => `<option value="${c.id}">${c.case_number} - ${c.case_name}</option>`).join('');
+                }
+            } catch (error) {
+                console.error('Error loading cases:', error);
+            }
+        }
+
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${API_BASE}/categories/?user_id=${USER_ID}`);
+                const result = await response.json();
+                if (result.success) {
+                    categories = (result.data.categories || []).filter(c => c.category_type === 'expense');
+                    const select = document.getElementById('category-id');
+                    select.innerHTML = '<option value="">Select category...</option>' +
+                        categories.map(c => `<option value="${c.id}">${c.icon || '📁'} ${c.name}</option>`).join('');
+                }
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        async function loadPrintQueue() {
+            try {
+                const response = await fetch(`${API_BASE}/checks/print-queue.php?user_id=${USER_ID}`);
+                const result = await response.json();
+                if (result.success) {
+                    printQueue = result.data.queue_items || [];
+                    renderPrintQueue();
+                }
+            } catch (error) {
+                console.error('Error loading print queue:', error);
+            }
+        }
+
+        // === Entity Search ===
+        function searchEntities(query) {
+            const filtered = entities.filter(e =>
+                e.name.toLowerCase().includes(query.toLowerCase()) ||
+                (e.display_name && e.display_name.toLowerCase().includes(query.toLowerCase()))
+            );
+            renderEntityDropdown(filtered, query);
+        }
+
+        function showEntityDropdown() {
+            document.getElementById('entity-dropdown').classList.add('open');
+            renderEntityDropdown(entities);
+        }
+
+        function renderEntityDropdown(list, query = '') {
+            const dropdown = document.getElementById('entity-dropdown');
+
+            if (list.length === 0) {
+                dropdown.innerHTML = `
+                    <div class="entity-create-new" onclick="createNewEntity('${query}')">
+                        <span>+</span> Create new: "${query}"
+                    </div>
+                `;
+            } else {
+                dropdown.innerHTML = list.slice(0, 10).map(e => `
+                    <div class="entity-option" onclick="selectEntity(${e.id})">
+                        <div class="entity-option-name">${e.display_name || e.name}</div>
+                        <div class="entity-option-type">${e.type_name || 'Entity'}</div>
+                        ${e.city ? `<div class="entity-option-address">${e.city}, ${e.state || ''}</div>` : ''}
+                    </div>
+                `).join('');
+
+                if (query && !list.find(e => e.name.toLowerCase() === query.toLowerCase())) {
+                    dropdown.innerHTML += `
+                        <div class="entity-create-new" onclick="createNewEntity('${query}')">
+                            <span>+</span> Create new: "${query}"
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function selectEntity(entityId) {
+            const entity = entities.find(e => e.id === entityId);
+            if (!entity) return;
+
+            document.getElementById('entity-id').value = entityId;
+            document.getElementById('entity-search').value = entity.display_name || entity.name;
+            document.getElementById('entity-dropdown').classList.remove('open');
+
+            // Show selected entity display
+            const display = document.getElementById('selected-entity-display');
+            display.style.display = 'block';
+            document.getElementById('selected-entity-name').textContent = entity.display_name || entity.name;
+
+            const addressParts = [entity.address_line1, entity.city, entity.state].filter(Boolean);
+            document.getElementById('selected-entity-address').textContent = addressParts.join(', ');
+
+            updatePreview();
+        }
+
+        function clearEntity() {
+            document.getElementById('entity-id').value = '';
+            document.getElementById('entity-search').value = '';
+            document.getElementById('selected-entity-display').style.display = 'none';
+            updatePreview();
+        }
+
+        function createNewEntity(name) {
+            showToast('Entity creation coming soon. Use existing entities for now.', 'info');
+            document.getElementById('entity-dropdown').classList.remove('open');
+        }
+
+        // === Ledger Balance ===
+        function updateLedgerBalance() {
+            const select = document.getElementById('ledger-id');
+            const option = select.options[select.selectedIndex];
+            const balance = option?.dataset?.balance || 0;
+            document.getElementById('ledger-balance').textContent = formatCurrency(balance);
+
+            const ledger = ledgers.find(l => l.id === parseInt(select.value));
+            if (ledger) {
+                document.getElementById('preview-bank-name').textContent = ledger.account_name || 'Trust Account';
+            }
+        }
+
+        // === Preview Update ===
+        function updatePreview() {
+            const checkNumber = document.getElementById('check-number').value || '----';
+            const checkDate = document.getElementById('check-date').value;
+            const amount = parseFloat(document.getElementById('check-amount').value) || 0;
+            const memo = document.getElementById('check-memo').value;
+
+            document.getElementById('preview-check-number').textContent = checkNumber;
+            document.getElementById('preview-date').textContent = checkDate ? formatDateShort(checkDate) : '--/--/----';
+            document.getElementById('preview-amount').textContent = amount.toFixed(2);
+            document.getElementById('preview-amount-words').textContent = numberToWords(amount);
+            document.getElementById('preview-memo').textContent = memo;
+
+            const entityId = document.getElementById('entity-id').value;
+            const entity = entities.find(e => e.id === parseInt(entityId));
+            document.getElementById('preview-payee').textContent = entity ? (entity.display_name || entity.name) : '';
+        }
+
+        // === Add to Print Queue ===
+        async function addToQueue() {
+            // Validate all required fields
+            const ledgerId = document.getElementById('ledger-id').value;
+            const entityId = document.getElementById('entity-id').value;
+            const caseId = document.getElementById('case-id').value;
+            const categoryId = document.getElementById('category-id').value;
+            const checkNumber = document.getElementById('check-number').value;
+            const checkDate = document.getElementById('check-date').value;
+            const amount = parseFloat(document.getElementById('check-amount').value);
+            const memo = document.getElementById('check-memo').value;
+
+            const errors = [];
+            if (!ledgerId) errors.push('Bank Account');
+            if (!entityId) errors.push('Recipient');
+            if (!caseId) errors.push('Case/Matter');
+            if (!categoryId) errors.push('Category');
+            if (!checkNumber) errors.push('Check Number');
+            if (!checkDate) errors.push('Check Date');
+            if (!amount || amount <= 0) errors.push('Amount');
+            if (!memo) errors.push('Memo');
+
+            if (errors.length > 0) {
+                showToast('Required fields missing: ' + errors.join(', '), 'error');
+                return;
+            }
+
+            const data = {
+                user_id: USER_ID,
+                ledger_id: parseInt(ledgerId),
+                entity_id: parseInt(entityId),
+                case_id: parseInt(caseId),
+                category_id: parseInt(categoryId),
+                check_number: checkNumber,
+                check_date: checkDate,
+                amount: amount,
+                memo: memo
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/checks/print-queue.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('Check added to print queue', 'success');
+                    await loadPrintQueue();
+                    resetForm();
+                    setWorkflowStep(2);
+                } else {
+                    showToast(result.message || 'Error adding to queue', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Error adding to queue', 'error');
+            }
+        }
+
+        // === Render Print Queue ===
+        function renderPrintQueue() {
+            const container = document.getElementById('queue-list');
+            const queuedItems = printQueue.filter(q => ['queued', 'previewing', 'printed'].includes(q.queue_status));
+
+            if (queuedItems.length === 0) {
+                container.innerHTML = '<div class="queue-empty">No checks in queue</div>';
+                document.getElementById('btn-print-all').style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = queuedItems.map(q => `
+                <div class="queue-item" onclick="selectQueueItem(${q.id})">
+                    <div class="queue-item-header">
+                        <span class="queue-item-number">#${q.check_number}</span>
+                        <span class="queue-item-amount">${formatCurrency(q.amount)}</span>
+                    </div>
+                    <div class="queue-item-payee">${q.payee_name}</div>
+                    <div class="queue-item-meta">
+                        <span>${formatDateShort(q.check_date)}</span>
+                        <span class="queue-status ${q.queue_status}">${q.queue_status}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('btn-print-all').style.display = queuedItems.length > 0 ? 'inline-flex' : 'none';
+        }
+
+        function selectQueueItem(queueId) {
+            const item = printQueue.find(q => q.id === queueId);
+            if (!item) return;
+
+            currentQueueItem = item;
+
+            if (item.queue_status === 'printed') {
+                showConfirmModal(item);
+            } else {
+                previewCheck(queueId);
+            }
+        }
+
+        // === Print Workflow ===
+        async function previewCheck(queueId) {
+            if (!queueId && printQueue.length > 0) {
+                queueId = printQueue.find(q => q.queue_status === 'queued')?.id;
+            }
+
+            if (!queueId) {
+                showToast('No checks to preview', 'error');
+                return;
+            }
+
+            currentQueueItem = printQueue.find(q => q.id === queueId);
+
+            // Update queue status to previewing
+            try {
+                await fetch(`${API_BASE}/checks/print-queue.php`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: queueId, action: 'preview' })
+                });
+
+                setWorkflowStep(2);
+
+                // Open print dialog
+                window.print();
+
+                // After print, mark as printed
+                await fetch(`${API_BASE}/checks/print-queue.php`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: queueId, action: 'print' })
+                });
+
+                setWorkflowStep(3);
+                await loadPrintQueue();
+
+                // Show confirmation modal
+                showConfirmModal(currentQueueItem);
+
+            } catch (error) {
+                console.error('Error in print workflow:', error);
+                showToast('Error during print workflow', 'error');
+            }
+        }
+
+        async function printAllQueued() {
+            const queuedItems = printQueue.filter(q => q.queue_status === 'queued');
+            if (queuedItems.length === 0) {
+                showToast('No checks to print', 'error');
+                return;
+            }
+
+            // Preview first queued check
+            previewCheck(queuedItems[0].id);
+        }
+
+        // === Confirmation Modal ===
+        function showConfirmModal(item) {
+            currentQueueItem = item;
+            document.getElementById('confirm-check-number').value = item.check_number;
+            document.getElementById('confirm-details').innerHTML = `
+                <div><strong>Payee:</strong> ${item.payee_name}</div>
+                <div><strong>Amount:</strong> ${formatCurrency(item.amount)}</div>
+                <div><strong>Date:</strong> ${formatDateShort(item.check_date)}</div>
+                <div><strong>Memo:</strong> ${item.memo || '-'}</div>
+            `;
+            openModal('confirm-modal');
+            setWorkflowStep(4);
+        }
+
+        async function confirmAndRegister() {
+            if (!currentQueueItem) return;
+
+            const finalCheckNumber = document.getElementById('confirm-check-number').value;
+            if (!finalCheckNumber) {
+                showToast('Please confirm the check number', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/checks/print-queue.php`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: currentQueueItem.id,
+                        action: 'confirm',
+                        final_check_number: finalCheckNumber
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('Check registered successfully!', 'success');
+                    closeModal('confirm-modal');
+                    setWorkflowStep(5);
+                    await loadPrintQueue();
+                    resetForm();
+
+                    // Reset workflow after delay
+                    setTimeout(() => setWorkflowStep(1), 2000);
+                } else {
+                    showToast(result.message || 'Error registering check', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Error registering check', 'error');
+            }
+        }
+
+        function reprintCheck() {
+            closeModal('confirm-modal');
+            if (currentQueueItem) {
+                previewCheck(currentQueueItem.id);
+            }
+        }
+
+        async function cancelCheck() {
+            if (!currentQueueItem) return;
+
+            if (!confirm('Cancel this check? It will be removed from the queue.')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/checks/print-queue.php`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: currentQueueItem.id,
+                        action: 'cancel',
+                        cancel_reason: 'User cancelled after print'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('Check cancelled', 'info');
+                    closeModal('confirm-modal');
+                    await loadPrintQueue();
+                    resetForm();
+                    setWorkflowStep(1);
+                } else {
+                    showToast(result.message || 'Error cancelling check', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Error cancelling check', 'error');
+            }
+        }
+
+        // === Workflow Steps ===
+        function setWorkflowStep(step) {
+            const steps = ['write', 'preview', 'print', 'confirm', 'register'];
+            steps.forEach((s, i) => {
+                const el = document.getElementById(`step-${s}`);
+                el.classList.remove('active', 'completed');
+                if (i + 1 < step) {
+                    el.classList.add('completed');
+                } else if (i + 1 === step) {
+                    el.classList.add('active');
+                }
+            });
+        }
+
+        // === Form Reset ===
+        function resetForm() {
+            document.getElementById('check-form').reset();
+            document.getElementById('queue-id').value = '';
+            document.getElementById('entity-id').value = '';
+            document.getElementById('check-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('selected-entity-display').style.display = 'none';
+            document.getElementById('ledger-balance').textContent = '$0.00';
+            document.getElementById('preview-bank-name').textContent = 'Trust Account';
+            updatePreview();
+            setWorkflowStep(1);
+            currentQueueItem = null;
+        }
+
+        // === Utilities ===
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(amount);
+        }
+
+        function formatDateShort(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr + 'T00:00:00');
+            return `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}/${d.getFullYear()}`;
+        }
+
+        function numberToWords(amount) {
+            const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+                         'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+                         'Seventeen', 'Eighteen', 'Nineteen'];
+            const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+            const dollars = Math.floor(amount);
+            const cents = Math.round((amount - dollars) * 100);
+
+            function convertHundreds(num) {
+                if (num === 0) return '';
+                if (num < 20) return ones[num];
+                if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 ? '-' + ones[num % 10] : '');
+                return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + convertHundreds(num % 100) : '');
+            }
+
+            function convert(num) {
+                if (num === 0) return 'Zero';
+                if (num < 1000) return convertHundreds(num);
+                if (num < 1000000) {
+                    return convertHundreds(Math.floor(num / 1000)) + ' Thousand' +
+                           (num % 1000 ? ' ' + convertHundreds(num % 1000) : '');
+                }
+                return convertHundreds(Math.floor(num / 1000000)) + ' Million' +
+                       (num % 1000000 ? ' ' + convert(num % 1000000) : '');
+            }
+
+            return convert(dollars) + ' and ' + cents.toString().padStart(2, '0') + '/100 Dollars';
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.add('open');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('open');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type + ' show';
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>
