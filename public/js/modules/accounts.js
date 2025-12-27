@@ -9,7 +9,13 @@
 // =====================================================
 
 async function loadAccounts() {
-    const data = await apiGet('/accounts/', { user_id: state.currentUser });
+    // Get current account mode (personal, iolta, cost, general)
+    const accountMode = typeof getAccountType === 'function' ? getAccountType() : 'personal';
+
+    const data = await apiGet('/accounts/', {
+        user_id: state.currentUser,
+        account_mode: accountMode
+    });
 
     if (data.success) {
         state.accounts = data.data.accounts;
@@ -25,7 +31,7 @@ function renderAccountsGrid() {
 
     grid.innerHTML = state.accounts.map(acc => {
         const balance = parseFloat(acc.current_balance);
-        const color = acc.account_color || '#6b7280';
+        const color = acc.color || '#6b7280';
 
         return `
             <div class="card account-card" onclick="showAccountDetailModal(${acc.id})" style="cursor: pointer;">
@@ -38,7 +44,7 @@ function renderAccountsGrid() {
                         <span>${formatAccountTypeName(acc.account_type)}</span>
                     </div>
                     <button class="btn-icon account-edit-btn" onclick="event.stopPropagation(); showEditAccountModal(${acc.id})" title="Edit Account">
-                        &#9998;
+                        &#8942;
                     </button>
                 </div>
                 <div class="account-card-balance ${balance < 0 ? 'text-danger' : ''}">
@@ -142,7 +148,7 @@ async function showAccountDetailModal(accountId) {
     if (!account) return;
 
     const balance = parseFloat(account.current_balance);
-    const color = account.account_color || '#6b7280';
+    const color = account.color || '#6b7280';
 
     // Fetch recent transactions for this account
     const txnData = await apiGet('/transactions/', {
@@ -251,10 +257,6 @@ function showEditAccountModal(accountId) {
                 <input type="number" class="form-input" name="current_balance" step="0.01" value="${account.current_balance}">
             </div>
             <div class="form-group">
-                <label>Credit Limit (for credit cards)</label>
-                <input type="number" class="form-input" name="credit_limit" step="0.01" value="${account.credit_limit || ''}">
-            </div>
-            <div class="form-group">
                 <label>Color</label>
                 <input type="color" name="color" value="${account.color || '#3b82f6'}">
             </div>
@@ -280,7 +282,6 @@ function showEditAccountModal(accountId) {
             account_name: formData.get('account_name'),
             account_type: formData.get('account_type'),
             current_balance: parseFloat(formData.get('current_balance')),
-            credit_limit: formData.get('credit_limit') ? parseFloat(formData.get('credit_limit')) : null,
             color: formData.get('color'),
             is_active: formData.get('is_active') ? 1 : 0
         });

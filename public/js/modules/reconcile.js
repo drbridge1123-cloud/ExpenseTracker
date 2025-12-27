@@ -21,11 +21,16 @@ const reconcileState = window._reconcileState;
 // =====================================================
 
 async function loadReconcilePage() {
-    // Populate account dropdown
+    // Populate account dropdown - only bank accounts (checking, savings, credit_card)
     const accountSelect = document.getElementById('reconcile-account');
     if (accountSelect && state.accounts) {
         accountSelect.innerHTML = '<option value="">-- Select Account --</option>';
-        state.accounts.forEach(acc => {
+        // Filter to only show bank accounts, not client ledgers
+        const bankAccountTypes = ['checking', 'savings', 'credit_card', 'bank'];
+        const bankAccounts = state.accounts.filter(acc =>
+            bankAccountTypes.includes(acc.account_type?.toLowerCase())
+        );
+        bankAccounts.forEach(acc => {
             accountSelect.innerHTML += `<option value="${acc.id}">${acc.account_name}</option>`;
         });
     }
@@ -95,28 +100,46 @@ function loadReconcileAccount() {
 }
 
 async function startReconciliation() {
-    const accountId = document.getElementById('reconcile-account')?.value;
-    const statementDate = document.getElementById('reconcile-statement-date')?.value;
-    const endingBalance = parseFloat(document.getElementById('reconcile-ending-balance')?.value) || 0;
+    const accountEl = document.getElementById('reconcile-account');
+    const dateEl = document.getElementById('reconcile-statement-date');
+    const balanceEl = document.getElementById('reconcile-ending-balance');
+
+    const accountId = accountEl?.value;
+    let statementDate = dateEl?.value?.trim() || '';
+    const endingBalance = parseFloat(balanceEl?.value) || 0;
+
 
     if (!accountId) {
         showToast('Please select an account', 'warning');
         return;
     }
 
-    if (!statementDate) {
-        showToast('Please select a statement date', 'warning');
-        return;
+    // Check for empty or whitespace-only date
+    if (!statementDate || statementDate === '') {
+        // Try to set today's date if element exists
+        if (dateEl) {
+            const today = new Date().toISOString().split('T')[0];
+            dateEl.value = today;
+            statementDate = today;
+        }
+        // Final check
+        if (!statementDate || statementDate === '') {
+            showToast('Please select a statement date', 'warning');
+            return;
+        }
     }
 
+    // Use the validated date
+    const finalDate = statementDate;
+
     reconcileState.accountId = accountId;
-    reconcileState.statementDate = statementDate;
+    reconcileState.statementDate = finalDate;
     reconcileState.endingBalance = endingBalance;
     reconcileState.clearedIds = new Set();
 
     // Load transactions for reconciliation
     try {
-        const response = await fetch(`${API_BASE}/transactions/?user_id=${state.currentUser}&account_id=${accountId}&end_date=${statementDate}&is_reconciled=0&limit=1000`);
+        const response = await fetch(`${API_BASE}/transactions/?user_id=${state.currentUser}&account_id=${accountId}&end_date=${finalDate}&is_reconciled=0&limit=1000`);
         const result = await response.json();
 
         if (result.success) {

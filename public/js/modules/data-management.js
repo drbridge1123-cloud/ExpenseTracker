@@ -120,7 +120,6 @@ function updateActivityLogPreview() {
                     e.preventDefault();
                     const entryId = this.dataset.entryId; // Keep as string to avoid precision issues
                     const section = this.dataset.section;
-                    console.log('Badge clicked:', entryId, section); // Debug
                     showActivityLogModalForEntry(entryId, section);
                 });
             });
@@ -554,8 +553,6 @@ function showActivityLogModal() {
 
     // Render content
     const container = document.getElementById('activity-log-modal-content');
-    console.log('Rendering modal content. Activity log entries:', dataManagementState.activityLog.length);
-    console.log('Entries:', dataManagementState.activityLog.map(e => ({ id: e.id, title: e.title })));
     renderActivityLogContent(container);
 
     // Close on backdrop click
@@ -590,7 +587,6 @@ function showActivityLogModalForEntry(entryId, section = null) {
 
         // Find entry by data-id (use string comparison to avoid number precision issues)
         const entry = modalContainer.querySelector(`.dm-log-entry[data-id="${entryId}"]`);
-        console.log('Looking for entry:', entryId, 'Found:', entry);
 
         if (entry) {
             entry.classList.add('expanded');
@@ -627,8 +623,6 @@ function showActivityLogModalForEntry(entryId, section = null) {
         } else {
             // Debug: show all entries in the modal
             const allEntries = modalContainer.querySelectorAll('.dm-log-entry');
-            console.log('All entries in modal:', allEntries.length);
-            allEntries.forEach(e => console.log('Entry data-id:', e.dataset.id));
         }
     }, 100);
 }

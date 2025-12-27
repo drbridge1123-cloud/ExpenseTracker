@@ -60,9 +60,9 @@ fclose($output);
 exit;
 
 function exportClients(PDO $pdo, int $userId, $output): void {
-    fputcsv($output, ['id', 'client_name', 'matter_number', 'contact_email', 'contact_phone', 'address', 'is_active', 'created_at']);
+    fputcsv($output, ['id', 'client_name', 'case_number', 'contact_email', 'contact_phone', 'address', 'is_active', 'created_at']);
 
-    $sql = "SELECT id, client_name, matter_number, contact_email, contact_phone, address, is_active, created_at
+    $sql = "SELECT id, client_name, case_number, contact_email, contact_phone, address, is_active, created_at
             FROM trust_clients WHERE user_id = :user_id ORDER BY client_name";
     $stmt = $pdo->prepare($sql);
     $stmt->execute(['user_id' => $userId]);

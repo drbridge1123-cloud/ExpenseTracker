@@ -44,7 +44,7 @@ function handleGet(PDO $pdo): void {
 
     // Single record
     if ($id) {
-        $sql = "SELECT s.*, a.account_name, c.client_name, c.matter_number
+        $sql = "SELECT s.*, a.account_name, c.client_name, c.case_number
                 FROM trust_staging s
                 JOIN accounts a ON s.account_id = a.id
                 LEFT JOIN trust_clients c ON s.client_id = c.id
@@ -132,7 +132,7 @@ function handleGet(PDO $pdo): void {
     ];
 
     // Get list
-    $sql = "SELECT s.*, a.account_name, c.client_name, c.matter_number
+    $sql = "SELECT s.*, a.account_name, c.client_name, c.case_number
             FROM trust_staging s
             JOIN accounts a ON s.account_id = a.id
             LEFT JOIN trust_clients c ON s.client_id = c.id
@@ -454,6 +454,15 @@ function handleCsvImport(Database $db, PDO $pdo): void {
                 $description = $type === 'deposit' ? 'Deposit' : 'Check/Withdrawal';
             }
 
+            // Extract check number from description if not already set
+            // Patterns: "CHECK 10715", "CHECK#10715", "CHECK #10715", "CHK 10715"
+            if (empty($reference) && $amount < 0) {
+                if (preg_match('/\b(?:CHECK|CHK|CK)\s*#?\s*(\d+)\b/i', $description, $matches)) {
+                    $reference = $matches[1];
+                    $type = 'check';
+                }
+            }
+
             // Check for duplicates (check# + amount)
             if ($reference) {
                 $dupKey = trim($reference) . '|' . round($amount, 2);
@@ -515,15 +524,22 @@ function handleCsvImport(Database $db, PDO $pdo): void {
             'ip_address' => getClientIp()
         ]);
 
+        // Auto-clear matching transactions (check_number + amount match)
+        $autoCleared = autoMatchAndClearTransactions($db, $pdo, $userId, $accountId, $batchId);
+
         $message = "$imported transactions imported to staging";
         if ($duplicates > 0) {
             $message .= ", $duplicates duplicates skipped";
+        }
+        if ($autoCleared > 0) {
+            $message .= ", $autoCleared auto-cleared";
         }
 
         successResponse([
             'imported' => $imported,
             'skipped' => $skipped,
             'duplicates' => $duplicates,
+            'auto_cleared' => $autoCleared,
             'batch_id' => $batchId,
             'errors' => $errors,
             'skipped_list' => $skippedList
@@ -1121,7 +1137,7 @@ function handleFindMatches(Database $db, PDO $pdo, array $input): void {
     // - Status is 'pending' (not yet cleared)
     $sql = "SELECT t.*,
                    l.client_id,
-                   tc.client_name, tc.matter_number,
+                   tc.client_name, tc.case_number,
                    a.account_name
             FROM trust_transactions t
             JOIN trust_ledger l ON t.ledger_id = l.id
@@ -1288,11 +1304,13 @@ function handleAutoMatch(Database $db, PDO $pdo, array $input): void {
 
     $matches = [];
     $unmatched = [];
+    $matchedTransactionIds = []; // Track already matched transactions to avoid duplicates
 
     foreach ($stagingRecords as $staging) {
-        $match = findBestMatch($db, $pdo, $staging);
+        $match = findBestMatch($db, $pdo, $staging, $matchedTransactionIds);
 
         if ($match) {
+            $matchedTransactionIds[] = $match['transaction']['id']; // Mark this transaction as used
             $matches[] = [
                 'staging' => $staging,
                 'transaction' => $match['transaction'],
@@ -1315,12 +1333,20 @@ function handleAutoMatch(Database $db, PDO $pdo, array $input): void {
 
 /**
  * Find best matching transaction for a staging record
+ * @param array $excludeIds Transaction IDs to exclude (already matched in this batch)
  */
-function findBestMatch(Database $db, PDO $pdo, array $staging): ?array {
+function findBestMatch(Database $db, PDO $pdo, array $staging, array $excludeIds = []): ?array {
     $amount = (float)$staging['amount'];
     $txDate = $staging['transaction_date'];
-    $checkNumber = $staging['check_number'] ?? null;
+    // staging table uses reference_number column for check numbers
+    $checkNumber = $staging['reference_number'] ?? $staging['check_number'] ?? null;
     $accountId = $staging['account_id'];
+
+    // Build exclude clause
+    $excludeClause = '';
+    if (!empty($excludeIds)) {
+        $excludeClause = ' AND t.id NOT IN (' . implode(',', array_map('intval', $excludeIds)) . ')';
+    }
 
     // Priority 1: Check number match (100% confidence)
     if ($checkNumber) {
@@ -1332,6 +1358,7 @@ function findBestMatch(Database $db, PDO $pdo, array $staging): ?array {
                   AND t.check_number = :check_number
                   AND t.status = 'pending'
                   AND (t.staging_id IS NULL OR t.staging_id = 0)
+                  $excludeClause
                 LIMIT 1";
 
         $stmt = $pdo->prepare($sql);
@@ -1364,6 +1391,7 @@ function findBestMatch(Database $db, PDO $pdo, array $staging): ?array {
                   AND (t.staging_id IS NULL OR t.staging_id = 0)
                   AND t.transaction_date BETWEEN DATE_SUB(:tx_date2, INTERVAL 14 DAY)
                                              AND DATE_ADD(:tx_date3, INTERVAL 14 DAY)
+                  $excludeClause
                 ORDER BY days_diff ASC
                 LIMIT 1";
 
@@ -1403,6 +1431,7 @@ function findBestMatch(Database $db, PDO $pdo, array $staging): ?array {
               AND (t.staging_id IS NULL OR t.staging_id = 0)
               AND t.transaction_date BETWEEN DATE_SUB(:tx_date2, INTERVAL 7 DAY)
                                          AND DATE_ADD(:tx_date3, INTERVAL 7 DAY)
+              $excludeClause
             ORDER BY days_diff ASC
             LIMIT 1";
 
@@ -1428,4 +1457,89 @@ function findBestMatch(Database $db, PDO $pdo, array $staging): ?array {
     }
 
     return null;
+}
+
+/**
+ * Auto-match and clear transactions after CSV import
+ * Matches staging records with trust_transactions by check_number + amount
+ * Updates matched transactions to 'cleared' status
+ */
+function autoMatchAndClearTransactions(Database $db, PDO $pdo, int $userId, int $accountId, string $batchId): int {
+    $cleared = 0;
+
+    // Get all staging records from this batch that have a check number
+    $stagingRecords = $db->fetchAll(
+        "SELECT s.* FROM trust_staging s
+         WHERE s.import_batch_id = :batch_id
+         AND s.reference_number IS NOT NULL
+         AND s.reference_number != ''
+         AND s.status = 'unassigned'",
+        ['batch_id' => $batchId]
+    );
+
+    foreach ($stagingRecords as $staging) {
+        $checkNumber = trim($staging['reference_number']);
+        $amount = (float)$staging['amount'];
+
+        // Find matching transaction: same check_number + same amount (or close amount for checks)
+        // For checks (negative amounts), we match the absolute value
+        $sql = "SELECT t.*, l.client_id, l.account_id
+                FROM trust_transactions t
+                JOIN trust_ledger l ON t.ledger_id = l.id
+                WHERE l.account_id = :account_id
+                  AND t.check_number = :check_number
+                  AND t.status IN ('pending', 'printed')
+                  AND (t.staging_id IS NULL OR t.staging_id = 0)
+                LIMIT 1";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            'account_id' => $accountId,
+            'check_number' => $checkNumber
+        ]);
+        $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($transaction) {
+            // Verify amount matches (allow small rounding difference)
+            $txAmount = (float)$transaction['amount'];
+            if (abs($amount - $txAmount) < 0.01) {
+                // Update transaction to cleared
+                $db->update('trust_transactions', [
+                    'status' => 'cleared',
+                    'cleared_date' => $staging['transaction_date'],
+                    'staging_id' => $staging['id']
+                ], 'id = :id', ['id' => $transaction['id']]);
+
+                // Update staging record - link to transaction and mark as posted
+                $db->update('trust_staging', [
+                    'matched_transaction_id' => $transaction['id'],
+                    'client_id' => $transaction['client_id'],
+                    'status' => 'posted',
+                    'posted_at' => date('Y-m-d H:i:s'),
+                    'posted_by' => $userId,
+                    'posted_transaction_id' => $transaction['id']
+                ], 'id = :id', ['id' => $staging['id']]);
+
+                // Log the auto-match
+                $db->insert('trust_audit_log', [
+                    'user_id' => $userId,
+                    'action' => 'auto_cleared',
+                    'entity_type' => 'trust_transactions',
+                    'entity_id' => $transaction['id'],
+                    'client_id' => $transaction['client_id'],
+                    'new_values' => json_encode([
+                        'staging_id' => $staging['id'],
+                        'check_number' => $checkNumber,
+                        'amount' => $amount
+                    ]),
+                    'description' => "Auto-cleared check #{$checkNumber} for \${$amount}",
+                    'ip_address' => getClientIp()
+                ]);
+
+                $cleared++;
+            }
+        }
+    }
+
+    return $cleared;
 }

@@ -363,6 +363,9 @@ function showAddEntityModal(presetType) {
 
     setTimeout(() => modal.classList.add('open'), 10);
 
+    // Setup phone formatting
+    setupEntityPhoneFormatting();
+
     // Focus on first visible field
     const focusField = presetType === 'vendor' ? 'entity-company' : 'entity-name';
     setTimeout(() => document.getElementById(focusField).focus(), 100);
@@ -413,7 +416,7 @@ function populateEditForm(entity) {
     document.getElementById('entity-display-name').value = entity.display_name || '';
     document.getElementById('entity-company').value = entity.company_name || '';
     document.getElementById('entity-email').value = entity.email || '';
-    document.getElementById('entity-phone').value = entity.phone || '';
+    document.getElementById('entity-phone').value = formatEntityPhone(entity.phone || '');
     document.getElementById('entity-fax').value = entity.fax || '';
     document.getElementById('entity-address1').value = entity.address_line1 || '';
     document.getElementById('entity-address2').value = entity.address_line2 || '';
@@ -426,6 +429,9 @@ function populateEditForm(entity) {
     const modal = document.getElementById('entity-modal');
     modal.style.display = 'flex';
     setTimeout(() => modal.classList.add('open'), 10);
+
+    // Setup phone formatting
+    setupEntityPhoneFormatting();
 }
 
 // Close entity modal
@@ -502,7 +508,6 @@ async function saveEntity() {
             // (closeEntityModal clears pendingEntitySource)
             if (!entityId && window.pendingEntitySource === 'trust-check' && result.data?.entity) {
                 const newEntity = result.data.entity;
-                console.log('New entity created from trust-check:', newEntity);
 
                 const payeeInput = document.getElementById('trust-check-payee');
                 const entityIdInput = document.getElementById('trust-check-entity-id');
@@ -584,6 +589,36 @@ async function apiPut(endpoint, data) {
     return response.json();
 }
 
+// Format phone number as (XXX) XXX-XXXX
+function formatEntityPhone(value) {
+    if (!value) return '';
+    // Remove all non-digit characters
+    const digits = value.replace(/\D/g, '');
+    // Limit to 10 digits
+    const limited = digits.substring(0, 10);
+    // Format based on length
+    if (limited.length === 0) {
+        return '';
+    } else if (limited.length <= 3) {
+        return `(${limited}`;
+    } else if (limited.length <= 6) {
+        return `(${limited.substring(0, 3)}) ${limited.substring(3)}`;
+    } else {
+        return `(${limited.substring(0, 3)}) ${limited.substring(3, 6)}-${limited.substring(6)}`;
+    }
+}
+
+// Setup phone formatting on input
+function setupEntityPhoneFormatting() {
+    const phoneInput = document.getElementById('entity-phone');
+    if (phoneInput && !phoneInput.dataset.formattingSetup) {
+        phoneInput.dataset.formattingSetup = 'true';
+        phoneInput.addEventListener('input', (e) => {
+            e.target.value = formatEntityPhone(e.target.value);
+        });
+    }
+}
+
 // Export functions
 window.loadVendorsPage = loadVendorsPage;
 window.loadCustomersPage = loadCustomersPage;
@@ -594,3 +629,4 @@ window.editEntity = editEntity;
 window.closeEntityModal = closeEntityModal;
 window.saveEntity = saveEntity;
 window.deleteEntity = deleteEntity;
+window.formatEntityPhone = formatEntityPhone;

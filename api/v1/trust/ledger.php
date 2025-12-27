@@ -36,7 +36,7 @@ function handleGet(PDO $pdo): void {
         // Get single ledger with recent transactions
         $sql = "SELECT
                     l.*,
-                    c.client_name, c.client_number, c.matter_number, c.matter_description,
+                    c.client_name, c.client_number, c.case_number, c.case_description,
                     a.account_name, a.account_number_last4
                 FROM trust_ledger l
                 JOIN trust_clients c ON l.client_id = c.id
@@ -90,15 +90,21 @@ function handleGet(PDO $pdo): void {
 
     $whereClause = implode(' AND ', $where);
 
+    // Optimized query using LEFT JOIN instead of correlated subqueries
     $sql = "SELECT
                 l.*,
-                c.client_name, c.client_number, c.matter_number,
+                c.client_name, c.client_number, c.case_number,
                 a.account_name, a.account_number_last4,
-                (SELECT COUNT(*) FROM trust_transactions WHERE ledger_id = l.id) as transaction_count,
-                (SELECT MAX(transaction_date) FROM trust_transactions WHERE ledger_id = l.id) as last_activity
+                COALESCE(ts.transaction_count, 0) as transaction_count,
+                ts.last_activity
             FROM trust_ledger l
             JOIN trust_clients c ON l.client_id = c.id
             JOIN accounts a ON l.account_id = a.id
+            LEFT JOIN (
+                SELECT ledger_id, COUNT(*) as transaction_count, MAX(transaction_date) as last_activity
+                FROM trust_transactions
+                GROUP BY ledger_id
+            ) ts ON ts.ledger_id = l.id
             WHERE $whereClause
             ORDER BY c.client_name, a.account_name";
 

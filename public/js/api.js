@@ -1,12 +1,14 @@
 // API Configuration - Auto-detect base path from current URL
-const API_BASE = (() => {
+const APP_BASE = (() => {
     // Get the base path from current location
     const pathParts = window.location.pathname.split('/');
     // Find the app folder (first non-empty path segment that's not 'public' and not a file)
     const appFolder = pathParts.find((part, index) => index > 0 && part !== '' && part !== 'public' && !part.includes('.'));
-    // Return the API base path
-    return appFolder ? '/' + appFolder + '/api/v1' : '/api/v1';
+    // Return the app base path
+    return appFolder ? '/' + appFolder : '';
 })();
+
+const API_BASE = APP_BASE + '/api/v1';
 
 // API Helpers
 async function apiGet(endpoint, params = {}) {
@@ -19,6 +21,9 @@ async function apiGet(endpoint, params = {}) {
 
     try {
         const response = await fetch(url);
+        if (!response.ok) {
+            return { success: false, message: `HTTP ${response.status}: ${response.statusText}` };
+        }
         return await response.json();
     } catch (error) {
         console.error('API GET error:', error);
@@ -30,14 +35,24 @@ async function apiPost(endpoint, data) {
     return apiRequest(endpoint, 'POST', data);
 }
 
-async function apiDelete(endpoint) {
+async function apiDelete(endpoint, data = null) {
     try {
-        const response = await fetch(API_BASE + endpoint, {
+        const options = {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
             }
-        });
+        };
+
+        // If data provided, send as JSON body
+        if (data) {
+            options.body = JSON.stringify(data);
+        }
+
+        const response = await fetch(API_BASE + endpoint, options);
+        if (!response.ok) {
+            return { success: false, message: `HTTP ${response.status}: ${response.statusText}` };
+        }
         return await response.json();
     } catch (error) {
         console.error('API DELETE error:', error);
@@ -61,6 +76,9 @@ async function apiRequest(endpoint, method, data) {
 
     try {
         const response = await fetch(API_BASE + endpoint, options);
+        if (!response.ok) {
+            return { success: false, message: `HTTP ${response.status}: ${response.statusText}` };
+        }
         return await response.json();
     } catch (error) {
         console.error(`API ${method} error:`, error);
@@ -69,9 +87,10 @@ async function apiRequest(endpoint, method, data) {
 }
 
 // Export for module usage
-export { API_BASE, apiGet, apiPost, apiDelete, apiRequest };
+export { APP_BASE, API_BASE, apiGet, apiPost, apiDelete, apiRequest };
 
 // Legacy Compatibility
+window.APP_BASE = APP_BASE;
 window.API_BASE = API_BASE;
 window.apiGet = apiGet;
 window.apiPost = apiPost;

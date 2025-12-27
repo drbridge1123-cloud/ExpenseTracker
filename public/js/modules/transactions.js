@@ -565,7 +565,7 @@ async function showTransactionDetail(id) {
                 <div class="detail-section-title">🧾 Receipt</div>
                 <div class="receipt-preview">
                     ${receipt.file_type.startsWith('image/') ? `
-                        <img src="/ExpensesTracker/${receipt.file_path}" alt="Receipt" onclick="viewReceiptFullscreen('${receipt.file_path}')">
+                        <img src="${APP_BASE}/${receipt.file_path}" alt="Receipt" onclick="viewReceiptFullscreen('${receipt.file_path}')">
                     ` : `
                         <div class="pdf-preview" onclick="viewReceiptFullscreen('${receipt.file_path}')">
                             <span>📄 PDF</span>
@@ -1056,7 +1056,7 @@ async function deleteReceiptFromTransaction(transactionId, receiptId) {
 }
 
 function viewReceiptFullscreen(filePath) {
-    const url = `/ExpensesTracker/${filePath}`;
+    const url = `${APP_BASE}/${filePath}`;
     const isPdf = filePath.toLowerCase().endsWith('.pdf');
 
     if (isPdf) {

@@ -29,9 +29,11 @@ switch ($method) {
 }
 
 function handleGet(PDO $pdo): void {
+    $transactionId = !empty($_GET['id']) ? (int)$_GET['id'] : null;
     $ledgerId = !empty($_GET['ledger_id']) ? (int)$_GET['ledger_id'] : null;
     $accountId = !empty($_GET['account_id']) ? (int)$_GET['account_id'] : null;
     $userId = !empty($_GET['user_id']) ? (int)$_GET['user_id'] : null;
+    $clientId = !empty($_GET['client_id']) ? (int)$_GET['client_id'] : null;
     $startDate = $_GET['start_date'] ?? null;
     $endDate = $_GET['end_date'] ?? null;
     $type = $_GET['type'] ?? null;
@@ -42,6 +44,11 @@ function handleGet(PDO $pdo): void {
 
     $where = ['1=1'];
     $params = [];
+
+    if ($transactionId) {
+        $where[] = 't.id = :transaction_id';
+        $params['transaction_id'] = $transactionId;
+    }
 
     if ($ledgerId) {
         $where[] = 't.ledger_id = :ledger_id';
@@ -56,6 +63,11 @@ function handleGet(PDO $pdo): void {
     if ($userId) {
         $where[] = 't.user_id = :user_id';
         $params['user_id'] = $userId;
+    }
+
+    if ($clientId) {
+        $where[] = 'l.client_id = :client_id';
+        $params['client_id'] = $clientId;
     }
 
     if ($startDate) {
@@ -93,7 +105,7 @@ function handleGet(PDO $pdo): void {
     $sql = "SELECT
                 t.*,
                 l.current_balance as ledger_balance,
-                tc.client_name, tc.matter_number,
+                tc.client_name, tc.case_number,
                 a.account_name
             FROM trust_transactions t
             JOIN trust_ledger l ON t.ledger_id = l.id
@@ -138,25 +150,69 @@ function handlePost(Database $db, PDO $pdo): void {
         }
     }
 
-    $required = ['user_id', 'ledger_id', 'transaction_type', 'amount', 'description', 'transaction_date'];
+    // Either ledger_id or client_id is required
+    $required = ['user_id', 'transaction_type', 'amount', 'description', 'transaction_date'];
     foreach ($required as $field) {
         if (!isset($input[$field]) || ($field !== 'amount' && empty($input[$field]))) {
             errorResponse("Field '$field' is required");
         }
     }
 
-    $validTypes = ['deposit', 'disbursement', 'transfer_in', 'transfer_out', 'earned_fee', 'refund', 'interest', 'adjustment'];
-    if (!in_array($input['transaction_type'], $validTypes)) {
-        errorResponse('Invalid transaction type');
+    // Need either ledger_id or client_id
+    if (empty($input['ledger_id']) && empty($input['client_id'])) {
+        errorResponse("Either 'ledger_id' or 'client_id' is required");
     }
 
-    // Get ledger
-    $ledger = $db->fetch("SELECT l.*, a.account_name FROM trust_ledger l
-                          JOIN accounts a ON l.account_id = a.id
-                          WHERE l.id = :id", ['id' => $input['ledger_id']]);
-    if (!$ledger) {
-        errorResponse('Ledger not found', 404);
+    $validTypes = ['deposit', 'disbursement', 'check', 'transfer_in', 'transfer_out', 'earned_fee', 'refund', 'interest', 'adjustment', 'payout', 'legal_fee', 'cost', 'bill'];
+    if (!in_array($input['transaction_type'], $validTypes)) {
+        errorResponse('Invalid transaction type: ' . $input['transaction_type']);
     }
+
+    // Get ledger - either by ledger_id or by client_id
+    if (!empty($input['ledger_id'])) {
+        $ledger = $db->fetch("SELECT l.*, a.account_name FROM trust_ledger l
+                              JOIN accounts a ON l.account_id = a.id
+                              WHERE l.id = :id", ['id' => $input['ledger_id']]);
+    } else {
+        // Find ledger by client_id (use first active ledger for this client)
+        $ledger = $db->fetch("SELECT l.*, a.account_name FROM trust_ledger l
+                              JOIN accounts a ON l.account_id = a.id
+                              WHERE l.client_id = :client_id AND l.is_active = 1
+                              ORDER BY l.id ASC LIMIT 1", ['client_id' => $input['client_id']]);
+    }
+
+    if (!$ledger) {
+        // Auto-create ledger for this client if it doesn't exist
+        $clientId = (int)$input['client_id'];
+        $userId = (int)$input['user_id'];
+
+        // Get default IOLTA account
+        $account = $db->fetch(
+            "SELECT id FROM accounts WHERE user_id = :user_id AND account_type = 'iolta' LIMIT 1",
+            ['user_id' => $userId]
+        );
+
+        if (!$account) {
+            errorResponse('No IOLTA account found. Please create an IOLTA account first.');
+        }
+
+        // Create ledger for this client
+        $newLedgerId = $db->insert('trust_ledger', [
+            'user_id' => $userId,
+            'client_id' => $clientId,
+            'account_id' => $account['id'],
+            'current_balance' => 0,
+            'is_active' => 1
+        ]);
+
+        // Fetch the newly created ledger
+        $ledger = $db->fetch("SELECT l.*, a.account_name FROM trust_ledger l
+                              JOIN accounts a ON l.account_id = a.id
+                              WHERE l.id = :id", ['id' => $newLedgerId]);
+    }
+
+    // Store the ledger_id for use in transaction
+    $input['ledger_id'] = $ledger['id'];
 
     if (!$ledger['is_active']) {
         errorResponse('Cannot add transactions to closed ledger');
@@ -197,6 +253,7 @@ function handlePost(Database $db, PDO $pdo): void {
             'received_from' => $input['received_from'] ?? null,
             'reference_number' => $input['reference_number'] ?? null,
             'check_number' => $input['check_number'] ?? null,
+            'status' => $input['status'] ?? 'pending',
             'transaction_date' => $input['transaction_date'],
             'cleared_date' => $input['cleared_date'] ?? null,
             'memo' => $input['memo'] ?? null,
@@ -276,7 +333,7 @@ function handlePut(Database $db, PDO $pdo): void {
         $params = ['id' => $transId];
 
         // Allowed update fields
-        $allowedFields = ['transaction_date', 'description', 'memo', 'reference_number', 'check_number', 'payee', 'status'];
+        $allowedFields = ['transaction_date', 'description', 'memo', 'reference_number', 'check_number', 'payee', 'status', 'transaction_type'];
 
         foreach ($allowedFields as $field) {
             if (isset($input[$field])) {
@@ -778,7 +835,7 @@ function handleUpdateAction(Database $db, PDO $pdo, array $input): void {
         $params = ['id' => $transId];
 
         // Allowed update fields
-        $allowedFields = ['transaction_date', 'description', 'memo', 'reference_number', 'check_number', 'payee'];
+        $allowedFields = ['transaction_date', 'description', 'memo', 'reference_number', 'check_number', 'payee', 'status', 'transaction_type'];
 
         foreach ($allowedFields as $field) {
             if (isset($input[$field])) {
@@ -840,6 +897,18 @@ function handleUpdateAction(Database $db, PDO $pdo, array $input): void {
 
             // Recalculate running balances for subsequent transactions
             recalculateRunningBalances($db, $existing['ledger_id'], $existing['transaction_date'], $transId);
+        }
+
+        // If status was updated and transaction has a check_number, sync to trust_checks
+        if (isset($input['status']) && !empty($existing['check_number'])) {
+            $db->query(
+                "UPDATE trust_checks SET status = :status WHERE ledger_id = :ledger_id AND check_number = :check_number",
+                [
+                    'status' => $input['status'],
+                    'ledger_id' => $existing['ledger_id'],
+                    'check_number' => $existing['check_number']
+                ]
+            );
         }
 
         // Audit log

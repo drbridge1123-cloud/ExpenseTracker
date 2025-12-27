@@ -30,8 +30,11 @@ switch ($reportType) {
     case 'balance_summary':
         getBalanceSummary($pdo);
         break;
+    case 'client_breakdown':
+        getClientBreakdown($pdo);
+        break;
     default:
-        errorResponse('Invalid report type. Use: client_statement, account_summary, audit_trail, balance_summary');
+        errorResponse('Invalid report type. Use: client_statement, account_summary, audit_trail, balance_summary, client_breakdown');
 }
 
 /**
@@ -49,7 +52,7 @@ function getClientStatement(PDO $pdo): void {
     // Get ledger info
     $ledgerSql = "SELECT
                     l.*,
-                    c.client_name, c.client_number, c.matter_number, c.matter_description,
+                    c.client_name, c.client_number, c.case_number, c.case_description,
                     c.contact_email, c.address,
                     a.account_name, a.account_number_last4
                   FROM trust_ledger l
@@ -140,7 +143,7 @@ function getAccountSummary(PDO $pdo): void {
     // Get all client ledgers
     $ledgerSql = "SELECT
                     l.*,
-                    c.client_name, c.client_number, c.matter_number,
+                    c.client_name, c.client_number, c.case_number,
                     (SELECT COUNT(*) FROM trust_transactions WHERE ledger_id = l.id) as transaction_count,
                     (SELECT MAX(transaction_date) FROM trust_transactions WHERE ledger_id = l.id) as last_activity
                   FROM trust_ledger l
@@ -253,7 +256,8 @@ function getAuditTrail(PDO $pdo): void {
 function getBalanceSummary(PDO $pdo): void {
     $userId = !empty($_GET['user_id']) ? (int)$_GET['user_id'] : null;
 
-    $where = ["a.account_type IN ('iolta', 'trust')"];
+    // Only get actual IOLTA bank accounts, not client sub-accounts marked as 'trust'
+    $where = ["a.account_type = 'iolta'"];
     $params = [];
 
     if ($userId) {
@@ -308,4 +312,253 @@ function getBalanceSummary(PDO $pdo): void {
         ],
         'generated_at' => date('Y-m-d H:i:s')
     ]);
+}
+
+/**
+ * Client breakdown - detailed analysis by Legal Fee, Cost, and Client Payout
+ * Shows remaining balances categorized by type
+ */
+function getClientBreakdown(PDO $pdo): void {
+    $userId = !empty($_GET['user_id']) ? (int)$_GET['user_id'] : null;
+    $balanceFilter = $_GET['balance_filter'] ?? 'all'; // all, zero, nonzero
+
+    if (!$userId) {
+        errorResponse('user_id is required');
+    }
+
+    // Get all client ledgers with their current balances
+    $ledgerSql = "SELECT
+                    l.id as ledger_id,
+                    l.current_balance,
+                    l.is_active,
+                    c.id as client_id,
+                    c.client_name,
+                    c.case_number,
+                    c.is_active as client_active
+                  FROM trust_ledger l
+                  JOIN trust_clients c ON l.client_id = c.id
+                  WHERE l.user_id = :user_id
+                  ORDER BY c.case_number DESC, c.client_name";
+
+    $ledgerStmt = $pdo->prepare($ledgerSql);
+    $ledgerStmt->execute(['user_id' => $userId]);
+    $ledgers = $ledgerStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // First pass: count all clients for filter buttons
+    $allClientsCount = count($ledgers);
+    $clientsWithBalanceCount = 0;
+    $clientsZeroBalanceCount = 0;
+    foreach ($ledgers as $ledger) {
+        if (abs((float)$ledger['current_balance']) < 0.01) {
+            $clientsZeroBalanceCount++;
+        } else {
+            $clientsWithBalanceCount++;
+        }
+    }
+
+    // For each ledger, calculate breakdown of remaining balance
+    $clients = [];
+    $totals = [
+        'total_balance' => 0,
+        'total_legal_fee' => 0,
+        'total_cost' => 0,
+        'total_client_payout' => 0,
+        'clients_with_balance' => $clientsWithBalanceCount,
+        'clients_zero_balance' => $clientsZeroBalanceCount,
+        'total_clients' => $allClientsCount
+    ];
+
+    foreach ($ledgers as $ledger) {
+        $ledgerId = $ledger['ledger_id'];
+        $currentBalance = (float)$ledger['current_balance'];
+
+        // Apply balance filter
+        if ($balanceFilter === 'zero' && abs($currentBalance) >= 0.01) continue;
+        if ($balanceFilter === 'nonzero' && abs($currentBalance) < 0.01) continue;
+
+        // Get all transactions for this ledger to calculate what's pending
+        $transSql = "SELECT
+                        t.transaction_type,
+                        t.amount,
+                        t.payee,
+                        t.description,
+                        t.status
+                     FROM trust_transactions t
+                     WHERE t.ledger_id = :ledger_id
+                     ORDER BY t.transaction_date, t.id";
+
+        $transStmt = $pdo->prepare($transSql);
+        $transStmt->execute(['ledger_id' => $ledgerId]);
+        $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Calculate totals by type
+        $totalDeposits = 0;
+        $legalFeePaid = 0;
+        $costPaid = 0;
+        $clientPayoutPaid = 0;
+
+        foreach ($transactions as $trans) {
+            $amount = (float)$trans['amount'];
+            $txType = $trans['transaction_type'] ?? '';
+
+            if ($amount > 0) {
+                // Deposit
+                $totalDeposits += $amount;
+            } else {
+                // Disbursement - categorize by transaction_type first, then fallback to payee analysis
+                $absAmount = abs($amount);
+
+                // Primary: Use explicit transaction_type
+                if ($txType === 'legal_fee' || $txType === 'earned_fee') {
+                    $legalFeePaid += $absAmount;
+                } elseif ($txType === 'cost') {
+                    $costPaid += $absAmount;
+                } elseif ($txType === 'payout') {
+                    $clientPayoutPaid += $absAmount;
+                } else {
+                    // Fallback for old data: analyze payee/description
+                    $payee = strtolower($trans['payee'] ?? '');
+                    $desc = strtolower($trans['description'] ?? '');
+
+                    if (strpos($payee, 'bridge law') !== false ||
+                        strpos($desc, 'legal fee') !== false) {
+                        $legalFeePaid += $absAmount;
+                    } elseif (isMedialProvider($payee) || isCostPayment($payee, $desc)) {
+                        $costPaid += $absAmount;
+                    } else {
+                        $clientPayoutPaid += $absAmount;
+                    }
+                }
+            }
+        }
+
+        // Calculate remaining amounts (what's still in the balance)
+        // The current balance represents funds still held
+
+        // For cases with remaining balance, estimate what it's for
+        // based on typical settlement structure
+        $legalFeeRemaining = 0;
+        $costRemaining = 0;
+        $clientPayoutRemaining = $currentBalance; // Default: all to client
+
+        // If there's a positive balance, it's typically waiting to be disbursed
+        if ($currentBalance > 0) {
+            // Check pending disbursements
+            $pendingSql = "SELECT
+                            t.payee,
+                            t.description,
+                            t.transaction_type,
+                            ABS(t.amount) as amount
+                           FROM trust_transactions t
+                           WHERE t.ledger_id = :ledger_id
+                           AND t.status = 'pending'
+                           AND t.amount < 0";
+            $pendingStmt = $pdo->prepare($pendingSql);
+            $pendingStmt->execute(['ledger_id' => $ledgerId]);
+            $pendingTrans = $pendingStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($pendingTrans as $pending) {
+                $amount = (float)$pending['amount'];
+                $txType = $pending['transaction_type'] ?? '';
+
+                // Primary: Use explicit transaction_type
+                if ($txType === 'legal_fee' || $txType === 'earned_fee') {
+                    $legalFeeRemaining += $amount;
+                } elseif ($txType === 'cost') {
+                    $costRemaining += $amount;
+                } elseif ($txType === 'payout') {
+                    // Don't add to clientPayoutRemaining here - handled below
+                } else {
+                    // Fallback for old data
+                    $payee = strtolower($pending['payee'] ?? '');
+                    $desc = strtolower($pending['description'] ?? '');
+
+                    if (strpos($payee, 'bridge law') !== false ||
+                        strpos($desc, 'legal fee') !== false) {
+                        $legalFeeRemaining += $amount;
+                    } elseif (isMedialProvider($payee) || isCostPayment($payee, $desc)) {
+                        $costRemaining += $amount;
+                    }
+                }
+            }
+
+            // Adjust client payout remaining (total balance minus identified pending)
+            $identifiedPending = $legalFeeRemaining + $costRemaining;
+            $clientPayoutRemaining = max(0, $currentBalance - $identifiedPending);
+        }
+
+        $clientData = [
+            'client_id' => $ledger['client_id'],
+            'ledger_id' => $ledgerId,
+            'client_name' => $ledger['client_name'],
+            'case_number' => $ledger['case_number'],
+            'current_balance' => $currentBalance,
+            'is_active' => $ledger['is_active'] && $ledger['client_active'],
+            'total_deposits' => $totalDeposits,
+            'legal_fee_paid' => $legalFeePaid,
+            'cost_paid' => $costPaid,
+            'client_payout_paid' => $clientPayoutPaid,
+            'legal_fee_remaining' => $legalFeeRemaining,
+            'cost_remaining' => $costRemaining,
+            'client_payout_remaining' => $clientPayoutRemaining
+        ];
+
+        $clients[] = $clientData;
+
+        // Update filtered totals (only for clients matching filter)
+        $totals['total_balance'] += $currentBalance;
+        $totals['total_legal_fee'] += $legalFeeRemaining;
+        $totals['total_cost'] += $costRemaining;
+        $totals['total_client_payout'] += $clientPayoutRemaining;
+    }
+
+    successResponse([
+        'client_breakdown' => [
+            'clients' => $clients,
+            'totals' => $totals,
+            'filter' => $balanceFilter
+        ],
+        'generated_at' => date('Y-m-d H:i:s')
+    ]);
+}
+
+/**
+ * Check if payee is a medical provider (for Cost categorization)
+ */
+function isMedialProvider(string $payee): bool {
+    $medicalKeywords = [
+        'chiropractic', 'chiropractor', 'd.c.', 'dc,',
+        'medical', 'imaging', 'radiology', 'diagnostic',
+        'physical therapy', 'therapy', 'rehab',
+        'hospital', 'clinic', 'health',
+        'pain', 'orthopedic', 'spine',
+        'acupuncture', 'l.ac', 'lac,',
+        'optum', 'ati physical'
+    ];
+
+    foreach ($medicalKeywords as $keyword) {
+        if (strpos($payee, $keyword) !== false) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Check if payment is a cost/expense (not client payout)
+ */
+function isCostPayment(string $payee, string $desc): bool {
+    $costKeywords = [
+        'records', 'copy service', 'subpoena',
+        'filing fee', 'court cost', 'expert',
+        'interpreter', 'translation',
+        'police report', 'medical record'
+    ];
+
+    foreach ($costKeywords as $keyword) {
+        if (strpos($payee, $keyword) !== false || strpos($desc, $keyword) !== false) {
+            return true;
+        }
+    }
+    return false;
 }

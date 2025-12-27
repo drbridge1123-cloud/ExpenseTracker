@@ -567,7 +567,6 @@ async function downloadDocument(type) {
  */
 async function downloadPnlExcel(data) {
     // Check if ExcelJS is available
-    console.log('ExcelJS check:', typeof ExcelJS, typeof window.ExcelJS);
     if (typeof ExcelJS === 'undefined' && typeof window.ExcelJS === 'undefined') {
         console.warn('ExcelJS not loaded, falling back to CSV');
         const csv = generatePnlCsv(data);

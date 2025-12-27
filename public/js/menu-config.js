@@ -4,69 +4,6 @@
  */
 
 const menuConfigs = {
-    personal: {
-        label: 'Personal Account',
-        icon: '💰',
-        color: '#6366f1',
-        sections: [
-            {
-                id: 'money',
-                label: 'MONEY',
-                items: [
-                    { page: 'transactions', icon: '💳', label: 'Transactions' },
-                    { page: 'accounts', icon: '🏛', label: 'Accounts' },
-                    { page: 'categories', icon: '📊', label: 'Chart of Accounts' }
-                ]
-            },
-            {
-                id: 'tools',
-                label: 'TOOLS',
-                collapsible: true,
-                defaultExpanded: true,
-                items: [
-                    { page: 'rules', icon: '⚙️', label: 'Rules' },
-                    { page: 'budgets', icon: '💰', label: 'Budgets' },
-                    { page: 'recurring', icon: '🔄', label: 'Recurring' },
-                    { page: 'checks', icon: '✏️', label: 'Write Checks' },
-                    { page: 'receipts', icon: '🧾', label: 'Receipts' },
-                    { page: 'reconcile', icon: '✅', label: 'Reconcile' },
-                    { page: 'data-management', icon: '💾', label: 'Data Management' }
-                ]
-            },
-            {
-                id: 'contacts',
-                label: 'CONTACTS',
-                collapsible: true,
-                defaultExpanded: true,
-                items: [
-                    { page: 'vendors', icon: '🏢', label: 'Vendors' },
-                    { page: 'customers', icon: '👤', label: 'Customers' },
-                    { page: 'employees', icon: '👔', label: 'Employees' }
-                ]
-            },
-            {
-                id: 'reports',
-                label: 'REPORTS',
-                collapsible: true,
-                defaultExpanded: false,
-                items: [
-                    { page: 'reports', icon: '📈', label: 'Reports' },
-                    { page: 'cpa-portal', icon: '👤', label: 'CPA Portal' }
-                ]
-            },
-            {
-                id: 'admin',
-                label: 'ADMIN',
-                collapsible: true,
-                defaultExpanded: false,
-                adminOnly: true,
-                items: [
-                    { page: 'admin', icon: '⚙️', label: 'Settings' }
-                ]
-            }
-        ]
-    },
-
     iolta: {
         label: 'IOLTA Account',
         icon: '⚖️',
@@ -76,10 +13,7 @@ const menuConfigs = {
                 id: 'trust',
                 label: 'TRUST',
                 items: [
-                    { page: 'trust-operations', icon: '💼', label: 'Operations' },
-                    { page: 'client-ledger', icon: '📄', label: 'Client Ledger' }
-                    // Import & Post removed - now integrated into Client Ledger
-                    // { page: 'trust-staging', icon: '📦', label: 'Import & Post' }
+                    { page: 'iolta', icon: '⚖️', label: 'Trust Ledger' }
                 ]
             },
             {
@@ -178,14 +112,8 @@ const menuConfigs = {
                 id: 'trust',
                 label: 'COST',
                 items: [
-                    { page: 'cost-client-ledger', icon: '📄', label: 'Client Ledger' }
-                ]
-            },
-            {
-                id: 'operations',
-                label: 'OPERATIONS',
-                items: [
-                    { page: 'cost-operations', icon: '💼', label: 'Operations' }
+                    { page: 'cost-client-ledger', icon: '📄', label: 'Client Ledger' },
+                    { page: 'cost-accounts', icon: '🏦', label: 'Accounts' }
                 ]
             },
             {
@@ -226,7 +154,7 @@ const menuConfigs = {
  * Get menu configuration for an account type
  */
 function getMenuConfig(accountType) {
-    return menuConfigs[accountType] || menuConfigs.personal;
+    return menuConfigs[accountType] || menuConfigs.general;
 }
 
 /**

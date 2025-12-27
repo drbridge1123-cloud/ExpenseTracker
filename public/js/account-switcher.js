@@ -12,7 +12,6 @@ let userIsAdmin = false;
 
 // Account type to permission mapping
 const accountTypePermissions = {
-    personal: 'account_type.personal',
     iolta: 'account_type.iolta',
     general: 'account_type.general',
     cost: 'account_type.cost'
@@ -54,7 +53,7 @@ function hasAccountTypePermission(accountType) {
  * Get allowed account types for current user
  */
 function getAllowedAccountTypes() {
-    const allTypes = ['iolta', 'personal', 'general', 'cost'];
+    const allTypes = ['iolta', 'general', 'cost'];
     return allTypes.filter(type => hasAccountTypePermission(type));
 }
 
@@ -101,7 +100,6 @@ function updateAccountTypeDropdown(allowedTypes) {
     if (!dropdown || !optionsContainer) return;
 
     const accountTypeInfo = {
-        personal: { icon: '💰', label: 'Personal Account' },
         iolta: { icon: '⚖️', label: 'IOLTA Account' },
         general: { icon: '🏢', label: 'General Account' },
         cost: { icon: '💵', label: 'Cost Account' }
@@ -139,7 +137,7 @@ function updateAccountTypeDropdown(allowedTypes) {
  * Switch to a different account type
  */
 function switchAccountType(newType) {
-    if (!['personal', 'iolta', 'general', 'cost'].includes(newType)) {
+    if (!['iolta', 'general', 'cost'].includes(newType)) {
         console.error('Invalid account type:', newType);
         return;
     }
@@ -257,7 +255,7 @@ function renderSidebarMenu(accountType) {
     dynamicMenu.innerHTML = menuHTML;
 
     // Re-show admin section for admins if applicable
-    if (accountType === 'personal') {
+    if (accountType === 'general') {
         const adminSection = document.getElementById('nav-admin-section');
         if (adminSection && typeof state !== 'undefined' && state.isAdmin) {
             adminSection.style.display = 'block';
@@ -289,7 +287,6 @@ function toggleSection(sectionId) {
  */
 function updatePageTitle(accountType) {
     const titles = {
-        personal: 'Personal Finance Management',
         iolta: 'IOLTA Trust Accounting',
         general: 'Business Expense Management',
         cost: 'Cost & Billing Management'
@@ -322,7 +319,6 @@ function clearTypeSpecificState(previousType) {
  */
 function showAccountTypeNotification(accountType) {
     const names = {
-        personal: 'Personal Account',
         iolta: 'IOLTA Account',
         general: 'General Account',
         cost: 'Cost Account'

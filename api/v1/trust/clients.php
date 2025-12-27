@@ -86,12 +86,15 @@ function handleGet(PDO $pdo): void {
     $sql = "SELECT
                 c.*,
                 COUNT(DISTINCT l.id) as ledger_count,
-                COALESCE(SUM(l.current_balance), 0) as total_balance
+                COALESCE(SUM(l.current_balance), 0) as total_balance,
+                (SELECT COUNT(*) FROM trust_transactions t WHERE t.ledger_id IN
+                    (SELECT id FROM trust_ledger WHERE client_id = c.id)
+                ) as transaction_count
             FROM trust_clients c
             LEFT JOIN trust_ledger l ON c.id = l.client_id AND l.is_active = 1
             WHERE $whereClause
             GROUP BY c.id
-            ORDER BY c.client_name";
+            ORDER BY c.case_number DESC, c.client_name";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -101,6 +104,7 @@ function handleGet(PDO $pdo): void {
     foreach ($clients as &$client) {
         $client['total_balance'] = (float)$client['total_balance'];
         $client['ledger_count'] = (int)$client['ledger_count'];
+        $client['transaction_count'] = (int)$client['transaction_count'];
     }
 
     successResponse([
@@ -119,13 +123,13 @@ function handlePost(Database $db): void {
         }
     }
 
-    // Check for duplicate matter number
-    if (!empty($input['matter_number'])) {
-        if ($db->exists('trust_clients', 'user_id = :user_id AND matter_number = :matter', [
+    // Check for duplicate case number
+    if (!empty($input['case_number'])) {
+        if ($db->exists('trust_clients', 'user_id = :user_id AND case_number = :case_num', [
             'user_id' => $input['user_id'],
-            'matter' => $input['matter_number']
+            'case_num' => $input['case_number']
         ])) {
-            errorResponse('Matter number already exists');
+            errorResponse('Case number already exists');
         }
     }
 
@@ -137,8 +141,8 @@ function handlePost(Database $db): void {
         'entity_id' => $entityId,
         'client_number' => $input['client_number'] ?? null,
         'client_name' => sanitize($input['client_name']),
-        'matter_number' => $input['matter_number'] ?? null,
-        'matter_description' => $input['matter_description'] ?? null,
+        'case_number' => $input['case_number'] ?? null,
+        'case_description' => $input['case_description'] ?? null,
         'contact_email' => $input['contact_email'] ?? null,
         'contact_phone' => $input['contact_phone'] ?? null,
         'address' => $input['address'] ?? null,
@@ -166,8 +170,8 @@ function handlePost(Database $db): void {
         ]);
 
         // Create Trust Sub-Account in accounts table (QuickBooks-style)
-        $matterNumber = $clientData['matter_number'] ?: 'C' . $clientId;
-        $accountName = $matterNumber . ' ' . $clientData['client_name'];
+        $caseNumber = $clientData['case_number'] ?: 'C' . $clientId;
+        $accountName = $caseNumber . ' ' . $clientData['client_name'];
 
         $db->insert('accounts', [
             'user_id' => (int)$input['user_id'],
@@ -210,19 +214,19 @@ function handlePut(Database $db): void {
         errorResponse('Client not found', 404);
     }
 
-    // Check for duplicate matter number (excluding current)
-    if (!empty($input['matter_number'])) {
-        if ($db->exists('trust_clients', 'user_id = :user_id AND matter_number = :matter AND id != :id', [
+    // Check for duplicate case number (excluding current)
+    if (!empty($input['case_number'])) {
+        if ($db->exists('trust_clients', 'user_id = :user_id AND case_number = :case_num AND id != :id', [
             'user_id' => $existing['user_id'],
-            'matter' => $input['matter_number'],
+            'case_num' => $input['case_number'],
             'id' => $clientId
         ])) {
-            errorResponse('Matter number already exists');
+            errorResponse('Case number already exists');
         }
     }
 
     $updateData = [];
-    $allowedFields = ['client_number', 'client_name', 'matter_number', 'matter_description',
+    $allowedFields = ['client_number', 'client_name', 'case_number', 'case_description',
                       'contact_email', 'contact_phone', 'address', 'notes', 'is_active'];
 
     foreach ($allowedFields as $field) {

@@ -110,7 +110,7 @@ function importClients(PDO $pdo, $file, array $header, int $userId): array {
     }
 
     // Optional columns - support multiple naming conventions
-    $matterIdx = $findColumn(['matter_number', 'matternumber', 'matter', 'case_number', 'casenumber', 'case number', 'matter number', 'case #', 'case#']);
+    $caseIdx = $findColumn(['case_number', 'casenumber', 'case number', 'case #', 'case#', 'matter_number', 'matternumber', 'matter', 'matter number']);
     $emailIdx = $findColumn(['contact_email', 'email', 'e-mail', 'contact email']);
     $phoneIdx = $findColumn(['contact_phone', 'phone', 'telephone', 'tel', 'contact phone']);
     $addressIdx = $findColumn(['address', 'addr', 'street', 'street_address']);
@@ -139,15 +139,15 @@ function importClients(PDO $pdo, $file, array $header, int $userId): array {
         $data = [
             'user_id' => $userId,
             'client_name' => $clientName,
-            'matter_number' => $matterIdx !== false ? trim($row[$matterIdx] ?? '') : null,
+            'case_number' => $caseIdx !== false ? trim($row[$caseIdx] ?? '') : null,
             'contact_email' => $emailIdx !== false ? trim($row[$emailIdx] ?? '') : null,
             'contact_phone' => $phoneIdx !== false ? trim($row[$phoneIdx] ?? '') : null,
             'address' => $addressIdx !== false ? trim($row[$addressIdx] ?? '') : null,
             'is_active' => $statusIdx !== false ? (strtolower(trim($row[$statusIdx] ?? '')) !== 'inactive') : true
         ];
 
-        $sql = "INSERT INTO trust_clients (user_id, client_name, matter_number, contact_email, contact_phone, address, is_active, created_at)
-                VALUES (:user_id, :client_name, :matter_number, :contact_email, :contact_phone, :address, :is_active, NOW())";
+        $sql = "INSERT INTO trust_clients (user_id, client_name, case_number, contact_email, contact_phone, address, is_active, created_at)
+                VALUES (:user_id, :client_name, :case_number, :contact_email, :contact_phone, :address, :is_active, NOW())";
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($data);
@@ -161,8 +161,8 @@ function importClients(PDO $pdo, $file, array $header, int $userId): array {
 
         if ($ioltaAccount) {
             // Create account name: "CaseNumber ClientName" (e.g., "200556 An, Do Want")
-            $matterNumber = $data['matter_number'] ?: 'C' . $clientId;
-            $accountName = $matterNumber . ' ' . $clientName;
+            $caseNumber = $data['case_number'] ?: 'C' . $clientId;
+            $accountName = $caseNumber . ' ' . $clientName;
 
             // Insert trust sub-account
             $accountSql = "INSERT INTO accounts (user_id, parent_account_id, linked_client_id, account_name, account_type, current_balance, is_active, created_at)

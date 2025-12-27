@@ -116,9 +116,9 @@ function handlePost(Database $db, PDO $pdo): void {
     $transactionType = $data['transaction_type'] ?? 'payout';
 
     // Validate transaction type
-    $validTypes = ['payout', 'legal_fee', 'disbursement', 'earned_fee'];
+    $validTypes = ['payout', 'legal_fee', 'cost', 'disbursement', 'earned_fee', 'bill'];
     if (!in_array($transactionType, $validTypes)) {
-        $transactionType = 'payout';
+        $transactionType = 'disbursement';
     }
 
     // Validation
@@ -202,6 +202,15 @@ function handlePost(Database $db, PDO $pdo): void {
                 $updateLedgerStmt->execute(['diff' => $amountDiff, 'id' => $ledgerId]);
             }
 
+            // Also update the corresponding trust_transactions status
+            $updateTransSql = "UPDATE trust_transactions SET status = :status WHERE ledger_id = :ledger_id AND check_number = :check_number";
+            $updateTransStmt = $pdo->prepare($updateTransSql);
+            $updateTransStmt->execute([
+                'status' => $status,
+                'ledger_id' => $ledgerId,
+                'check_number' => $checkNumber
+            ]);
+
             // Audit log
             logTrustAudit($pdo, $userId, 'check_updated', $ledger['client_id'], $checkId, [
                 'check_number' => $checkNumber,
@@ -250,7 +259,7 @@ function handlePost(Database $db, PDO $pdo): void {
                 'transaction_type' => $transactionType,
                 'amount' => -$amount,
                 'date' => $checkDate,
-                'desc' => "Check #$checkNumber to $payee" . ($memo ? " - $memo" : ''),
+                'desc' => $memo ?: '',
                 'ref' => "CHK-$checkNumber",
                 'check_number' => $checkNumber,
                 'status' => $status,

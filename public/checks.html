@@ -176,21 +176,10 @@
         .check-paper {
             background: var(--bg-paper);
             border: 2px solid var(--border-gold);
-            border-radius: 2px;
-            padding: 30px;
+            border-radius: 4px;
+            padding: 32px 40px;
             position: relative;
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        }
-
-        .check-paper::before {
-            content: '';
-            position: absolute;
-            top: 8px;
-            left: 8px;
-            right: 8px;
-            bottom: 8px;
-            border: 1px solid var(--border-light);
-            pointer-events: none;
         }
 
         .check-inner {
@@ -201,9 +190,11 @@
         /* Check Header Row */
         .check-header-row {
             display: flex;
-            justify-content: flex-end;
-            gap: 30px;
-            margin-bottom: 24px;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--text-navy);
         }
 
         .check-field-group {
@@ -213,27 +204,25 @@
         }
 
         .check-field-label {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
-            color: var(--text-muted);
+            color: var(--text-navy);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
         }
 
         .check-field-input {
             font-family: 'Source Sans 3', sans-serif;
-            font-size: 15px;
+            font-size: 16px;
+            font-weight: 600;
             color: var(--text-navy);
             border: none;
-            border-bottom: 1px solid var(--border-light);
             background: transparent;
-            padding: 6px 10px;
-            transition: border-color 0.2s;
+            padding: 4px 8px;
         }
 
         .check-field-input:focus {
             outline: none;
-            border-bottom-color: var(--border-gold);
         }
 
         .check-field-input.number-input {
@@ -249,53 +238,63 @@
         .payto-row {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
+            gap: 16px;
+            margin-bottom: 20px;
         }
 
         .payto-label {
             font-size: 11px;
             font-weight: 600;
-            color: var(--text-muted);
+            color: var(--text-navy);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
             white-space: nowrap;
         }
 
-        .payto-input {
+        .payto-input-wrapper {
             flex: 1;
-            font-family: 'Source Sans 3', sans-serif;
-            font-size: 16px;
+            border-bottom: 1px solid var(--text-navy);
+        }
+
+        .payto-input {
+            width: 100%;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 20px;
+            font-style: italic;
             color: var(--text-navy);
             border: none;
-            border-bottom: 1px solid #888;
             background: transparent;
             padding: 8px 4px;
         }
 
+        .payto-input::placeholder {
+            color: #a0a0a0;
+        }
+
         .payto-input:focus {
             outline: none;
-            border-bottom-color: var(--border-gold);
         }
 
         .amount-box {
             border: 2px solid var(--text-navy);
-            padding: 8px 12px;
-            min-width: 120px;
+            padding: 8px 16px;
+            min-width: 140px;
             display: flex;
             align-items: center;
+            background: #fff;
+            border-radius: 2px;
         }
 
         .amount-box-symbol {
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 600;
             color: var(--text-navy);
-            margin-right: 4px;
+            margin-right: 8px;
         }
 
         .amount-box-input {
-            font-family: 'Source Sans 3', sans-serif;
-            font-size: 18px;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 22px;
             font-weight: 600;
             color: var(--text-navy);
             border: none;
@@ -308,68 +307,101 @@
             outline: none;
         }
 
-        /* Amount Words */
-        .amount-words-row {
+        .amount-box-input::placeholder {
+            color: #a0a0a0;
+        }
+
+        /* Amount Row - Combined amount box and words */
+        .amount-row {
             display: flex;
-            align-items: baseline;
-            gap: 8px;
-            margin-bottom: 20px;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .amount-words-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--text-navy);
+            padding-bottom: 8px;
         }
 
         .amount-words-input {
             flex: 1;
             font-family: 'Cormorant Garamond', serif;
-            font-size: 15px;
+            font-size: 16px;
             font-style: italic;
-            color: var(--text-dark);
+            color: var(--text-navy);
             border: none;
-            border-bottom: 1px solid #888;
             background: transparent;
-            padding: 6px 4px;
+            padding: 6px 0;
+            text-transform: uppercase;
         }
 
         .amount-words-input:focus {
             outline: none;
         }
 
+        .amount-words-input::placeholder {
+            color: #a0a0a0;
+            text-transform: uppercase;
+        }
+
         .amount-words-suffix {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             color: var(--text-navy);
             text-transform: uppercase;
             letter-spacing: 1px;
         }
 
-        /* Address Section */
-        .address-section {
-            margin-bottom: 20px;
+        /* Bottom Section: Address, Memo, Signature */
+        .check-bottom-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 40px;
         }
 
-        .address-label {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
+        .check-bottom-left {
+            flex: 1;
+            max-width: 450px;
+        }
+
+        .check-bottom-right {
+            width: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
         }
 
         .address-box {
             width: 280px;
-            height: 72px;
-            border: 1px solid var(--border-light);
-            background: rgba(255,255,255,0.5);
-            padding: 8px 10px;
+            height: 56px;
+            border: none !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            outline: none !important;
+            padding: 8px 0;
             font-family: 'Source Sans 3', sans-serif;
             font-size: 13px;
             color: var(--text-navy);
             resize: none;
             line-height: 1.5;
+            margin-bottom: 16px;
+        }
+
+        .address-box::placeholder {
+            color: #a0a0a0;
+            font-style: italic;
         }
 
         .address-box:focus {
-            outline: none;
-            border-color: var(--border-gold);
+            outline: none !important;
+            border: none !important;
         }
 
         /* Memo Line */
@@ -382,25 +414,36 @@
         .memo-label {
             font-size: 11px;
             font-weight: 600;
-            color: var(--text-muted);
+            color: var(--text-navy);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
         }
 
         .memo-input {
             flex: 1;
             font-family: 'Source Sans 3', sans-serif;
             font-size: 14px;
-            color: var(--text-dark);
+            color: var(--text-navy);
             border: none;
-            border-bottom: 1px solid #ccc;
+            border-bottom: 1px solid var(--text-navy);
             background: transparent;
             padding: 6px 4px;
         }
 
+        .memo-input::placeholder {
+            color: #a0a0a0;
+            font-style: italic;
+        }
+
         .memo-input:focus {
             outline: none;
-            border-bottom-color: var(--border-gold);
+        }
+
+        /* Signature Line */
+        .signature-line {
+            width: 100%;
+            border-bottom: 1px solid var(--text-navy);
+            margin-bottom: 8px;
         }
 
         /* Additional Options */
@@ -1075,29 +1118,36 @@
                     <!-- Pay To Line -->
                     <div class="payto-row">
                         <span class="payto-label">Pay to the order of</span>
-                        <input type="text" id="check-payee" class="payto-input" placeholder="Enter payee name" oninput="updatePreview()">
+                        <div class="payto-input-wrapper">
+                            <input type="text" id="check-payee" class="payto-input" placeholder="Recipient Name" oninput="updatePreview()">
+                        </div>
+                    </div>
+
+                    <!-- Amount Row -->
+                    <div class="amount-row">
                         <div class="amount-box">
                             <span class="amount-box-symbol">$</span>
                             <input type="number" id="check-amount" class="amount-box-input" placeholder="0.00" step="0.01" min="0" oninput="updateAmountWords()">
                         </div>
+                        <div class="amount-words-wrapper">
+                            <input type="text" id="amount-words" class="amount-words-input" readonly placeholder="ZERO AND 0/100">
+                            <span class="amount-words-suffix">Dollars</span>
+                        </div>
                     </div>
 
-                    <!-- Amount in Words -->
-                    <div class="amount-words-row">
-                        <input type="text" id="amount-words" class="amount-words-input" readonly placeholder="Zero and 00/100">
-                        <span class="amount-words-suffix">Dollars</span>
-                    </div>
 
-                    <!-- Address Section -->
-                    <div class="address-section">
-                        <div class="address-label">Address</div>
-                        <textarea id="check-address" class="address-box" placeholder="Name&#10;Street Address&#10;City, State ZIP"></textarea>
-                    </div>
-
-                    <!-- Memo Line -->
-                    <div class="memo-row">
-                        <span class="memo-label">Memo</span>
-                        <input type="text" id="check-memo" class="memo-input" placeholder="Invoice number, description, etc.">
+                    <!-- Bottom Section: Address, Memo, Signature -->
+                    <div class="check-bottom-section">
+                        <div class="check-bottom-left">
+                            <textarea id="check-address" class="address-box" placeholder="Mailing address (optional)"></textarea>
+                            <div class="memo-row">
+                                <span class="memo-label">Memo</span>
+                                <input type="text" id="check-memo" class="memo-input" placeholder="What is this check for?">
+                            </div>
+                        </div>
+                        <div class="check-bottom-right">
+                            <div class="signature-line"></div>
+                        </div>
                     </div>
                 </div>
             </div>

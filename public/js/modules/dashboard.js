@@ -49,6 +49,21 @@ async function loadDashboard() {
     if (ioltaWrapper) ioltaWrapper.style.display = 'none';
     if (personalWrapper) personalWrapper.style.display = 'block';
 
+    // Check account type - hide summary cards for Cost Account
+    const accountType = typeof getAccountType === 'function' ? getAccountType() : 'general';
+    const summaryCards = document.querySelector('#page-dashboard .summary-cards');
+    const categoryChartRow = document.getElementById('category-chart-row');
+
+    if (accountType === 'cost') {
+        // Hide Income/Expenses/Net Savings/Savings Rate cards for Cost Account
+        if (summaryCards) summaryCards.style.display = 'none';
+        // Also hide category spending chart (not relevant for cost)
+        if (categoryChartRow) categoryChartRow.style.display = 'none';
+    } else {
+        if (summaryCards) summaryCards.style.display = '';
+        if (categoryChartRow) categoryChartRow.style.display = '';
+    }
+
     const monthSelect = document.getElementById('dashboard-month');
     if (!monthSelect) return;
 
@@ -67,30 +82,45 @@ async function loadDashboard() {
     }
 
     try {
-        // Load report data
-        const reportParams = {
-            user_id: state.currentUser,
-            year,
-            type: reportType
-        };
-        if (month) {
-            reportParams.month = month;
+        // Load report data - skip for cost accounts (not needed)
+        if (accountType !== 'cost') {
+            const reportParams = {
+                user_id: state.currentUser,
+                year,
+                type: reportType
+            };
+            if (month) {
+                reportParams.month = month;
+            }
+            const reportData = await apiGet('/reports/', reportParams);
+
+            if (reportData.success) {
+                updateDashboardSummary(reportData.data.report);
+                updateCategoryChart(reportData.data.report.category_breakdown);
+            }
         }
-        const reportData = await apiGet('/reports/', reportParams);
 
-        if (reportData.success) {
-            updateDashboardSummary(reportData.data.report);
-            updateCategoryChart(reportData.data.report.category_breakdown);
-        }
+        // Load accounts summary based on account type
+        if (accountType === 'cost') {
+            // Load cost accounts
+            const costAccountsData = await apiGet('/cost/accounts.php', {
+                user_id: state.currentUser
+            });
+            if (costAccountsData.success) {
+                const costAccounts = costAccountsData.data?.accounts || costAccountsData.data || [];
+                dashboardCostAccounts = costAccounts; // Store for detail modal access
+                updateCostAccountsSummary(costAccounts);
+            }
+        } else {
+            // Load general accounts
+            const accountsData = await apiGet('/accounts/', {
+                user_id: state.currentUser
+            });
 
-        // Load accounts summary
-        const accountsData = await apiGet('/accounts/', {
-            user_id: state.currentUser
-        });
-
-        if (accountsData.success) {
-            state.accounts = accountsData.data.accounts;
-            updateAccountsSummary(accountsData.data.accounts);
+            if (accountsData.success) {
+                state.accounts = accountsData.data.accounts;
+                updateAccountsSummary(accountsData.data.accounts);
+            }
         }
 
         // Load recent transactions
@@ -366,8 +396,8 @@ function showSavingsRateDetail() {
             </div>
         </div>
         <div class="rate-formula">
-            <p>Savings Rate = (Income - Expenses) / Income × 100</p>
-            <p>= (${formatCurrency(report.total_income)} - ${formatCurrency(report.total_expenses)}) / ${formatCurrency(report.total_income)} × 100</p>
+            <p>Savings Rate = (Income - Expenses) / Income &#215; 100</p>
+            <p>= (${formatCurrency(report.total_income)} - ${formatCurrency(report.total_expenses)}) / ${formatCurrency(report.total_income)} &#215; 100</p>
         </div>
         <div class="rate-assessment" style="color: ${ratingColor}">
             <p>${ratingText}</p>
@@ -461,19 +491,77 @@ function updateAccountsSummary(accounts) {
         return;
     }
 
+    const typeIcons = {
+        'checking': '🏦',
+        'savings': '💰',
+        'credit_card': '💳',
+        'investment': '📈',
+        'cash': '💵',
+        'loan': '📋',
+        'other': '📁'
+    };
+
     container.innerHTML = filteredAccounts.map(acc => {
         const balance = parseFloat(acc.current_balance);
         const balanceClass = balance < 0 ? 'negative' : '';
         const color = acc.color || '#6b7280';
+        const icon = typeIcons[acc.account_type] || '📁';
         const jointBadge = acc.is_joint ? '<span class="joint-badge">Joint</span>' : '';
 
         return `
             <div class="account-row clickable" onclick="showAccountDetail(${acc.id})">
                 <div class="account-info">
-                    <div class="account-color" style="background: ${color}"></div>
+                    <div class="account-color" style="background: ${color}; display: flex; align-items: center; justify-content: center; font-size: 14px;">${icon}</div>
                     <div>
                         <div class="account-name">${acc.account_name} ${jointBadge}</div>
                         <div class="account-type">${formatAccountType(acc.account_type)}</div>
+                    </div>
+                </div>
+                <div class="account-balance ${balanceClass}">${formatCurrency(balance)}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateCostAccountsSummary(accounts) {
+    const container = document.getElementById('accounts-summary');
+    if (!container) return;
+
+    if (!accounts || accounts.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">No cost accounts found</p>';
+        return;
+    }
+
+    const typeIcons = {
+        'Credit Card': '💳',
+        'Checking': '🏦',
+        'Savings': '💰',
+        'Cash': '💵',
+        'Other': '📋'
+    };
+
+    const typeColors = {
+        'Credit Card': '#8b5cf6',
+        'Checking': '#059669',
+        'Savings': '#0891b2',
+        'Cash': '#f59e0b',
+        'Other': '#6b7280'
+    };
+
+    container.innerHTML = accounts.map(acc => {
+        const balance = parseFloat(acc.balance || 0);
+        const balanceClass = balance < 0 ? 'negative' : '';
+        const icon = typeIcons[acc.account_type] || '💳';
+        // Use account's custom color if set, otherwise fall back to type color
+        const color = acc.color || typeColors[acc.account_type] || '#6b7280';
+
+        return `
+            <div class="account-row clickable" onclick="showCostAccountDetail(${acc.id})">
+                <div class="account-info">
+                    <div class="account-color" style="background: ${color}; display: flex; align-items: center; justify-content: center; font-size: 14px;">${icon}</div>
+                    <div>
+                        <div class="account-name">${acc.account_name}</div>
+                        <div class="account-type">${acc.account_type || 'Account'}</div>
                     </div>
                 </div>
                 <div class="account-balance ${balanceClass}">${formatCurrency(balance)}</div>
@@ -588,6 +676,47 @@ function getCategoryIcon(iconName) {
 }
 
 // =====================================================
+// Cost Account Detail (for dashboard)
+// =====================================================
+
+// Store cost accounts for detail modal access
+let dashboardCostAccounts = [];
+
+async function showCostAccountDetail(accountId) {
+    // Find account from stored cost accounts
+    let account = dashboardCostAccounts.find(a => a.id === accountId);
+
+    // If not found, try to fetch
+    if (!account) {
+        try {
+            const result = await apiGet('/cost/accounts.php', {
+                user_id: state.currentUser,
+                id: accountId
+            });
+            if (result.success && result.data) {
+                account = result.data.accounts?.[0] || result.data;
+            }
+        } catch (e) {
+            console.error('Error fetching cost account:', e);
+        }
+    }
+
+    if (!account) {
+        showToast('Account not found', 'error');
+        return;
+    }
+
+    // Use CostAccountsModule if available
+    if (typeof CostAccountsModule !== 'undefined' && CostAccountsModule.showAccountDetailModal) {
+        CostAccountsModule.accounts = dashboardCostAccounts;
+        CostAccountsModule.showAccountDetailModal(account);
+    } else {
+        // Fallback: navigate to cost-accounts page
+        navigateTo('cost-accounts');
+    }
+}
+
+// =====================================================
 // Expose Functions Globally
 // =====================================================
 window.initDashboardMonthSelector = initDashboardMonthSelector;
@@ -604,3 +733,4 @@ window.getAccountIcon = getAccountIcon;
 window.formatAccountType = formatAccountType;
 window.loadPendingChecksForDashboard = loadPendingChecksForDashboard;
 window.goToPendingCheck = goToPendingCheck;
+window.showCostAccountDetail = showCostAccountDetail;

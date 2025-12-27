@@ -1,7 +1,7 @@
 <?php
 /**
- * Bank Reconciliation API
- * QuickBooks-style reconciliation for IOLTA accounts
+ * Cost Account Bank Reconciliation API
+ * QuickBooks-style reconciliation for Cost Accounts
  */
 require_once __DIR__ . '/../../../config/config.php';
 
@@ -30,7 +30,6 @@ switch ($method) {
  */
 function handleGet(Database $db, PDO $pdo): void {
     $userId = !empty($_GET['user_id']) ? (int)$_GET['user_id'] : null;
-    $accountId = !empty($_GET['account_id']) ? (int)$_GET['account_id'] : null;
     $reconcileId = !empty($_GET['id']) ? (int)$_GET['id'] : null;
     $status = $_GET['status'] ?? null;
 
@@ -41,10 +40,7 @@ function handleGet(Database $db, PDO $pdo): void {
     // Get specific reconciliation
     if ($reconcileId) {
         $recon = $db->fetch(
-            "SELECT r.*, a.account_name
-             FROM trust_reconciliations r
-             JOIN accounts a ON r.account_id = a.id
-             WHERE r.id = :id AND r.user_id = :user_id",
+            "SELECT * FROM cost_reconciliations WHERE id = :id AND user_id = :user_id",
             ['id' => $reconcileId, 'user_id' => $userId]
         );
 
@@ -54,13 +50,13 @@ function handleGet(Database $db, PDO $pdo): void {
 
         // Get cleared items for this reconciliation
         $clearedIds = $db->fetchAll(
-            "SELECT transaction_id FROM trust_reconciliation_items WHERE reconciliation_id = :id",
+            "SELECT transaction_id FROM cost_reconciliation_items WHERE reconciliation_id = :id",
             ['id' => $reconcileId]
         );
         $recon['cleared_ids'] = array_column($clearedIds, 'transaction_id');
 
-        // Get uncleared transactions for this account
-        $transactions = getUnclearedTransactions($db, $userId, $recon['account_id'], $reconcileId);
+        // Get uncleared transactions
+        $transactions = getUnclearedCostTransactions($db, $userId, $reconcileId);
         $recon['checks'] = $transactions['checks'];
         $recon['deposits'] = $transactions['deposits'];
 
@@ -68,27 +64,20 @@ function handleGet(Database $db, PDO $pdo): void {
     }
 
     // List reconciliations
-    $where = ['r.user_id = :user_id'];
+    $where = ['user_id = :user_id'];
     $params = ['user_id' => $userId];
 
-    if ($accountId) {
-        $where[] = 'r.account_id = :account_id';
-        $params['account_id'] = $accountId;
-    }
-
     if ($status) {
-        $where[] = 'r.status = :status';
+        $where[] = 'status = :status';
         $params['status'] = $status;
     }
 
     $whereClause = implode(' AND ', $where);
 
     $reconciliations = $db->fetchAll(
-        "SELECT r.*, a.account_name
-         FROM trust_reconciliations r
-         JOIN accounts a ON r.account_id = a.id
+        "SELECT * FROM cost_reconciliations
          WHERE $whereClause
-         ORDER BY r.statement_date DESC, r.id DESC
+         ORDER BY statement_date DESC, id DESC
          LIMIT 50",
         $params
     );
@@ -113,14 +102,11 @@ function handlePost(Database $db, PDO $pdo): void {
         case 'complete':
             handleComplete($db, $pdo, $input);
             break;
-        case 'resume':
-            handleResume($db, $pdo, $input);
-            break;
         case 'update':
             handleUpdate($db, $pdo, $input);
             break;
         default:
-            errorResponse('Invalid action. Use: start, save, complete, resume, update');
+            errorResponse('Invalid action. Use: start, save, complete, update');
     }
 }
 
@@ -129,51 +115,46 @@ function handlePost(Database $db, PDO $pdo): void {
  */
 function handleStart(Database $db, PDO $pdo, array $input): void {
     $userId = !empty($input['user_id']) ? (int)$input['user_id'] : null;
-    $accountId = !empty($input['account_id']) ? (int)$input['account_id'] : null;
     $statementDate = $input['statement_date'] ?? null;
     $statementEndingBalance = isset($input['statement_ending_balance']) ? (float)$input['statement_ending_balance'] : null;
 
-    if (!$userId || !$accountId || !$statementDate || $statementEndingBalance === null) {
-        errorResponse('Required: user_id, account_id, statement_date, statement_ending_balance');
+    if (!$userId || !$statementDate || $statementEndingBalance === null) {
+        errorResponse('Required: user_id, statement_date, statement_ending_balance');
     }
 
     // Check for existing in-progress reconciliation
     $existing = $db->fetch(
-        "SELECT id FROM trust_reconciliations
-         WHERE user_id = :user_id AND account_id = :account_id AND status = 'in_progress'",
-        ['user_id' => $userId, 'account_id' => $accountId]
+        "SELECT id FROM cost_reconciliations
+         WHERE user_id = :user_id AND status = 'in_progress'",
+        ['user_id' => $userId]
     );
 
     if ($existing) {
-        errorResponse('An in-progress reconciliation already exists for this account. Please complete or delete it first.', 400);
+        errorResponse('An in-progress reconciliation already exists. Please complete or delete it first.', 400);
     }
 
     // Calculate beginning balance (last completed reconciliation's ending balance, or 0)
     $lastRecon = $db->fetch(
-        "SELECT statement_ending_balance FROM trust_reconciliations
-         WHERE user_id = :user_id AND account_id = :account_id AND status = 'completed'
+        "SELECT statement_ending_balance FROM cost_reconciliations
+         WHERE user_id = :user_id AND status = 'completed'
          ORDER BY statement_date DESC LIMIT 1",
-        ['user_id' => $userId, 'account_id' => $accountId]
+        ['user_id' => $userId]
     );
 
     $beginningBalance = $lastRecon ? (float)$lastRecon['statement_ending_balance'] : 0;
 
     // Create reconciliation record
-    $reconcileId = $db->insert('trust_reconciliations', [
+    $reconcileId = $db->insert('cost_reconciliations', [
         'user_id' => $userId,
-        'account_id' => $accountId,
         'reconciliation_date' => date('Y-m-d'),
         'statement_date' => $statementDate,
         'statement_ending_balance' => $statementEndingBalance,
         'beginning_balance' => $beginningBalance,
-        'bank_balance' => $statementEndingBalance,
-        'book_balance' => $beginningBalance,
-        'client_ledger_total' => $beginningBalance,
         'status' => 'in_progress'
     ]);
 
     // Get uncleared transactions
-    $transactions = getUnclearedTransactions($db, $userId, $accountId, $reconcileId);
+    $transactions = getUnclearedCostTransactions($db, $userId, $reconcileId);
 
     successResponse([
         'reconcile_id' => $reconcileId,
@@ -198,7 +179,7 @@ function handleSave(Database $db, PDO $pdo, array $input): void {
 
     // Verify ownership
     $recon = $db->fetch(
-        "SELECT * FROM trust_reconciliations WHERE id = :id AND user_id = :user_id",
+        "SELECT * FROM cost_reconciliations WHERE id = :id AND user_id = :user_id",
         ['id' => $reconcileId, 'user_id' => $userId]
     );
 
@@ -215,7 +196,7 @@ function handleSave(Database $db, PDO $pdo, array $input): void {
     try {
         // Clear existing items
         $db->query(
-            "DELETE FROM trust_reconciliation_items WHERE reconciliation_id = :id",
+            "DELETE FROM cost_reconciliation_items WHERE reconciliation_id = :id",
             ['id' => $reconcileId]
         );
 
@@ -230,12 +211,12 @@ function handleSave(Database $db, PDO $pdo, array $input): void {
 
             // Get transaction details
             $trans = $db->fetch(
-                "SELECT amount FROM trust_transactions WHERE id = :id",
+                "SELECT amount FROM cost_transactions WHERE id = :id",
                 ['id' => $transId]
             );
 
             if ($trans) {
-                $db->insert('trust_reconciliation_items', [
+                $db->insert('cost_reconciliation_items', [
                     'reconciliation_id' => $reconcileId,
                     'transaction_id' => $transId
                 ]);
@@ -256,7 +237,7 @@ function handleSave(Database $db, PDO $pdo, array $input): void {
         $difference = $recon['statement_ending_balance'] - $clearedBalance;
 
         // Update reconciliation
-        $db->update('trust_reconciliations', [
+        $db->update('cost_reconciliations', [
             'cleared_checks_count' => $checksCount,
             'cleared_checks_total' => $checksTotal,
             'cleared_deposits_count' => $depositsCount,
@@ -296,7 +277,7 @@ function handleComplete(Database $db, PDO $pdo, array $input): void {
 
     // Verify ownership
     $recon = $db->fetch(
-        "SELECT * FROM trust_reconciliations WHERE id = :id AND user_id = :user_id",
+        "SELECT * FROM cost_reconciliations WHERE id = :id AND user_id = :user_id",
         ['id' => $reconcileId, 'user_id' => $userId]
     );
 
@@ -316,7 +297,7 @@ function handleComplete(Database $db, PDO $pdo, array $input): void {
 
     foreach ($clearedIds as $transId) {
         $trans = $db->fetch(
-            "SELECT amount FROM trust_transactions WHERE id = :id",
+            "SELECT amount FROM cost_transactions WHERE id = :id",
             ['id' => (int)$transId]
         );
         if ($trans) {
@@ -345,7 +326,7 @@ function handleComplete(Database $db, PDO $pdo, array $input): void {
         // Mark transactions as cleared
         $clearedDate = $recon['statement_date'];
         foreach ($clearedIds as $transId) {
-            $db->update('trust_transactions', [
+            $db->update('cost_transactions', [
                 'status' => 'cleared',
                 'cleared_date' => $clearedDate,
                 'reconciliation_id' => $reconcileId
@@ -354,12 +335,12 @@ function handleComplete(Database $db, PDO $pdo, array $input): void {
 
         // Clear temporary items
         $db->query(
-            "DELETE FROM trust_reconciliation_items WHERE reconciliation_id = :id",
+            "DELETE FROM cost_reconciliation_items WHERE reconciliation_id = :id",
             ['id' => $reconcileId]
         );
 
         // Update reconciliation as completed
-        $db->update('trust_reconciliations', [
+        $db->update('cost_reconciliations', [
             'status' => 'completed',
             'cleared_checks_count' => $checksCount,
             'cleared_checks_total' => $checksTotal,
@@ -368,21 +349,6 @@ function handleComplete(Database $db, PDO $pdo, array $input): void {
             'difference' => 0,
             'completed_at' => date('Y-m-d H:i:s')
         ], 'id = :id', ['id' => $reconcileId]);
-
-        // Audit log
-        $db->insert('trust_audit_log', [
-            'user_id' => $userId,
-            'action' => 'reconciliation_completed',
-            'entity_type' => 'trust_reconciliations',
-            'entity_id' => $reconcileId,
-            'new_values' => json_encode([
-                'statement_date' => $recon['statement_date'],
-                'ending_balance' => $recon['statement_ending_balance'],
-                'cleared_count' => $checksCount + $depositsCount
-            ]),
-            'description' => "Reconciliation completed for statement date {$recon['statement_date']}",
-            'ip_address' => getClientIp()
-        ]);
 
         $pdo->commit();
 
@@ -395,45 +361,6 @@ function handleComplete(Database $db, PDO $pdo, array $input): void {
         $pdo->rollBack();
         errorResponse('Failed to complete: ' . $e->getMessage());
     }
-}
-
-/**
- * Resume in-progress reconciliation
- */
-function handleResume(Database $db, PDO $pdo, array $input): void {
-    $userId = !empty($input['user_id']) ? (int)$input['user_id'] : null;
-    $accountId = !empty($input['account_id']) ? (int)$input['account_id'] : null;
-
-    if (!$userId || !$accountId) {
-        errorResponse('Required: user_id, account_id');
-    }
-
-    // Find in-progress reconciliation
-    $recon = $db->fetch(
-        "SELECT r.*, a.account_name
-         FROM trust_reconciliations r
-         JOIN accounts a ON r.account_id = a.id
-         WHERE r.user_id = :user_id AND r.account_id = :account_id AND r.status = 'in_progress'",
-        ['user_id' => $userId, 'account_id' => $accountId]
-    );
-
-    if (!$recon) {
-        errorResponse('No in-progress reconciliation found', 404);
-    }
-
-    // Get cleared items
-    $clearedIds = $db->fetchAll(
-        "SELECT transaction_id FROM trust_reconciliation_items WHERE reconciliation_id = :id",
-        ['id' => $recon['id']]
-    );
-    $recon['cleared_ids'] = array_column($clearedIds, 'transaction_id');
-
-    // Get uncleared transactions
-    $transactions = getUnclearedTransactions($db, $userId, $accountId, $recon['id']);
-    $recon['checks'] = $transactions['checks'];
-    $recon['deposits'] = $transactions['deposits'];
-
-    successResponse($recon, 'Reconciliation resumed');
 }
 
 /**
@@ -451,7 +378,7 @@ function handleUpdate(Database $db, PDO $pdo, array $input): void {
 
     // Verify ownership
     $recon = $db->fetch(
-        "SELECT * FROM trust_reconciliations WHERE id = :id AND user_id = :user_id",
+        "SELECT * FROM cost_reconciliations WHERE id = :id AND user_id = :user_id",
         ['id' => $reconcileId, 'user_id' => $userId]
     );
 
@@ -470,14 +397,13 @@ function handleUpdate(Database $db, PDO $pdo, array $input): void {
     }
     if ($statementEndingBalance !== null) {
         $updateData['statement_ending_balance'] = $statementEndingBalance;
-        $updateData['bank_balance'] = $statementEndingBalance;
     }
 
     if (empty($updateData)) {
         errorResponse('No fields to update');
     }
 
-    $db->update('trust_reconciliations', $updateData, 'id = :id', ['id' => $reconcileId]);
+    $db->update('cost_reconciliations', $updateData, 'id = :id', ['id' => $reconcileId]);
 
     successResponse([
         'reconcile_id' => $reconcileId,
@@ -498,7 +424,7 @@ function handleDelete(Database $db, PDO $pdo): void {
     }
 
     $recon = $db->fetch(
-        "SELECT * FROM trust_reconciliations WHERE id = :id AND user_id = :user_id",
+        "SELECT * FROM cost_reconciliations WHERE id = :id AND user_id = :user_id",
         ['id' => $reconcileId, 'user_id' => $userId]
     );
 
@@ -510,29 +436,27 @@ function handleDelete(Database $db, PDO $pdo): void {
         errorResponse('Cannot delete completed reconciliation');
     }
 
-    // Delete (cascade will handle items)
-    $db->query("DELETE FROM trust_reconciliations WHERE id = :id", ['id' => $reconcileId]);
+    // Delete items first, then reconciliation
+    $db->query("DELETE FROM cost_reconciliation_items WHERE reconciliation_id = :id", ['id' => $reconcileId]);
+    $db->query("DELETE FROM cost_reconciliations WHERE id = :id", ['id' => $reconcileId]);
 
     successResponse(null, 'Reconciliation deleted');
 }
 
 /**
- * Get uncleared transactions for an account
+ * Get uncleared cost transactions
  */
-function getUnclearedTransactions(Database $db, int $userId, int $accountId, int $reconcileId): array {
+function getUnclearedCostTransactions(Database $db, int $userId, int $reconcileId): array {
     // Get transactions that are not cleared, or are temporarily cleared in this reconciliation
-    $sql = "SELECT t.*, tc.client_name, tc.case_number
-            FROM trust_transactions t
-            JOIN trust_ledger l ON t.ledger_id = l.id
-            JOIN trust_clients tc ON l.client_id = tc.id
-            WHERE t.user_id = :user_id
-            AND l.account_id = :account_id
-            AND (t.status != 'cleared' OR t.reconciliation_id = :recon_id)
-            ORDER BY t.transaction_date ASC, t.id ASC";
+    $sql = "SELECT ct.*, tc.client_name, tc.case_number
+            FROM cost_transactions ct
+            LEFT JOIN trust_clients tc ON ct.client_id = tc.id
+            WHERE ct.user_id = :user_id
+            AND (ct.status != 'cleared' OR ct.reconciliation_id = :recon_id OR ct.status IS NULL OR ct.status = 'pending')
+            ORDER BY ct.transaction_date ASC, ct.id ASC";
 
     $transactions = $db->fetchAll($sql, [
         'user_id' => $userId,
-        'account_id' => $accountId,
         'recon_id' => $reconcileId
     ]);
 
@@ -541,7 +465,6 @@ function getUnclearedTransactions(Database $db, int $userId, int $accountId, int
 
     foreach ($transactions as $t) {
         $t['amount'] = (float)$t['amount'];
-        $t['running_balance'] = (float)$t['running_balance'];
 
         if ($t['amount'] < 0) {
             $checks[] = $t;
@@ -555,4 +478,3 @@ function getUnclearedTransactions(Database $db, int $userId, int $accountId, int
         'deposits' => $deposits
     ];
 }
-

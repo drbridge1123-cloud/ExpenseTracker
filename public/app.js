@@ -35,6 +35,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function initApp() {
+    // Close any stale modals from previous session
+    closeAllDynamicModals();
+
     // Setup login form
     setupLoginForm();
 
@@ -94,9 +97,9 @@ async function showMainApp() {
     // Initialize report selectors
     // initReportSelectors(); // initReportSelectors might be missing, check later
 
-    // Load initial data
+    // Load initial data - navigate to dashboard (will auto-detect account type)
     if (state.currentUser) {
-        loadDashboard();
+        navigateTo('dashboard');
     }
 }
 
@@ -177,6 +180,9 @@ function restoreSidebarSectionStates() {
 }
 
 function navigateTo(page) {
+    // Close any open dynamically created modals
+    closeAllDynamicModals();
+
     // Update nav active state for menu items
     document.querySelectorAll('.menu-item[data-page]').forEach(item => {
         item.classList.toggle('active', item.dataset.page === page);
@@ -194,6 +200,26 @@ function navigateTo(page) {
 
     // Close mobile menu
     elements.sidebar.classList.remove('open');
+}
+
+// Close all dynamically created modals
+function closeAllDynamicModals() {
+    const dynamicModalIds = [
+        'checks-filter-modal',
+        'check-status-modal',
+        'cost-client-modal',
+        'cost-account-modal'
+    ];
+    dynamicModalIds.forEach(id => {
+        const modal = document.getElementById(id);
+        if (modal) modal.style.display = 'none';
+    });
+    // Also remove any overlay modals that might be floating
+    document.querySelectorAll('[style*="position: fixed"][style*="z-index: 99999"]').forEach(el => {
+        if (el.id && el.id.includes('modal')) {
+            el.style.display = 'none';
+        }
+    });
 }
 
 async function loadPageData(page) {
@@ -257,23 +283,11 @@ async function loadPageData(page) {
                 loadDataManagementPage();
                 break;
             // IOLTA Pages
-            case 'client-ledger':
-                if (typeof loadClientLedgerPage === 'function') await loadClientLedgerPage();
-                break;
-            case 'trust-disburse':
-                if (typeof loadTrustDisburse === 'function') await loadTrustDisburse();
-                break;
-            case 'trust-transfer':
-                if (typeof loadTrustTransfer === 'function') await loadTrustTransfer();
-                break;
-            case 'trust-fee':
-                if (typeof loadTrustFee === 'function') await loadTrustFee();
+            case 'iolta':
+                if (typeof loadIoltaPage === 'function') await loadIoltaPage();
                 break;
             case 'trust-operations':
                 if (typeof loadTrustOperations === 'function') await loadTrustOperations();
-                break;
-            case 'trust-staging':
-                if (typeof loadStagingPage === 'function') await loadStagingPage();
                 break;
             case 'trust-reconcile':
                 if (typeof loadTrustReconcile === 'function') await loadTrustReconcile();
@@ -284,13 +298,13 @@ async function loadPageData(page) {
             case 'trust-reports':
                 if (typeof loadTrustReports === 'function') await loadTrustReports();
                 break;
-            case 'trust-statements':
-                if (typeof loadTrustStatements === 'function') await loadTrustStatements();
-                break;
             case 'trust-data-management':
                 if (typeof loadTrustDataManagement === 'function') await loadTrustDataManagement();
                 break;
             // Cost Account Pages (mirrors IOLTA structure)
+            case 'cost-accounts':
+                if (typeof CostAccountsModule !== 'undefined') await CostAccountsModule.init();
+                break;
             case 'cost-client-ledger':
                 if (typeof loadCostClientLedgerPage === 'function') await loadCostClientLedgerPage();
                 break;
@@ -542,6 +556,8 @@ function closeModal() {
     elements.modalOverlay.classList.remove('open');
     // Clean up size classes
     document.getElementById('modal').classList.remove('modal-lg', 'modal-sm');
+    // Clean up edit-transaction-modal class
+    document.getElementById('modal-body').classList.remove('edit-transaction-modal');
 }
 
 // =====================================================
@@ -640,89 +656,6 @@ document.addEventListener('DOMContentLoaded', function () {
 // Expose mobile functions globally
 window.toggleMobileSidebar = toggleMobileSidebar;
 window.closeMobileSidebar = closeMobileSidebar;
-
-// =====================================================
-// Container Width Toggle System
-// =====================================================
-
-class ContainerWidthToggle {
-    constructor() {
-        this.widths = ['100', '75', '50'];
-        this.currentIndex = 0;
-        this.storageKey = 'expense_tracker_container_width';
-
-        this.init();
-    }
-
-    init() {
-        // Load saved width from localStorage
-        const savedWidth = localStorage.getItem(this.storageKey);
-        if (savedWidth && this.widths.includes(savedWidth)) {
-            this.currentIndex = this.widths.indexOf(savedWidth);
-        }
-
-        // Apply initial state
-        this.applyWidth(this.widths[this.currentIndex]);
-
-        // Bind events
-        this.bindEvents();
-    }
-
-    bindEvents() {
-        // Button group click handlers
-        document.querySelectorAll('.width-toggle-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const width = e.target.dataset.width;
-                this.setWidth(width);
-            });
-        });
-    }
-
-    setWidth(width) {
-        // Update index
-        this.currentIndex = this.widths.indexOf(width);
-
-        // Apply to UI
-        this.applyWidth(width);
-
-        // Save to localStorage
-        localStorage.setItem(this.storageKey, width);
-    }
-
-    applyWidth(width) {
-        // Update main content width
-        const mainContent = document.getElementById('page-content');
-        if (mainContent) {
-            mainContent.dataset.width = width;
-        }
-
-        // Update button active states
-        document.querySelectorAll('.width-toggle-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.width === width);
-        });
-    }
-
-    // Cycle through widths (for single button toggle)
-    cycleWidth() {
-        this.currentIndex = (this.currentIndex + 1) % this.widths.length;
-        const newWidth = this.widths[this.currentIndex];
-        this.setWidth(newWidth);
-        return newWidth;
-    }
-
-    // Get current width
-    getCurrentWidth() {
-        return this.widths[this.currentIndex];
-    }
-}
-
-// Initialize Container Width Toggle when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    window.containerWidth = new ContainerWidthToggle();
-});
-
-// Expose globally
-window.ContainerWidthToggle = ContainerWidthToggle;
 
 // =====================================================
 // Password Visibility Toggle

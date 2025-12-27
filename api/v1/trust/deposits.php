@@ -30,7 +30,7 @@ function handleGet(PDO $pdo): void {
     if ($depositId) {
         $sql = "SELECT t.*,
                        l.client_id,
-                       tc.client_name, tc.matter_number,
+                       tc.client_name, tc.case_number,
                        a.account_name as trust_account_name,
                        e.name as entity_name,
                        e.display_name as entity_display_name,
@@ -73,10 +73,10 @@ function handleGet(PDO $pdo): void {
     $whereClause = implode(' AND ', $where);
 
     $sql = "SELECT t.*,
-                   tc.client_name, tc.matter_number,
+                   tc.client_name, tc.case_number,
                    a.account_name as trust_account_name,
                    e.name as entity_name,
-                   cs.case_number
+                   cs.case_number as case_case_number
             FROM trust_transactions t
             JOIN trust_ledger l ON t.ledger_id = l.id
             JOIN trust_clients tc ON l.client_id = tc.id

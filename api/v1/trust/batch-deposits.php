@@ -9,19 +9,16 @@
  * DELETE - 배치/아이템 삭제
  */
 
-require_once __DIR__ . '/../../../core/init.php';
+require_once __DIR__ . '/../../../config/config.php';
 
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+setCorsHeaders();
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
-$db = new Database();
+$db = Database::getInstance();
 $pdo = $db->getConnection();
 
 switch ($_SERVER['REQUEST_METHOD']) {
@@ -42,32 +39,6 @@ switch ($_SERVER['REQUEST_METHOD']) {
 }
 
 // =====================================================
-// Helper Functions
-// =====================================================
-
-function successResponse($data = null, string $message = 'Success'): void {
-    echo json_encode([
-        'success' => true,
-        'message' => $message,
-        'data' => $data
-    ]);
-    exit;
-}
-
-function errorResponse(string $message, int $code = 400): void {
-    http_response_code($code);
-    echo json_encode([
-        'success' => false,
-        'error' => $message
-    ]);
-    exit;
-}
-
-function getClientIp(): string {
-    return $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-}
-
-// =====================================================
 // GET - 배치 목록 조회
 // =====================================================
 
@@ -81,7 +52,7 @@ function handleGet(Database $db, PDO $pdo): void {
     // 단일 배치 조회
     if ($batchId) {
         $batch = $db->fetch(
-            "SELECT b.*, a.name as account_name
+            "SELECT b.*, a.account_name
              FROM deposit_batches b
              LEFT JOIN accounts a ON b.account_id = a.id
              WHERE b.id = :id",
@@ -94,7 +65,7 @@ function handleGet(Database $db, PDO $pdo): void {
 
         // 아이템 포함
         $batch['items'] = $db->fetchAll(
-            "SELECT di.*, c.client_name, c.matter_number
+            "SELECT di.*, c.client_name, c.case_number
              FROM deposit_items di
              LEFT JOIN trust_clients c ON di.client_id = c.id
              WHERE di.deposit_batch_id = :batch_id
@@ -127,7 +98,7 @@ function handleGet(Database $db, PDO $pdo): void {
     $whereClause = implode(' AND ', $where);
 
     $batches = $db->fetchAll(
-        "SELECT b.*, a.name as account_name,
+        "SELECT b.*, a.account_name,
                 (SELECT COUNT(*) FROM deposit_items WHERE deposit_batch_id = b.id) as item_count
          FROM deposit_batches b
          LEFT JOIN accounts a ON b.account_id = a.id
@@ -141,7 +112,7 @@ function handleGet(Database $db, PDO $pdo): void {
     if ($includeItems) {
         foreach ($batches as &$batch) {
             $batch['items'] = $db->fetchAll(
-                "SELECT di.*, c.client_name, c.matter_number
+                "SELECT di.*, c.client_name, c.case_number
                  FROM deposit_items di
                  LEFT JOIN trust_clients c ON di.client_id = c.id
                  WHERE di.deposit_batch_id = :batch_id

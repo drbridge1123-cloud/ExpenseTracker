@@ -39,15 +39,15 @@ if (!$file) {
 $db = Database::getInstance();
 $pdo = $db->getConnection();
 
-// Load all clients for matter number matching
-$clients = $db->fetchAll("SELECT id, client_name, matter_number FROM trust_clients WHERE user_id = :user_id", ['user_id' => $USER_ID]);
+// Load all clients for case number matching
+$clients = $db->fetchAll("SELECT id, client_name, case_number FROM trust_clients WHERE user_id = :user_id", ['user_id' => $USER_ID]);
 $clientMap = [];
 foreach ($clients as $c) {
-    if ($c['matter_number']) {
-        $clientMap[$c['matter_number']] = $c;
+    if ($c['case_number']) {
+        $clientMap[$c['case_number']] = $c;
     }
 }
-echo "Loaded " . count($clientMap) . " clients with matter numbers\n\n";
+echo "Loaded " . count($clientMap) . " clients with case numbers\n\n";
 
 // Parse CSV - QuickBooks format has specific column positions
 // Columns: (empty), (account), (client header), (empty), (empty), Type, (empty), Date, (empty), Num, (empty), Name, (empty), Memo, (empty), Clr, (empty), Split, (empty), Amount, (empty), Balance
@@ -102,21 +102,21 @@ while (($row = fgetcsv($file)) !== false) {
     // Parse date
     $parsedDate = date('Y-m-d', strtotime($date));
 
-    // Extract matter number from Split column (e.g., "201747 Choe, Jenna" -> "201747")
-    $matterNumber = null;
+    // Extract case number from Split column (e.g., "201747 Choe, Jenna" -> "201747")
+    $caseNumber = null;
     $clientId = null;
 
     if (preg_match('/^(\d{6}(-\d+)?)\s/', $split, $matches)) {
-        $matterNumber = $matches[1];
+        $caseNumber = $matches[1];
 
-        // Try to find client by matter number
-        if (isset($clientMap[$matterNumber])) {
-            $clientId = $clientMap[$matterNumber]['id'];
+        // Try to find client by case number
+        if (isset($clientMap[$caseNumber])) {
+            $clientId = $clientMap[$caseNumber]['id'];
         } else {
             // Try without suffix (-1, -2, etc.)
-            $baseMatter = preg_replace('/-\d+$/', '', $matterNumber);
-            if (isset($clientMap[$baseMatter])) {
-                $clientId = $clientMap[$baseMatter]['id'];
+            $baseCase = preg_replace('/-\d+$/', '', $caseNumber);
+            if (isset($clientMap[$baseCase])) {
+                $clientId = $clientMap[$baseCase]['id'];
             }
         }
     }
@@ -146,14 +146,14 @@ while (($row = fgetcsv($file)) !== false) {
         'description' => $description,
         'amount' => $amount,
         'split' => $split,
-        'matter_number' => $matterNumber,
+        'case_number' => $caseNumber,
         'client_id' => $clientId
     ];
 
     if ($clientId) {
         $transactions[] = $tx;
     } else {
-        $unmatchedClients[$matterNumber] = $split;
+        $unmatchedClients[$caseNumber] = $split;
         $skipped[] = $tx;
     }
 }
@@ -167,9 +167,9 @@ echo "Total transactions to import: " . count($transactions) . "\n";
 echo "Skipped (no client match): " . count($skipped) . "\n";
 
 if (!empty($unmatchedClients)) {
-    echo "\nUnmatched matter numbers:\n";
-    foreach ($unmatchedClients as $matter => $split) {
-        echo "  - $matter: $split\n";
+    echo "\nUnmatched case numbers:\n";
+    foreach ($unmatchedClients as $caseNum => $split) {
+        echo "  - $caseNum: $split\n";
     }
 }
 
@@ -178,7 +178,8 @@ echo "\n===========================================\n";
 echo "PREVIEW (first 10 transactions)\n";
 echo "===========================================\n";
 foreach (array_slice($transactions, 0, 10) as $tx) {
-    $client = $clientMap[$tx['matter_number']] ?? null;
+    $caseNum = $tx['case_number'] ?? '';
+    $client = $caseNum ? ($clientMap[$caseNum] ?? null) : null;
     $clientName = $client ? $client['client_name'] : 'UNKNOWN';
     echo sprintf("Row %d: %s | %s | %s | %s | \$%.2f\n",
         $tx['row'],

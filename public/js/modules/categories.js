@@ -384,6 +384,10 @@ function renderChartOfAccounts() {
             return false;
         }
 
+        // General/Cost mode: hide IOLTA account and trust sub-accounts
+        if (cat.account_type === 'iolta') return false;
+        if (cat.is_trust_sub_account) return false;
+
         if (coaState.typeFilter && cat.category_type !== coaState.typeFilter) {
             return false;
         }
@@ -984,7 +988,6 @@ async function loadTrustSubAccountDetail(accountId) {
     // Setup view all button
     document.getElementById('detail-view-all-btn').onclick = () => {
         // Could open client ledger modal in the future
-        console.log('View all transactions for client:', clientId);
     };
 }
 
@@ -2057,7 +2060,7 @@ async function showEditTransaction(transactionId) {
                         ? `<img src="${API_BASE}/../${r.file_path}" style="width: 100%; height: 100%; object-fit: cover;">`
                         : `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: var(--bg-secondary); font-size: 20px;">📄</div>`
                     }
-                    <button type="button" onclick="event.stopPropagation(); detachReceiptFromTransaction(${r.id}, ${transactionId})" style="position: absolute; top: -4px; right: -4px; width: 18px; height: 18px; border-radius: 50%; background: var(--color-danger); border: none; color: white; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;">×</button>
+                    <button type="button" onclick="event.stopPropagation(); detachReceiptFromTransaction(${r.id}, ${transactionId})" style="position: absolute; top: -4px; right: -4px; width: 18px; height: 18px; border-radius: 50%; background: var(--color-danger); border: none; color: white; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;">&#215;</button>
                 </div>
             `).join('')}
         </div>

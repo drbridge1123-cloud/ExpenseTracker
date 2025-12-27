@@ -1,0 +1,400 @@
+/* =====================================================
+   Expense Tracker - Styles
+   Personal Finance Management System
+   ===================================================== */
+
+/* CSS Variables */
+:root {
+    /* Colors */
+    --primary: #3b82f6;
+    --primary-dark: #2563eb;
+    --primary-light: #60a5fa;
+    --secondary: #6b7280;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --info: #06b6d4;
+
+    /* Grays */
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+
+    /* Backgrounds */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f9fafb;
+    --bg-sidebar: #1f2937;
+
+    /* Text */
+    --text-primary: #111827;
+    --text-secondary: #6b7280;
+    --text-muted: #9ca3af;
+
+    /* Borders */
+    --border-color: #e5e7eb;
+    --border-radius: 8px;
+    --border-radius-lg: 12px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+    /* Spacing */
+    --sidebar-width: 250px;
+    --topbar-height: 64px;
+
+    /* Transitions */
+    --transition: all 0.2s ease;
+
+    /* Container Width Toggle */
+    --toggle-bg: #f1f5f9;
+    --toggle-bg-hover: #e2e8f0;
+    --toggle-active-bg: #3b82f6;
+    --toggle-active-text: #ffffff;
+    --toggle-text: #64748b;
+    --toggle-border: #e2e8f0;
+    --container-transition: 0.3s ease;
+}
+
+/* Reset & Base */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* App Layout */
+#app {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    width: var(--sidebar-width);
+    background: #1e2530;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 100;
+    transition: var(--transition);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Sidebar Scrollbar */
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #3a4553;
+    border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #4a5563;
+}
+
+/* Logo */
+.sidebar-logo {
+    padding: 24px 20px 16px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #3b82f6;
+    letter-spacing: -0.5px;
+}
+
+/* Account Type Selector */
+.account-type-selector {
+    padding: 0 16px 16px;
+}
+
+.account-type-selector select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6,9 12,15 18,9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+}
+
+.account-type-selector select:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.account-type-selector select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.account-type-selector select option {
+    background: #1e2530;
+    color: #fff;
+    padding: 10px;
+}
+
+/* Account Type Badge Colors */
+[data-account-type="personal"] .account-type-selector select {
+    border-color: rgba(99, 102, 241, 0.5);
+}
+
+[data-account-type="iolta"] .account-type-selector select {
+    border-color: rgba(124, 58, 237, 0.5);
+}
+
+[data-account-type="general"] .account-type-selector select {
+    border-color: rgba(8, 145, 178, 0.5);
+}
+
+[data-account-type="cost"] .account-type-selector select {
+    border-color: rgba(5, 150, 105, 0.5);
+}
+
+/* Fixed Menu */
+.fixed-menu {
+    padding: 0 12px 8px;
+}
+
+/* Menu Item */
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    color: #8b95a5;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.menu-item:hover {
+    background: #2a3441;
+    color: #ffffff;
+}
+
+.menu-item.active {
+    background: #3b82f6;
+    color: #ffffff;
+}
+
+.menu-icon {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.menu-label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Section Divider */
+.section-divider {
+    height: 1px;
+    background: #2a3441;
+    margin: 8px 16px;
+}
+
+/* Section Label */
+.section-label {
+    padding: 16px 20px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #5a6474;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Section Menu */
+.section-menu {
+    padding: 0 12px 8px;
+}
+
+/* Collapsible Section */
+.collapsible-section {
+    border-top: 1px solid #2a3441;
+}
+
+.collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.collapsible-header:hover {
+    background: #2a3441;
+}
+
+.collapsible-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #5a6474;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.collapsible-toggle {
+    width: 16px;
+    height: 16px;
+    color: #5a6474;
+    transition: transform 0.2s;
+}
+
+/* Collapsed state */
+.collapsible-section.collapsed .collapsible-toggle {
+    transform: rotate(-90deg);
+}
+
+.collapsible-count {
+    background: #2a3441;
+    color: #8b95a5;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+}
+
+.collapsible-body {
+    overflow: hidden;
+    transition: max-height 0.25s ease, padding 0.25s ease;
+    padding: 0 12px 8px;
+}
+
+.collapsible-section.collapsed .collapsible-body {
+    max-height: 0 !important;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* Dynamic Sidebar Menu */
+.dynamic-sidebar-menu {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.dynamic-sidebar-menu .menu-section {
+    border-top: 1px solid #2a3441;
+}
+
+.dynamic-sidebar-menu .menu-section:first-child {
+    border-top: none;
+}
+
+.dynamic-sidebar-menu .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px 8px;
+    cursor: default;
+}
+
+.dynamic-sidebar-menu .menu-section.collapsible .section-header {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.dynamic-sidebar-menu .menu-section.collapsible .section-header:hover {
+    background: #2a3441;
+}
+
+.dynamic-sidebar-menu .section-label {
+    padding: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: #5a6474;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.dynamic-sidebar-menu .section-toggle {
+    display: flex;
+    align-items: center;
+}
+
+.dynamic-sidebar-menu .toggle-icon {
+    width: 16px;
+    height: 16px;
+    color: #5a6474;
+    transition: transform 0.2s;
+}
+
+.dynamic-sidebar-menu .toggle-icon.collapsed {
+    transform: rotate(-90deg);
+}
+
+.dynamic-sidebar-menu .section-content {
+    padding: 0 12px 8px;
+    overflow: hidden;
+    transition: max-height 0.25s ease, padding 0.25s ease, opacity 0.25s ease;
+    max-height: 500px;
+    opacity: 1;
+}
+
+.dynamic-sidebar-menu .section-content.collapsed {
+    max-height: 0 !important;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+}
+
+.dynamic-sidebar-menu .section-count {
+    background: #2a3441;
+    color: #8b95a5;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+}
+
