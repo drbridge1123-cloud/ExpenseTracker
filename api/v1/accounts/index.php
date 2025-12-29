@@ -22,6 +22,8 @@ function handleGet(PDO $pdo): void {
     $userId = !empty($_GET['user_id']) ? (int)$_GET['user_id'] : null;
     $includeInactive = isset($_GET['include_inactive']) && $_GET['include_inactive'] === '1';
     $accountMode = !empty($_GET['account_mode']) ? $_GET['account_mode'] : null;
+    $accountType = !empty($_GET['account_type']) ? $_GET['account_type'] : null;
+    $type = !empty($_GET['type']) ? $_GET['type'] : null;
 
     $where = ['1=1'];
     $params = [];
@@ -36,8 +38,15 @@ function handleGet(PDO $pdo): void {
         $where[] = 'a.is_active = 1';
     }
 
-    // Filter by account mode (personal excludes trust/iolta, iolta shows only trust/iolta)
-    if ($accountMode === 'personal' || $accountMode === 'general') {
+    // Filter by specific account_type (exact match) - fast path
+    if ($accountType) {
+        $where[] = "a.account_type = :account_type";
+        $params['account_type'] = $accountType;
+    } elseif ($type) {
+        $where[] = "a.account_type = :type";
+        $params['type'] = $type;
+    } elseif ($accountMode === 'personal' || $accountMode === 'general') {
+        // Filter by account mode (personal excludes trust/iolta, iolta shows only trust/iolta)
         $where[] = "a.account_type NOT IN ('trust', 'iolta')";
     } elseif ($accountMode === 'iolta') {
         $where[] = "a.account_type IN ('trust', 'iolta')";

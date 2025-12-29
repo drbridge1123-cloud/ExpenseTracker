@@ -309,66 +309,254 @@ function searchEntitiesByType(type, term) {
     renderEntityTable(type);
 }
 
-// Configure modal fields based on entity type
-function configureModalFields(type) {
-    const companyGroup = document.getElementById('entity-company-group');
-    const nameGroup = document.getElementById('entity-name-group');
-    const faxGroup = document.getElementById('entity-fax-group');
+// Show add entity modal with pre-selected type (Professional Style)
+function showAddEntityModal(presetType) {
+    openProfessionalEntityModal(null, presetType);
+}
 
-    if (type === 'vendor') {
-        // Vendor: show company and fax, hide name
-        companyGroup.style.display = 'block';
-        nameGroup.style.display = 'none';
-        faxGroup.style.display = 'block';
-    } else {
-        // Customer/Employee: show name, hide company and fax
-        companyGroup.style.display = 'none';
-        nameGroup.style.display = 'block';
-        faxGroup.style.display = 'none';
+// Professional Entity Modal (Same style as Cost/Trust Client modals)
+function openProfessionalEntityModal(entity, presetType) {
+    var modal = document.getElementById('professional-entity-modal');
+    if (modal) modal.remove();
+
+    var isEdit = !!entity;
+    var type = entity ? entity.type_code : presetType;
+    var title = getModalTitle(type, isEdit);
+    var isVendor = type === 'vendor';
+
+    modal = document.createElement('div');
+    modal.id = 'professional-entity-modal';
+    modal.style.cssText = 'display: flex; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 99999; justify-content: center; align-items: center; padding: 20px;';
+
+    // If opened from trust check modal, increase z-index
+    if (window.pendingEntitySource === 'trust-check') {
+        modal.style.zIndex = '999999';
+    }
+
+    var entityId = entity ? entity.id : '';
+    var name = entity ? (entity.name || '') : '';
+    var displayName = entity ? (entity.display_name || '') : '';
+    var company = entity ? (entity.company_name || '') : '';
+    var entityCode = entity ? (entity.entity_code || '') : '';
+    var email = entity ? (entity.email || '') : '';
+    var phone = entity ? formatEntityPhone(entity.phone || '') : '';
+    var fax = entity ? (entity.fax || '') : '';
+    var address1 = entity ? (entity.address_line1 || '') : '';
+    var address2 = entity ? (entity.address_line2 || '') : '';
+    var city = entity ? (entity.city || '') : '';
+    var stateCode = entity ? (entity.state || '') : '';
+    var zip = entity ? (entity.zip_code || '') : '';
+    var notes = entity ? (entity.notes || '') : '';
+
+    var inputStyle = 'width: 100%; padding: 11px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; box-sizing: border-box; background: #fff; transition: all 0.15s ease; outline: none;';
+    var inputFocus = "this.style.borderColor='#059669'; this.style.boxShadow='0 0 0 3px rgba(5,150,105,0.1)'";
+    var inputBlur = "this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'";
+
+    modal.innerHTML = `
+        <div style="width: 480px; max-width: 95%; max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.15);">
+            <div style="padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600; color: #1e293b;">${title}</h2>
+                <button onclick="closeProfessionalEntityModal()" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: #f8fafc; border: none; border-radius: 6px; font-size: 16px; color: #64748b; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">&times;</button>
+            </div>
+
+            <form id="professional-entity-form" onsubmit="saveProfessionalEntity(event)" style="padding: 20px 24px;">
+                <input type="hidden" id="prof-entity-id" value="${entityId}">
+                <input type="hidden" id="prof-entity-type" value="${type}">
+
+                ${isVendor ? `
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Company Name <span style="color: #ef4444;">*</span></label>
+                    <input type="text" id="prof-entity-company" required value="${company}" placeholder="Company or business name"
+                           style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                </div>
+                ` : `
+                <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Name <span style="color: #ef4444;">*</span></label>
+                        <input type="text" id="prof-entity-name" required value="${name}" placeholder="Full name"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Case #</label>
+                        <input type="text" id="prof-entity-code" value="${entityCode}" placeholder="Case number"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                </div>
+                `}
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Display Name <span style="color: #94a3b8; font-weight: 400;">(for checks)</span></label>
+                    <input type="text" id="prof-entity-display-name" value="${displayName}" placeholder="Name as printed on checks"
+                           style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Email</label>
+                        <input type="email" id="prof-entity-email" value="${email}" placeholder="email@example.com"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Phone</label>
+                        <input type="tel" id="prof-entity-phone" value="${phone}" placeholder="(555) 123-4567"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}" oninput="this.value=formatEntityPhone(this.value)">
+                    </div>
+                </div>
+
+                ${isVendor ? `
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Fax</label>
+                    <input type="tel" id="prof-entity-fax" value="${fax}" placeholder="(555) 123-4568"
+                           style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                </div>
+                ` : ''}
+
+                <div style="margin-bottom: 16px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Address</label>
+
+                    <div style="margin-bottom: 10px;">
+                        <input type="text" id="prof-entity-address1" value="${address1}" placeholder="Street address"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <input type="text" id="prof-entity-address2" value="${address2}" placeholder="Suite, unit, building (optional)"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1.2fr; gap: 10px;">
+                        <input type="text" id="prof-entity-city" value="${city}" placeholder="City"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                        <input type="text" id="prof-entity-state" value="${stateCode}" placeholder="State" maxlength="2"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                        <input type="text" id="prof-entity-zip" value="${zip}" placeholder="Zip"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Notes</label>
+                    <textarea id="prof-entity-notes" rows="2" placeholder="Additional notes (optional)"
+                              style="${inputStyle} resize: vertical; min-height: 60px;" onfocus="${inputFocus}" onblur="${inputBlur}">${notes}</textarea>
+                </div>
+
+                <div style="display: flex; justify-content: ${isEdit ? 'space-between' : 'flex-end'}; gap: 10px; padding-top: 16px; border-top: 1px solid #f1f5f9;">
+                    ${isEdit ? `
+                    <button type="button" onclick="deleteProfessionalEntity()"
+                            style="padding: 10px 20px; background: #fff; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s;"
+                            onmouseover="this.style.background='#fef2f2'; this.style.borderColor='#f87171'" onmouseout="this.style.background='#fff'; this.style.borderColor='#fecaca'">Delete</button>
+                    ` : ''}
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" onclick="closeProfessionalEntityModal()"
+                                style="padding: 10px 20px; background: #fff; color: #64748b; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s;"
+                                onmouseover="this.style.background='#f8fafc'; this.style.borderColor='#cbd5e1'" onmouseout="this.style.background='#fff'; this.style.borderColor='#e2e8f0'">Cancel</button>
+                        <button type="submit"
+                                style="padding: 10px 20px; background: #059669; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; box-shadow: 0 1px 2px rgba(5,150,105,0.2);"
+                                onmouseover="this.style.background='#047857'; this.style.boxShadow='0 2px 4px rgba(5,150,105,0.3)'" onmouseout="this.style.background='#059669'; this.style.boxShadow='0 1px 2px rgba(5,150,105,0.2)'">Save</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Focus on first field
+    setTimeout(() => {
+        const focusField = isVendor ? 'prof-entity-company' : 'prof-entity-name';
+        document.getElementById(focusField)?.focus();
+    }, 100);
+}
+
+function closeProfessionalEntityModal() {
+    var modal = document.getElementById('professional-entity-modal');
+    if (modal) modal.remove();
+    window.pendingEntitySource = null;
+}
+
+async function saveProfessionalEntity(event) {
+    event.preventDefault();
+
+    var id = document.getElementById('prof-entity-id').value;
+    var type = document.getElementById('prof-entity-type').value;
+    var isVendor = type === 'vendor';
+
+    var userId = state.currentUser || localStorage.getItem('currentUser');
+
+    var data = {
+        user_id: userId,
+        type: type,
+        name: isVendor ? '' : document.getElementById('prof-entity-name')?.value || '',
+        display_name: document.getElementById('prof-entity-display-name')?.value || null,
+        company_name: isVendor ? document.getElementById('prof-entity-company')?.value || '' : '',
+        entity_code: isVendor ? '' : document.getElementById('prof-entity-code')?.value || '',
+        email: document.getElementById('prof-entity-email')?.value || '',
+        phone: document.getElementById('prof-entity-phone')?.value.replace(/\D/g, '') || '',
+        fax: isVendor ? document.getElementById('prof-entity-fax')?.value || '' : '',
+        address_line1: document.getElementById('prof-entity-address1')?.value || '',
+        address_line2: document.getElementById('prof-entity-address2')?.value || '',
+        city: document.getElementById('prof-entity-city')?.value || '',
+        state: document.getElementById('prof-entity-state')?.value || '',
+        zip_code: document.getElementById('prof-entity-zip')?.value || '',
+        notes: document.getElementById('prof-entity-notes')?.value || ''
+    };
+
+    if (id) data.id = id;
+
+    try {
+        var result;
+        if (id) {
+            result = await apiPut('/entities/', data);
+        } else {
+            result = await apiPost('/entities/', data);
+        }
+
+        if (result.success) {
+            closeProfessionalEntityModal();
+
+            // Handle callback for trust check modal
+            if (window.pendingEntitySource === 'trust-check' && typeof window.onEntityCreated === 'function') {
+                window.onEntityCreated(result.data?.entity || { id: result.data?.id, ...data });
+            }
+
+            // Refresh entity list
+            if (entitiesState.currentType) {
+                await loadEntitiesByType(entitiesState.currentType);
+            }
+
+            showToast(id ? 'Contact updated' : 'Contact added', 'success');
+        } else {
+            showToast(result.message || 'Error saving contact', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving entity:', error);
+        showToast('Error saving contact', 'error');
     }
 }
 
-// Show add entity modal with pre-selected type
-function showAddEntityModal(presetType) {
-    document.getElementById('entity-modal-title').textContent = getModalTitle(presetType, false);
-    document.getElementById('entity-id').value = '';
-    document.getElementById('entity-type').value = presetType || '';
+async function deleteProfessionalEntity() {
+    var id = document.getElementById('prof-entity-id').value;
+    if (!id) return;
 
-    // Configure fields based on type
-    configureModalFields(presetType);
+    if (!confirm('Are you sure you want to delete this contact?')) return;
 
-    document.getElementById('entity-name').value = '';
-    document.getElementById('entity-display-name').value = '';
-    document.getElementById('entity-company').value = '';
-    document.getElementById('entity-email').value = '';
-    document.getElementById('entity-phone').value = '';
-    document.getElementById('entity-fax').value = '';
-    document.getElementById('entity-address1').value = '';
-    document.getElementById('entity-address2').value = '';
-    document.getElementById('entity-city').value = '';
-    document.getElementById('entity-state').value = '';
-    document.getElementById('entity-zip').value = '';
-    document.getElementById('entity-notes').value = '';
-    document.getElementById('entity-delete-btn').style.display = 'none';
+    var userId = state.currentUser || localStorage.getItem('currentUser');
 
-    const modal = document.getElementById('entity-modal');
-    modal.style.display = 'flex';
+    try {
+        var result = await apiDelete('/entities/', { id: id, user_id: userId });
 
-    // If opened from trust check modal, set higher z-index to appear above it
-    if (window.pendingEntitySource === 'trust-check') {
-        modal.style.zIndex = '999999';
-    } else {
-        modal.style.zIndex = '';  // Reset to CSS default
+        if (result.success) {
+            closeProfessionalEntityModal();
+            if (entitiesState.currentType) {
+                await loadEntitiesByType(entitiesState.currentType);
+            }
+            showToast('Contact deleted', 'success');
+        } else {
+            showToast(result.message || 'Error deleting contact', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting entity:', error);
+        showToast('Error deleting contact', 'error');
     }
-
-    setTimeout(() => modal.classList.add('open'), 10);
-
-    // Setup phone formatting
-    setupEntityPhoneFormatting();
-
-    // Focus on first visible field
-    const focusField = presetType === 'vendor' ? 'entity-company' : 'entity-name';
-    setTimeout(() => document.getElementById(focusField).focus(), 100);
 }
 
 function getModalTitle(type, isEdit) {
@@ -380,14 +568,14 @@ function getModalTitle(type, isEdit) {
     return titles[type] || (isEdit ? 'Edit Contact' : 'Add New Contact');
 }
 
-// Edit entity
+// Edit entity (use professional modal)
 function editEntity(id) {
     const entity = entitiesState.entities.find(e => e.id == id);
     if (!entity) {
         fetchAndEditEntity(id);
         return;
     }
-    populateEditForm(entity);
+    openProfessionalEntityModal(entity, entity.type_code);
 }
 
 async function fetchAndEditEntity(id) {
@@ -395,7 +583,7 @@ async function fetchAndEditEntity(id) {
     try {
         const result = await apiGet('/entities/', { id: id, user_id: userId });
         if (result.success && result.data.entity) {
-            populateEditForm(result.data.entity);
+            openProfessionalEntityModal(result.data.entity, result.data.entity.type_code);
         } else {
             showToast('Contact not found', 'error');
         }
@@ -404,179 +592,6 @@ async function fetchAndEditEntity(id) {
     }
 }
 
-function populateEditForm(entity) {
-    document.getElementById('entity-modal-title').textContent = getModalTitle(entity.type_code, true);
-    document.getElementById('entity-id').value = entity.id;
-    document.getElementById('entity-type').value = entity.type_code || '';
-
-    // Configure fields based on type
-    configureModalFields(entity.type_code);
-
-    document.getElementById('entity-name').value = entity.name || '';
-    document.getElementById('entity-display-name').value = entity.display_name || '';
-    document.getElementById('entity-company').value = entity.company_name || '';
-    document.getElementById('entity-email').value = entity.email || '';
-    document.getElementById('entity-phone').value = formatEntityPhone(entity.phone || '');
-    document.getElementById('entity-fax').value = entity.fax || '';
-    document.getElementById('entity-address1').value = entity.address_line1 || '';
-    document.getElementById('entity-address2').value = entity.address_line2 || '';
-    document.getElementById('entity-city').value = entity.city || '';
-    document.getElementById('entity-state').value = entity.state || '';
-    document.getElementById('entity-zip').value = entity.zip_code || '';
-    document.getElementById('entity-notes').value = entity.notes || '';
-    document.getElementById('entity-delete-btn').style.display = 'inline-block';
-
-    const modal = document.getElementById('entity-modal');
-    modal.style.display = 'flex';
-    setTimeout(() => modal.classList.add('open'), 10);
-
-    // Setup phone formatting
-    setupEntityPhoneFormatting();
-}
-
-// Close entity modal
-function closeEntityModal() {
-    const modal = document.getElementById('entity-modal');
-    modal.classList.remove('open');
-    setTimeout(() => {
-        modal.style.display = 'none';
-        modal.style.zIndex = '';  // Reset z-index
-    }, 300);
-
-    // Clear pending source flags
-    window.pendingEntitySource = null;
-    window.pendingEntityName = null;
-}
-
-// Save entity
-async function saveEntity() {
-    const userId = state.currentUser || localStorage.getItem('currentUser');
-    const entityId = document.getElementById('entity-id').value;
-    const type = document.getElementById('entity-type').value;
-
-    // Get the appropriate primary field based on type
-    let name, companyName;
-    if (type === 'vendor') {
-        companyName = document.getElementById('entity-company').value.trim();
-        name = companyName; // For vendor, company name is the name
-        if (!companyName) {
-            showToast('Please enter a company name', 'error');
-            return;
-        }
-    } else {
-        name = document.getElementById('entity-name').value.trim();
-        companyName = ''; // Customer/Employee don't have company
-        if (!name) {
-            showToast('Please enter a name', 'error');
-            return;
-        }
-    }
-
-    if (!type) {
-        showToast('Please select a type', 'error');
-        return;
-    }
-
-    const data = {
-        user_id: userId,
-        type: type,
-        name: name,
-        display_name: document.getElementById('entity-display-name').value.trim() || name,
-        company_name: companyName,
-        email: document.getElementById('entity-email').value.trim(),
-        phone: document.getElementById('entity-phone').value.trim(),
-        fax: type === 'vendor' ? document.getElementById('entity-fax').value.trim() : '',
-        address_line1: document.getElementById('entity-address1').value.trim(),
-        address_line2: document.getElementById('entity-address2').value.trim(),
-        city: document.getElementById('entity-city').value.trim(),
-        state: document.getElementById('entity-state').value.trim(),
-        zip_code: document.getElementById('entity-zip').value.trim(),
-        notes: document.getElementById('entity-notes').value.trim()
-    };
-
-    if (entityId) {
-        data.id = parseInt(entityId);
-    }
-
-    try {
-        const result = await (entityId ? apiPut('/entities/', data) : apiPost('/entities/', data));
-
-        if (result.success) {
-            showToast(entityId ? 'Updated successfully' : 'Created successfully', 'success');
-
-            // If created from trust check modal, auto-fill the payee field BEFORE closing modal
-            // (closeEntityModal clears pendingEntitySource)
-            if (!entityId && window.pendingEntitySource === 'trust-check' && result.data?.entity) {
-                const newEntity = result.data.entity;
-
-                const payeeInput = document.getElementById('trust-check-payee');
-                const entityIdInput = document.getElementById('trust-check-entity-id');
-                const entitySelected = document.getElementById('trust-check-entity-selected');
-
-                if (payeeInput) payeeInput.value = newEntity.display_name || newEntity.name;
-                if (entityIdInput) entityIdInput.value = newEntity.id;
-
-                // Update selected entity display
-                if (entitySelected) {
-                    entitySelected.style.display = 'block';
-                    const nameEl = document.getElementById('trust-check-entity-name');
-                    const addrEl = document.getElementById('trust-check-entity-address');
-                    if (nameEl) nameEl.textContent = newEntity.display_name || newEntity.name;
-                    // Show type name (Vendor, Customer, etc.) instead of address
-                    if (addrEl) addrEl.textContent = newEntity.type_name || type.charAt(0).toUpperCase() + type.slice(1);
-                }
-
-                // Add to trustChecksState.entities if available
-                if (typeof trustChecksState !== 'undefined' && trustChecksState.entities) {
-                    trustChecksState.entities.push({
-                        id: newEntity.id,
-                        name: newEntity.name,
-                        display_name: newEntity.display_name || newEntity.name,
-                        type_name: newEntity.type_name || type.charAt(0).toUpperCase() + type.slice(1)
-                    });
-                    trustChecksState.selectedEntityId = newEntity.id;
-                }
-            }
-
-            closeEntityModal();
-
-            if (entitiesState.currentType) {
-                await loadEntitiesByType(entitiesState.currentType);
-            }
-        } else {
-            showToast(result.message || 'Error saving', 'error');
-        }
-    } catch (e) {
-        console.error('Error saving entity:', e);
-        showToast('Error saving', 'error');
-    }
-}
-
-// Delete entity
-async function deleteEntity() {
-    const entityId = document.getElementById('entity-id').value;
-    if (!entityId) return;
-
-    if (!confirm('Are you sure you want to delete this contact?')) return;
-
-    try {
-        const result = await apiDelete('/entities/?id=' + entityId);
-
-        if (result.success) {
-            showToast('Deleted successfully', 'success');
-            closeEntityModal();
-
-            if (entitiesState.currentType) {
-                await loadEntitiesByType(entitiesState.currentType);
-            }
-        } else {
-            showToast(result.message || 'Error deleting', 'error');
-        }
-    } catch (e) {
-        console.error('Error deleting entity:', e);
-        showToast('Error deleting', 'error');
-    }
-}
 
 // API helper for PUT
 async function apiPut(endpoint, data) {
@@ -608,17 +623,6 @@ function formatEntityPhone(value) {
     }
 }
 
-// Setup phone formatting on input
-function setupEntityPhoneFormatting() {
-    const phoneInput = document.getElementById('entity-phone');
-    if (phoneInput && !phoneInput.dataset.formattingSetup) {
-        phoneInput.dataset.formattingSetup = 'true';
-        phoneInput.addEventListener('input', (e) => {
-            e.target.value = formatEntityPhone(e.target.value);
-        });
-    }
-}
-
 // Export functions
 window.loadVendorsPage = loadVendorsPage;
 window.loadCustomersPage = loadCustomersPage;
@@ -626,7 +630,8 @@ window.loadEmployeesPage = loadEmployeesPage;
 window.searchEntitiesByType = searchEntitiesByType;
 window.showAddEntityModal = showAddEntityModal;
 window.editEntity = editEntity;
-window.closeEntityModal = closeEntityModal;
-window.saveEntity = saveEntity;
-window.deleteEntity = deleteEntity;
+window.openProfessionalEntityModal = openProfessionalEntityModal;
+window.closeProfessionalEntityModal = closeProfessionalEntityModal;
+window.saveProfessionalEntity = saveProfessionalEntity;
+window.deleteProfessionalEntity = deleteProfessionalEntity;
 window.formatEntityPhone = formatEntityPhone;

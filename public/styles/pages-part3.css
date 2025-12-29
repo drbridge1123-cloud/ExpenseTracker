@@ -2496,109 +2496,120 @@
     color: #dc2626;
 }
 
-/* Receipt Upload Modal - Professional Design */
+/* Receipt Upload Modal - Clean Theme */
 .receipt-modal {
     max-width: 480px;
-    border-radius: 16px;
+    border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    background: #fff;
 }
 
 .receipt-modal .modal-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 20px 24px;
-    border-bottom: none;
+    background: #e8f4fc;
+    padding: 18px 24px;
+    border-bottom: 1px solid #cce5f6;
 }
 
 .receipt-modal .modal-header h3 {
-    color: white;
-    font-size: 18px;
+    color: #212529;
+    font-size: 16px;
     font-weight: 600;
     margin: 0;
 }
 
 .receipt-modal .modal-close {
-    color: white;
-    opacity: 0.8;
-    font-size: 24px;
-    background: rgba(255,255,255,0.15);
-    border-radius: 8px;
-    width: 32px;
-    height: 32px;
+    color: #868e96;
+    font-size: 20px;
+    background: transparent;
+    border: none;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    cursor: pointer;
+    transition: color 0.2s ease;
 }
 
 .receipt-modal .modal-close:hover {
-    opacity: 1;
-    background: rgba(255,255,255,0.25);
+    color: #212529;
 }
 
 .receipt-modal .modal-body {
     padding: 24px;
-    background: #fafbfc;
+    background: #fff;
 }
 
 .receipt-modal .modal-footer {
-    background: white;
-    padding: 16px 24px;
-    border-top: 1px solid #e5e7eb;
-    gap: 12px;
+    background: #f8f9fa;
+    padding: 14px 24px;
+    border-top: 1px solid #e9ecef;
+    gap: 10px;
 }
 
 .receipt-modal .modal-footer .btn-secondary {
-    background: white;
-    border: 1px solid #d1d5db;
-    color: #374151;
+    background: #fff;
+    border: 1px solid #ced4da;
+    color: #495057;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6px;
 }
 
 .receipt-modal .modal-footer .btn-secondary:hover {
-    background: #f3f4f6;
+    background: #e9ecef;
 }
 
 .receipt-modal .modal-footer .btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #4a6cf7;
     border: none;
-    padding: 10px 24px;
-    font-weight: 600;
+    color: #fff;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6px;
+}
+
+.receipt-modal .modal-footer .btn-primary:hover {
+    background: #3d5bd9;
 }
 
 .receipt-dropzone {
-    border: 2px dashed #d1d5db;
-    border-radius: 12px;
+    border: 2px dashed #ced4da;
+    border-radius: 8px;
     padding: 32px 20px;
     text-align: center;
     cursor: pointer;
     transition: all 0.2s ease;
     margin-bottom: 20px;
-    background: white;
+    background: #f8f9fa;
 }
 
 .receipt-dropzone:hover,
 .receipt-dropzone.dragover {
-    border-color: #667eea;
-    background: #f5f3ff;
+    border-color: #4a6cf7;
+    background: #f0f4ff;
 }
 
 .receipt-dropzone svg {
     margin-bottom: 12px;
-    stroke: #9ca3af;
+    stroke: #868e96;
 }
 
 .receipt-dropzone:hover svg {
-    stroke: #667eea;
+    stroke: #4a6cf7;
 }
 
 .receipt-dropzone p {
     margin: 0 0 6px;
-    color: #4b5563;
+    color: #495057;
     font-size: 14px;
 }
 
 .receipt-dropzone p span {
-    color: #667eea;
+    color: #4a6cf7;
     cursor: pointer;
     font-weight: 600;
 }
@@ -2608,7 +2619,7 @@
 }
 
 .receipt-dropzone small {
-    color: #9ca3af;
+    color: #868e96;
     font-size: 12px;
 }
 
@@ -2618,9 +2629,9 @@
 
 .receipt-modal .form-group label {
     display: block;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
-    color: #374151;
+    color: #868e96;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 6px;
@@ -2631,24 +2642,30 @@
 .receipt-modal .form-group textarea {
     width: 100%;
     padding: 10px 12px;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 14px;
-    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #fff;
+    color: #212529;
     transition: all 0.2s;
+}
+
+.receipt-modal .form-group input:hover,
+.receipt-modal .form-group select:hover,
+.receipt-modal .form-group textarea:hover {
+    border-color: #ced4da;
 }
 
 .receipt-modal .form-group input:focus,
 .receipt-modal .form-group select:focus,
 .receipt-modal .form-group textarea:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: #495057;
 }
 
 .receipt-modal .form-group input::placeholder,
 .receipt-modal .form-group textarea::placeholder {
-    color: #9ca3af;
+    color: #adb5bd;
 }
 
 .receipt-modal .form-row {
@@ -2660,33 +2677,33 @@
 .receipt-modal .checkbox-label {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     font-size: 13px;
-    color: #4b5563;
+    color: #495057;
     cursor: pointer;
 }
 
 .receipt-modal .checkbox-label input[type="checkbox"] {
     width: 16px;
     height: 16px;
-    accent-color: #667eea;
+    accent-color: #212529;
 }
 
 .receipt-preview {
     text-align: center;
     margin-bottom: 20px;
-    background: white;
+    background: #f8f9fa;
     padding: 16px;
-    border-radius: 12px;
-    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
 }
 
 .receipt-preview img {
     max-width: 100%;
     max-height: 180px;
-    border-radius: 8px;
+    border-radius: 6px;
     margin-bottom: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
 /* Receipt View Modal */

@@ -15,18 +15,136 @@
 .bulk-categorize-modal-v2 {
     max-width: 560px;
     width: 95%;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    background: #fff;
+}
+
+.bulk-categorize-modal-v2 .modal-header {
+    background: #e8f4fc;
+    padding: 18px 24px;
+    border-bottom: 1px solid #cce5f6;
+}
+
+.bulk-categorize-modal-v2 .modal-header h3 {
+    color: #212529;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.bulk-categorize-modal-v2 .close-btn {
+    color: #868e96;
+    font-size: 20px;
+    background: transparent;
+    border: none;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.bulk-categorize-modal-v2 .close-btn:hover {
+    color: #212529;
 }
 
 .bulk-categorize-modal-v2 .modal-body {
     max-height: 70vh;
     overflow-y: auto;
+    padding: 24px;
+    background: #fff;
+}
+
+.bulk-categorize-modal-v2 .modal-footer {
+    background: #f8f9fa;
+    padding: 14px 24px;
+    border-top: 1px solid #e9ecef;
+    gap: 10px;
+}
+
+.bulk-categorize-modal-v2 .modal-footer .btn-secondary {
+    background: #fff;
+    border: 1px solid #ced4da;
+    color: #495057;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6px;
+}
+
+.bulk-categorize-modal-v2 .modal-footer .btn-secondary:hover {
+    background: #e9ecef;
+}
+
+.bulk-categorize-modal-v2 .modal-footer .btn-primary {
+    background: #4a6cf7;
+    border: none;
+    color: #fff;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6px;
+}
+
+.bulk-categorize-modal-v2 .modal-footer .btn-primary:hover {
+    background: #3d5bd9;
+}
+
+.bulk-categorize-modal-v2 .form-group label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #868e96;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.bulk-categorize-modal-v2 .form-group input,
+.bulk-categorize-modal-v2 .form-group select {
+    padding: 10px 12px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #fff;
+    color: #212529;
+    transition: all 0.2s;
+}
+
+.bulk-categorize-modal-v2 .form-group input:hover,
+.bulk-categorize-modal-v2 .form-group select:hover {
+    border-color: #ced4da;
+}
+
+.bulk-categorize-modal-v2 .form-group input:focus,
+.bulk-categorize-modal-v2 .form-group select:focus {
+    outline: none;
+    border-color: #495057;
+}
+
+.bulk-categorize-modal-v2 .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #495057;
+    cursor: pointer;
+}
+
+.bulk-categorize-modal-v2 .checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #212529;
 }
 
 /* Selected Transactions Preview */
 .bulk-cat-preview {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
     padding: 16px;
     margin-bottom: 20px;
 }
@@ -39,7 +157,7 @@
 }
 
 .bulk-cat-count-badge {
-    background: #3b82f6;
+    background: #4a6cf7;
     color: white;
     font-size: 12px;
     font-weight: 600;
@@ -61,8 +179,8 @@
     align-items: center;
     padding: 10px 12px;
     background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
     font-size: 13px;
 }
 
@@ -91,7 +209,7 @@
 
 /* Rule Settings Section */
 .bulk-cat-rule-section {
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid #e9ecef;
     padding-top: 16px;
     margin-top: 16px;
 }
@@ -102,9 +220,9 @@
 }
 
 .bulk-cat-rule-settings {
-    background: #fafbfc;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
     padding: 16px;
 }
 
@@ -128,13 +246,13 @@
     gap: 6px;
     cursor: pointer;
     font-size: 13px;
-    color: #475569;
+    color: #495057;
 }
 
 .radio-label input[type="radio"] {
     width: 16px;
     height: 16px;
-    accent-color: #3b82f6;
+    accent-color: #212529;
 }
 
 .form-hint {
@@ -1313,6 +1431,21 @@
 /* Memo field */
 .checks-form-row .form-group.memo-field {
     grid-column: span 2;
+}
+
+/* Category dropdown - wider (Write Checks page) */
+.check-option-inline .custom-dropdown {
+    min-width: 300px !important;
+    width: 300px !important;
+}
+
+.check-option-inline .custom-dropdown .dropdown-trigger {
+    width: 300px !important;
+}
+
+.check-option-inline .custom-dropdown .dropdown-menu {
+    width: 300px !important;
+    min-width: 300px !important;
 }
 
 .checks-form-footer {

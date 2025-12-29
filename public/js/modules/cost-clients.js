@@ -6,20 +6,18 @@ window.getCostUserId = function() {
     return (typeof state !== 'undefined' && state.currentUser) || localStorage.getItem('currentUser') || '1';
 };
 
-window.loadCostClients = async function() {
-    try {
-        const result = await apiGet('/trust/clients.php', { user_id: getCostUserId() });
-        costState.clients = (result.success && result.data) ? (result.data.clients || []) : [];
-    } catch (e) {
-        console.error('Error loading cost clients:', e);
-        costState.clients = [];
-    }
-    return costState.clients;
-};
+// Note: loadCostClients cache function is defined in cost.js and exposed as window.loadCostClients
 
 window.loadCostOperations = async function() {
     try {
-        await loadCostClients();
+        // Use cached loadCostClients from cost.js if available
+        if (typeof window.loadCostClients === 'function') {
+            costState.clients = await window.loadCostClients();
+        } else {
+            // Fallback
+            const result = await apiGet('/trust/clients.php', { user_id: getCostUserId() });
+            costState.clients = (result.success && result.data) ? (result.data.clients || []) : [];
+        }
         costState.currentTab = costState.currentTab || 'receive';
         renderCostDepositClientSidebar();
     } catch (error) {
@@ -194,18 +192,120 @@ window.openCostClientModal = function(client) {
     var modal = document.getElementById('cost-client-modal');
     if (modal) modal.remove();
     var isEdit = !!client;
-    var title = isEdit ? 'Edit Client' : 'Add Client';
+    var title = isEdit ? 'Edit Client' : 'Add New Client';
     modal = document.createElement('div');
     modal.id = 'cost-client-modal';
-    modal.style.cssText = 'display: flex; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center;';
+    modal.style.cssText = 'display: flex; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 99999; justify-content: center; align-items: center; padding: 20px;';
     var clientId = client ? client.id : '';
-    var caseNum = client ? (client.case_number || '') : '';
+    var caseNumber = client ? (client.case_number || '') : '';
     var clientName = client ? (client.client_name || '') : '';
-    var caseDesc = client ? (client.case_description || '') : '';
+    var displayName = client ? (client.display_name || '') : '';
     var email = client ? (client.contact_email || '') : '';
     var phone = client ? (client.contact_phone || '') : '';
+    var address = client ? (client.address || '') : '';
     var notes = client ? (client.notes || '') : '';
-    modal.innerHTML = '<div style="width: 500px; max-width: 95%; background: white; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow: hidden;"><div style="padding: 20px 24px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white;"><div style="display: flex; justify-content: space-between; align-items: center;"><h3 style="margin: 0; font-size: 18px; font-weight: 600;">' + title + '</h3><button onclick="closeCostClientModal()" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.2); color: white; border: none; cursor: pointer; font-size: 18px;">&times;</button></div></div><form id="cost-client-form" onsubmit="saveCostClient(event)" style="padding: 24px;"><input type="hidden" id="cost-client-id" value="' + clientId + '"><div style="margin-bottom: 16px;"><label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Case Number</label><input type="text" id="cost-client-case-number" value="' + caseNum + '" placeholder="e.g., 202401" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box;"></div><div style="margin-bottom: 16px;"><label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Client Name *</label><input type="text" id="cost-client-name" required value="' + clientName + '" placeholder="e.g., Kim, Susan" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box;"></div><div style="margin-bottom: 16px;"><label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Case Description</label><input type="text" id="cost-client-case-desc" value="' + caseDesc + '" placeholder="e.g., Personal Injury" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box;"></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;"><div><label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Email</label><input type="email" id="cost-client-email" value="' + email + '" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box;"></div><div><label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Phone</label><input type="tel" id="cost-client-phone" value="' + phone + '" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box;"></div></div><div style="margin-bottom: 16px;"><label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Notes</label><textarea id="cost-client-notes" rows="2" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box; resize: vertical;">' + notes + '</textarea></div><div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;"><button type="button" onclick="closeCostClientModal()" style="padding: 10px 20px; background: white; color: #64748b; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; cursor: pointer;">Cancel</button><button type="submit" style="padding: 10px 20px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;">' + (isEdit ? 'Save Changes' : 'Add Client') + '</button></div></form></div>';
+
+    // Parse address into components if available
+    var street = '', street2 = '', city = '', stateCode = '', zip = '';
+    if (address) {
+        var parts = address.split(',').map(function(p) { return p.trim(); });
+        if (parts.length >= 1) street = parts[0] || '';
+        if (parts.length >= 2) street2 = parts[1] || '';
+        if (parts.length >= 3) city = parts[2] || '';
+        if (parts.length >= 4) {
+            var stateZip = parts[3].trim().split(' ');
+            stateCode = stateZip[0] || '';
+            zip = stateZip[1] || '';
+        }
+    }
+
+    // Input style for cleaner look
+    var inputStyle = 'width: 100%; padding: 11px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; box-sizing: border-box; background: #fff; transition: all 0.15s ease; outline: none;';
+    var inputFocus = "this.style.borderColor='#6366f1'; this.style.boxShadow='0 0 0 3px rgba(99,102,241,0.1)'";
+    var inputBlur = "this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'";
+
+    modal.innerHTML = `
+        <div style="width: 480px; max-width: 95%; max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.15);">
+            <div style="padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600; color: #1e293b;">${title}</h2>
+                <button onclick="closeCostClientModal()" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: #f8fafc; border: none; border-radius: 6px; font-size: 16px; color: #64748b; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">&times;</button>
+            </div>
+
+            <form id="cost-client-form" onsubmit="saveCostClient(event)" style="padding: 20px 24px;">
+                <input type="hidden" id="cost-client-id" value="${clientId}">
+
+                <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Name <span style="color: #ef4444;">*</span></label>
+                        <input type="text" id="cost-client-name" required value="${clientName}" placeholder="Full name"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Case #</label>
+                        <input type="text" id="cost-client-case" value="${caseNumber}" placeholder="Case number"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Display Name <span style="color: #94a3b8; font-weight: 400;">(for checks)</span></label>
+                    <input type="text" id="cost-client-display-name" value="${displayName}" placeholder="Name as printed on checks"
+                           style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Email</label>
+                        <input type="email" id="cost-client-email" value="${email}" placeholder="email@example.com"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Phone</label>
+                        <input type="tel" id="cost-client-phone" value="${phone}" placeholder="(555) 123-4567"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 16px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Address</label>
+
+                    <div style="margin-bottom: 10px;">
+                        <input type="text" id="cost-client-street" value="${street}" placeholder="Street address"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <input type="text" id="cost-client-street2" value="${street2}" placeholder="Suite, unit, building (optional)"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1.2fr; gap: 10px;">
+                        <input type="text" id="cost-client-city" value="${city}" placeholder="City"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                        <input type="text" id="cost-client-state" value="${stateCode}" placeholder="State" maxlength="2"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                        <input type="text" id="cost-client-zip" value="${zip}" placeholder="Zip"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Notes</label>
+                    <textarea id="cost-client-notes" rows="2" placeholder="Additional notes (optional)"
+                              style="${inputStyle} resize: vertical; min-height: 60px;" onfocus="${inputFocus}" onblur="${inputBlur}">${notes}</textarea>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 16px; border-top: 1px solid #f1f5f9;">
+                    <button type="button" onclick="closeCostClientModal()"
+                            style="padding: 10px 20px; background: #fff; color: #64748b; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s;"
+                            onmouseover="this.style.background='#f8fafc'; this.style.borderColor='#cbd5e1'" onmouseout="this.style.background='#fff'; this.style.borderColor='#e2e8f0'">Cancel</button>
+                    <button type="submit"
+                            style="padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; box-shadow: 0 1px 2px rgba(99,102,241,0.2);"
+                            onmouseover="this.style.background='#4f46e5'; this.style.boxShadow='0 2px 4px rgba(99,102,241,0.3)'" onmouseout="this.style.background='#6366f1'; this.style.boxShadow='0 1px 2px rgba(99,102,241,0.2)'">Save Client</button>
+                </div>
+            </form>
+        </div>
+    `;
     document.body.appendChild(modal);
 };
 
@@ -217,13 +317,29 @@ window.closeCostClientModal = function() {
 window.saveCostClient = async function(event) {
     event.preventDefault();
     var id = document.getElementById('cost-client-id').value;
+
+    // Build address from components
+    var street = document.getElementById('cost-client-street')?.value.trim() || '';
+    var street2 = document.getElementById('cost-client-street2')?.value.trim() || '';
+    var city = document.getElementById('cost-client-city')?.value.trim() || '';
+    var stateCode = document.getElementById('cost-client-state')?.value.trim() || '';
+    var zip = document.getElementById('cost-client-zip')?.value.trim() || '';
+
+    var address = '';
+    if (street) address += street;
+    if (street2) address += (address ? ', ' : '') + street2;
+    if (city) address += (address ? ', ' : '') + city;
+    if (stateCode) address += (address ? ', ' : '') + stateCode;
+    if (zip) address += (address ? ' ' : '') + zip;
+
     var data = {
         user_id: getCostUserId(),
-        case_number: document.getElementById('cost-client-case-number').value,
+        case_number: document.getElementById('cost-client-case').value,
         client_name: document.getElementById('cost-client-name').value,
-        case_description: document.getElementById('cost-client-case-desc').value,
+        display_name: document.getElementById('cost-client-display-name')?.value || null,
         contact_email: document.getElementById('cost-client-email').value,
         contact_phone: document.getElementById('cost-client-phone').value,
+        address: address || null,
         notes: document.getElementById('cost-client-notes').value
     };
     try {

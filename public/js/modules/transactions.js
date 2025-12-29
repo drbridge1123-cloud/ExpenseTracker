@@ -157,9 +157,9 @@ async function loadTransactions() {
 }
 
 async function loadFilterOptions() {
-    // Load accounts for filter
+    // Load accounts for filter (general mode only - exclude IOLTA client ledgers)
     if (state.accounts.length === 0) {
-        const accountsData = await apiGet('/accounts/', { user_id: state.currentUser });
+        const accountsData = await apiGet('/accounts/', { user_id: state.currentUser, account_mode: 'general' });
         if (accountsData.success) {
             state.accounts = accountsData.data.accounts;
         }
@@ -177,13 +177,30 @@ async function loadFilterOptions() {
     const accountFilter = document.getElementById('txn-account-filter');
     accountFilter.innerHTML = '<option value="">All Accounts</option>' + buildGroupedAccountOptions();
 
+    // Check if there's a pending account filter from navigation
+    if (state.filters.pendingAccountFilter) {
+        accountFilter.value = state.filters.pendingAccountFilter;
+        state.filters.accountId = state.filters.pendingAccountFilter;
+        delete state.filters.pendingAccountFilter; // Clear the flag
+    }
+
     // Populate category filter with hierarchical structure
     const categoryFilter = document.getElementById('txn-category-filter');
     categoryFilter.innerHTML = '<option value="">All Categories</option>' + buildHierarchicalCategoryOptions();
 
-    // Set default date range (current month)
-    document.getElementById('txn-date-preset').value = 'this_month';
-    applyDatePreset('this_month', false);
+    // Initialize custom category dropdown for filter
+    if (typeof initCustomCategoryDropdown === 'function') {
+        initCustomCategoryDropdown('txn-category-filter', state.categories, 'All Categories');
+    }
+
+    // Set default date range (current month) - but use 'all' if filtering by account
+    if (state.filters.accountId) {
+        document.getElementById('txn-date-preset').value = 'all';
+        applyDatePreset('all', false);
+    } else {
+        document.getElementById('txn-date-preset').value = 'this_month';
+        applyDatePreset('this_month', false);
+    }
 }
 
 function applyDatePreset(preset, autoFilter = true) {

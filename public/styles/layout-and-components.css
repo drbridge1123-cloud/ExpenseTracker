@@ -288,13 +288,74 @@
 
 .page-actions {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     align-items: center;
 }
 
 .page-actions .form-select {
-    min-width: 130px;
-    max-width: 160px;
+    min-width: 150px;
+    padding: 10px 36px 10px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #495057;
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.page-actions .form-select:hover {
+    background-color: #fff;
+    border-color: #ced4da;
+}
+
+.page-actions .form-select:focus {
+    background-color: #fff;
+    border-color: #4a6cf7;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.1);
+}
+
+/* Category filter dropdown - wider */
+.page-actions .custom-dropdown {
+    min-width: 200px !important;
+    width: 200px !important;
+}
+
+.page-actions .custom-dropdown .dropdown-trigger {
+    width: 200px !important;
+    padding: 10px 36px 10px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #495057;
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.page-actions .custom-dropdown .dropdown-trigger:hover {
+    background-color: #fff;
+    border-color: #ced4da;
+}
+
+.page-actions .custom-dropdown .dropdown-trigger.placeholder {
+    color: #868e96;
+}
+
+.page-actions .custom-dropdown.open .dropdown-trigger {
+    background-color: #fff;
+    border-color: #4a6cf7;
+    box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.1);
+}
+
+.page-actions .custom-dropdown .dropdown-menu {
+    width: 250px !important;
+    min-width: 250px !important;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    border: 1px solid #e9ecef;
 }
 
 /* Cards */
@@ -374,6 +435,95 @@
     font-size: 1.5rem;
     font-weight: 700;
     color: var(--text-primary);
+}
+
+.card-value.muted {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Comparison Cards */
+.comparison-cards .summary-card.comparison {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px;
+}
+
+.comparison-cards .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.comparison-cards .card-header .card-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.change-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 12px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.change-badge.positive {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.change-badge.negative {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.card-comparison {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.card-comparison .this-month,
+.card-comparison .last-month {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-comparison .period-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.card-comparison .this-month .card-value {
+    font-size: 1.25rem;
+}
+
+.card-comparison .last-month .card-value {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
+.summary-card.comparison.income {
+    border-left: 3px solid var(--success);
+}
+
+.summary-card.comparison.expenses {
+    border-left: 3px solid var(--danger);
+}
+
+.summary-card.comparison.net {
+    border-left: 3px solid var(--primary);
+}
+
+.summary-card.comparison.balance {
+    border-left: 3px solid var(--warning);
 }
 
 /* Dashboard Row */
@@ -1098,3 +1248,4 @@
 
 .reports-card-label {
     font-size: 13px;
+.summary-card.comparison.transfer { border-left: 3px solid #8b5cf6; }

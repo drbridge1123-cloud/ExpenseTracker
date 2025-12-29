@@ -41,6 +41,7 @@ function handleGet(Database $db): void {
     $type = $_GET['type'] ?? null; // income, expense, transfer
     $includeStats = isset($_GET['include_stats']) && $_GET['include_stats'] === '1';
     $hierarchical = isset($_GET['hierarchical']) && $_GET['hierarchical'] === '1';
+    $includeAccounts = isset($_GET['include_accounts']) && $_GET['include_accounts'] === '1';
 
     $conditions = ['c.is_active = 1'];
     $params = [];
@@ -83,7 +84,8 @@ function handleGet(Database $db): void {
     $categories = $db->fetchAll($sql, $params);
 
     // Add real bank accounts under Assets category (hierarchical)
-    if ($userId) {
+    // Only include if explicitly requested to reduce response size
+    if ($includeAccounts && $userId) {
         // Find Assets category for this user
         $assetsCategory = null;
         foreach ($categories as $cat) {

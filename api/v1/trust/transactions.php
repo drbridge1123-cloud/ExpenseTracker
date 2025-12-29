@@ -86,8 +86,20 @@ function handleGet(PDO $pdo): void {
     }
 
     if ($status) {
-        $where[] = 't.status = :status';
-        $params['status'] = $status;
+        // Support comma-separated status values (e.g., "pending,printed")
+        $statusList = array_map('trim', explode(',', $status));
+        if (count($statusList) === 1) {
+            $where[] = 't.status = :status';
+            $params['status'] = $statusList[0];
+        } else {
+            $placeholders = [];
+            foreach ($statusList as $i => $s) {
+                $key = "status_{$i}";
+                $placeholders[] = ":{$key}";
+                $params[$key] = $s;
+            }
+            $where[] = 't.status IN (' . implode(',', $placeholders) . ')';
+        }
     }
 
     $whereClause = implode(' AND ', $where);
@@ -105,6 +117,7 @@ function handleGet(PDO $pdo): void {
     $sql = "SELECT
                 t.*,
                 l.current_balance as ledger_balance,
+                l.client_id,
                 tc.client_name, tc.case_number,
                 a.account_name
             FROM trust_transactions t

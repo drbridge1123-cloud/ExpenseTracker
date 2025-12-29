@@ -24,10 +24,19 @@ if (!window._receiptsState) {
         selectedReceipts: new Set(),
         isSelectionMode: false,
         folders: [],
-        currentFolderId: null
+        currentFolderId: null,
+        // Cache for page load
+        _cache: {
+            receipts: null,
+            unattachedReceipts: null,
+            reimbursements: null,
+            loadedAt: 0
+        },
+        _isPageLoading: false
     };
 }
 const receiptsState = window._receiptsState;
+const RECEIPTS_CACHE_TTL = 5000; // 5 seconds
 
 // Legacy aliases for compatibility
 let receiptsData = receiptsState.receiptsData;
@@ -44,13 +53,58 @@ let currentReimbursementFilter = receiptsState.currentFilter;
 let currentReceiptsView = 'list'; // 'list' or 'kanban'
 
 async function loadReceiptsPage() {
-    // Load data for both views
-    await Promise.all([
-        loadReceipts(),
-        loadReimbursementSummary(),
-        loadKanbanBoard(),
-        loadFolders()
-    ]);
+    // Prevent duplicate concurrent loads
+    if (receiptsState._isPageLoading) {
+        console.log('Receipts page load already in progress, skipping...');
+        return;
+    }
+    receiptsState._isPageLoading = true;
+
+    try {
+        // Load all data in a single batch (prevents duplicate API calls)
+        const [receiptsRes, unattachedRes, reimbRes] = await Promise.all([
+            fetch(`${API_BASE}/receipts/?user_id=${state.currentUser}`),
+            fetch(`${API_BASE}/receipts/?user_id=${state.currentUser}&unattached=1`),
+            fetch(`${API_BASE}/reimbursements/?user_id=${state.currentUser}`)
+        ]);
+
+        const [receiptsResult, unattachedResult, reimbResult] = await Promise.all([
+            receiptsRes.json(),
+            unattachedRes.json(),
+            reimbRes.json()
+        ]);
+
+        // Cache the results
+        receiptsState._cache.receipts = receiptsResult.success ? receiptsResult.data : null;
+        receiptsState._cache.unattachedReceipts = unattachedResult.success ? unattachedResult.data : null;
+        receiptsState._cache.reimbursements = reimbResult.success ? reimbResult.data : null;
+        receiptsState._cache.loadedAt = Date.now();
+
+        // Update state from cache
+        if (receiptsState._cache.receipts) {
+            receiptsState.receiptsData = receiptsState._cache.receipts.receipts || [];
+        }
+        if (receiptsState._cache.reimbursements) {
+            receiptsState.allReimbursementsData = receiptsState._cache.reimbursements.transactions || [];
+        }
+
+        // Now render views using cached data (no additional API calls)
+        await renderReceiptsFromCache();
+        await loadFolders();
+    } finally {
+        receiptsState._isPageLoading = false;
+    }
+}
+
+// Render all views from cached data (no API calls)
+async function renderReceiptsFromCache() {
+    // Render list view
+    renderReceiptsList();
+    updateReimbursementSummaryFromCache();
+    updateTabCountsFromCache();
+
+    // Render kanban view
+    renderKanbanFromCache();
 }
 
 async function switchReceiptsView(view) {
@@ -89,14 +143,30 @@ async function switchReceiptsView(view) {
 
 async function loadKanbanBoard() {
     try {
-        // Load both reimbursement data and cash receipts
-        const [reimbResponse, cashResponse] = await Promise.all([
-            fetch(`${API_BASE}/reimbursements/?user_id=${state.currentUser}`),
-            fetch(`${API_BASE}/receipts/?user_id=${state.currentUser}&unattached=1`)
-        ]);
+        // Use cache if available and fresh
+        const now = Date.now();
+        let reimbResult, cashResult;
 
-        const reimbResult = await reimbResponse.json();
-        const cashResult = await cashResponse.json();
+        if (receiptsState._cache.reimbursements && receiptsState._cache.unattachedReceipts &&
+            (now - receiptsState._cache.loadedAt) < RECEIPTS_CACHE_TTL) {
+            // Use cached data
+            reimbResult = { success: true, data: receiptsState._cache.reimbursements };
+            cashResult = { success: true, data: receiptsState._cache.unattachedReceipts };
+        } else {
+            // Fetch fresh data
+            const [reimbResponse, cashResponse] = await Promise.all([
+                fetch(`${API_BASE}/reimbursements/?user_id=${state.currentUser}`),
+                fetch(`${API_BASE}/receipts/?user_id=${state.currentUser}&unattached=1`)
+            ]);
+
+            reimbResult = await reimbResponse.json();
+            cashResult = await cashResponse.json();
+
+            // Update cache
+            if (reimbResult.success) receiptsState._cache.reimbursements = reimbResult.data;
+            if (cashResult.success) receiptsState._cache.unattachedReceipts = cashResult.data;
+            receiptsState._cache.loadedAt = now;
+        }
 
         if (reimbResult.success) {
             receiptsState.allReimbursementsData = reimbResult.data.transactions || [];
@@ -1198,6 +1268,15 @@ async function loadFolders() {
 }
 
 async function updateTabCounts() {
+    // Use cache if available, otherwise fetch
+    const now = Date.now();
+    if (receiptsState._cache.receipts && receiptsState._cache.unattachedReceipts &&
+        receiptsState._cache.reimbursements && (now - receiptsState._cache.loadedAt) < RECEIPTS_CACHE_TTL) {
+        // Use cached data
+        updateTabCountsFromCache();
+        return;
+    }
+
     try {
         // Load receipt counts and reimbursement summary
         const [receiptsResponse, unattachedResponse, reimbResponse] = await Promise.all([
@@ -1210,49 +1289,101 @@ async function updateTabCounts() {
         const unattachedResult = await unattachedResponse.json();
         const reimbResult = await reimbResponse.json();
 
-        // Get counts
-        const allReceiptsCount = receiptsResult.success ? (receiptsResult.data?.receipts?.length || 0) : 0;
-        const unattachedCount = unattachedResult.success ? (unattachedResult.data?.receipts?.length || 0) : 0;
-        const unattachedReceipts = unattachedResult.success ? (unattachedResult.data?.receipts || []) : [];
+        // Update cache
+        if (receiptsResult.success) receiptsState._cache.receipts = receiptsResult.data;
+        if (unattachedResult.success) receiptsState._cache.unattachedReceipts = unattachedResult.data;
+        if (reimbResult.success) receiptsState._cache.reimbursements = reimbResult.data;
+        receiptsState._cache.loadedAt = Date.now();
 
-        // Calculate cash total
-        const cashTotal = unattachedReceipts.reduce((sum, r) => sum + Math.abs(parseFloat(r.amount) || 0), 0);
-
-        const reimbSummary = reimbResult.success ? reimbResult.data.summary : {};
-        const allReimbData = reimbResult.success ? (reimbResult.data.transactions || []) : [];
-
-        // Count pending transactions (not cash)
-        const pendingCount = allReimbData.filter(
-            t => t.reimbursement_status === 'pending' && t.item_type === 'transaction'
-        ).length;
-
-        // Submitted count (both transactions and cash)
-        const submittedCount = reimbSummary.submitted?.count || 0;
-
-        // Reimbursed count
-        const reimbursedCount = reimbSummary.reimbursed?.count || 0;
-
-        // Update tab counts
-        const allCountEl = document.getElementById('tab-count-all');
-        const pendingCountEl = document.getElementById('tab-count-pending');
-        const cashCountEl = document.getElementById('tab-count-cash');
-        const submittedCountEl = document.getElementById('tab-count-submitted');
-        const reimbursementsCountEl = document.getElementById('tab-count-reimbursements');
-
-        if (allCountEl) allCountEl.textContent = allReceiptsCount;
-        if (pendingCountEl) pendingCountEl.textContent = pendingCount;
-        if (cashCountEl) cashCountEl.textContent = unattachedCount;
-        if (submittedCountEl) submittedCountEl.textContent = submittedCount;
-        if (reimbursementsCountEl) reimbursementsCountEl.textContent = reimbursedCount;
-
-        // Update Cash summary card
-        const cashTotalEl = document.getElementById('reimb-cash-total');
-        const cashCountSummaryEl = document.getElementById('reimb-cash-count');
-        if (cashTotalEl) cashTotalEl.textContent = formatCurrency(cashTotal);
-        if (cashCountSummaryEl) cashCountSummaryEl.textContent = `${unattachedCount} items`;
+        // Render from cache
+        updateTabCountsFromCache();
 
     } catch (error) {
         console.error('Error updating tab counts:', error);
+    }
+}
+
+// Update tab counts from cached data (no API calls)
+function updateTabCountsFromCache() {
+    const receiptsData = receiptsState._cache.receipts;
+    const unattachedData = receiptsState._cache.unattachedReceipts;
+    const reimbData = receiptsState._cache.reimbursements;
+
+    // Get counts
+    const allReceiptsCount = receiptsData?.receipts?.length || 0;
+    const unattachedCount = unattachedData?.receipts?.length || 0;
+    const unattachedReceipts = unattachedData?.receipts || [];
+
+    // Calculate cash total
+    const cashTotal = unattachedReceipts.reduce((sum, r) => sum + Math.abs(parseFloat(r.amount) || 0), 0);
+
+    const reimbSummary = reimbData?.summary || {};
+    const allReimbData = reimbData?.transactions || [];
+
+    // Count pending transactions (not cash)
+    const pendingCount = allReimbData.filter(
+        t => t.reimbursement_status === 'pending' && t.item_type === 'transaction'
+    ).length;
+
+    // Submitted count (both transactions and cash)
+    const submittedCount = reimbSummary.submitted?.count || 0;
+
+    // Reimbursed count
+    const reimbursedCount = reimbSummary.reimbursed?.count || 0;
+
+    // Update tab counts
+    const allCountEl = document.getElementById('tab-count-all');
+    const pendingCountEl = document.getElementById('tab-count-pending');
+    const cashCountEl = document.getElementById('tab-count-cash');
+    const submittedCountEl = document.getElementById('tab-count-submitted');
+    const reimbursementsCountEl = document.getElementById('tab-count-reimbursements');
+
+    if (allCountEl) allCountEl.textContent = allReceiptsCount;
+    if (pendingCountEl) pendingCountEl.textContent = pendingCount;
+    if (cashCountEl) cashCountEl.textContent = unattachedCount;
+    if (submittedCountEl) submittedCountEl.textContent = submittedCount;
+    if (reimbursementsCountEl) reimbursementsCountEl.textContent = reimbursedCount;
+
+    // Update Cash summary card
+    const cashTotalEl = document.getElementById('reimb-cash-total');
+    const cashCountSummaryEl = document.getElementById('reimb-cash-count');
+    if (cashTotalEl) cashTotalEl.textContent = formatCurrency(cashTotal);
+    if (cashCountSummaryEl) cashCountSummaryEl.textContent = `${unattachedCount} items`;
+}
+
+// Update reimbursement summary from cache
+function updateReimbursementSummaryFromCache() {
+    const reimbData = receiptsState._cache.reimbursements;
+    if (!reimbData) return;
+
+    const summary = reimbData.summary || {};
+
+    // Update summary cards if they exist
+    const pendingAmountEl = document.getElementById('reimb-pending-amount');
+    const pendingCountEl = document.getElementById('reimb-pending-count');
+    const submittedAmountEl = document.getElementById('reimb-submitted-amount');
+    const submittedCountEl = document.getElementById('reimb-submitted-count');
+
+    if (pendingAmountEl) pendingAmountEl.textContent = formatCurrency(summary.pending?.total || 0);
+    if (pendingCountEl) pendingCountEl.textContent = `${summary.pending?.count || 0} items`;
+    if (submittedAmountEl) submittedAmountEl.textContent = formatCurrency(summary.submitted?.total || 0);
+    if (submittedCountEl) submittedCountEl.textContent = `${summary.submitted?.count || 0} items`;
+}
+
+// Render kanban from cache
+function renderKanbanFromCache() {
+    const reimbData = receiptsState._cache.reimbursements;
+    const unattachedData = receiptsState._cache.unattachedReceipts;
+
+    if (reimbData) {
+        receiptsState.allReimbursementsData = reimbData.transactions || [];
+    }
+
+    const cashPendingReceipts = unattachedData?.receipts || [];
+
+    // Call the existing render function if it exists
+    if (typeof renderKanbanColumns === 'function') {
+        renderKanbanColumns(receiptsState.allReimbursementsData, cashPendingReceipts);
     }
 }
 

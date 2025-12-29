@@ -17,7 +17,10 @@ if (!window.IoltaPageState) {
         unassignedCount: 0,
         sortColumn: 'date',
         sortDirection: 'desc',
-        selectedTxIds: new Set()
+        selectedTxIds: new Set(),
+        statusFilter: null,  // 'pending', 'printed', 'cleared', or null for all
+        _isLoading: false,   // Prevent duplicate page loads
+        lastCheckedIndex: null  // For shift+click range selection
     };
 }
 const IoltaPageState = window.IoltaPageState;
@@ -30,6 +33,24 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Update check counts from already-loaded transactions (avoids extra API call)
+function updateCheckCountsFromTransactions(transactions) {
+    if (!transactions || !Array.isArray(transactions)) return;
+
+    const checks = transactions.filter(t =>
+        (t.check_number && t.check_number.trim() !== '') ||
+        (t.reference_number && t.reference_number.trim() !== '')
+    );
+
+    const pendingCount = checks.filter(t => t.status === 'pending').length;
+    const printedCount = checks.filter(t => t.status === 'printed').length;
+    const clearedCount = checks.filter(t => t.status === 'cleared').length;
+
+    if (typeof updatePendingChecksCount === 'function') updatePendingChecksCount(pendingCount);
+    if (typeof updatePrintedChecksCount === 'function') updatePrintedChecksCount(printedCount);
+    if (typeof updateClearedChecksCount === 'function') updateClearedChecksCount(clearedCount);
+}
+
 // ============================================================
 // UNIFIED IOLTA PAGE - Combined Operations + Client Ledger
 // ============================================================
@@ -38,39 +59,58 @@ function escapeHtml(text) {
  * Load the unified IOLTA page
  */
 async function loadIoltaPage() {
+    // Prevent duplicate concurrent loads
+    if (IoltaPageState._isLoading) {
+        console.log('IOLTA page load already in progress, skipping...');
+        return;
+    }
+    IoltaPageState._isLoading = true;
+
     const userId = window.getCurrentUserId ? window.getCurrentUserId() : 1;
 
+    // Check for status filter from dashboard navigation
+    const statusFilter = sessionStorage.getItem('ioltaStatusFilter');
+    if (statusFilter) {
+        IoltaPageState.statusFilter = statusFilter;
+        sessionStorage.removeItem('ioltaStatusFilter');
+    } else {
+        IoltaPageState.statusFilter = null;
+    }
+
     try {
-        // Load clients, trust account, and unassigned staging count
-        const [clientsResult, accountsResult, stagingResult] = await Promise.all([
-            apiGet(`/trust/clients.php?user_id=${userId}`),
-            apiGet(`/accounts/index.php?user_id=${userId}&type=iolta`),
+        // Use centralized loaders - force refresh to get latest transaction counts
+        const [clientsData, accountsData, stagingResult] = await Promise.all([
+            typeof window.loadTrustClients === 'function'
+                ? window.loadTrustClients(true)  // Force refresh to get accurate transaction_count
+                : apiGet(`/trust/clients.php?user_id=${userId}`).then(r => r.success ? (r.data.clients || []) : []),
+            typeof window.loadTrustAccounts === 'function'
+                ? window.loadTrustAccounts()
+                : apiGet(`/accounts/index.php?user_id=${userId}&type=iolta`).then(r => r.success ? (r.data.accounts || []) : []),
             apiGet(`/trust/staging.php?user_id=${userId}&status=unassigned`)
         ]);
 
-        if (clientsResult.success) {
-            IoltaPageState.clients = clientsResult.data.clients || [];
-
-            // Calculate total balance
-            IoltaPageState.totalBalance = IoltaPageState.clients.reduce(
-                (sum, c) => sum + parseFloat(c.total_balance || 0), 0
+        // Update page state
+        if (clientsData && clientsData.length > 0) {
+            IoltaPageState.clients = clientsData;
+            IoltaPageState.totalBalance = clientsData.reduce(
+                (sum, c) => sum + parseFloat(c.total_balance || c.balance || 0), 0
             );
         }
 
-        // Find trust account
-        if (accountsResult.success && accountsResult.data.accounts) {
-            const trustAcc = accountsResult.data.accounts.find(a => a.account_type === 'iolta');
+        if (accountsData && accountsData.length > 0) {
+            const trustAcc = accountsData.find(a => a.account_type === 'iolta');
             if (trustAcc) {
                 IoltaPageState.trustAccountId = trustAcc.id;
             }
         }
 
-        // Store unassigned staging count
-        if (stagingResult.success) {
-            IoltaPageState.unassignedCount = (stagingResult.data.staging || []).length;
-        } else {
-            IoltaPageState.unassignedCount = 0;
-        }
+        // Get unassigned count from General/Unassigned client's transaction_count or staging
+        const unassignedClient = clientsData.find(c =>
+            c.client_name === 'General/Unassigned' || c.client_name === 'Unassigned'
+        );
+        IoltaPageState.unassignedCount = unassignedClient
+            ? (parseInt(unassignedClient.transaction_count) || 0)
+            : (stagingResult.success ? (stagingResult.data.staging || []).length : 0);
 
         renderIoltaClientSidebar();
 
@@ -80,20 +120,20 @@ async function loadIoltaPage() {
             localStorage.removeItem('ioltaPendingClientId');
             selectIoltaClient(parseInt(pendingClientId) || pendingClientId);
         } else if (IoltaPageState.clients.length > 0) {
-            // Select all clients by default
-            selectIoltaClient('all');
+            // Select all clients by default (this also loads transactions)
+            await selectIoltaClient('all');
+
+            // Calculate check counts from loaded transactions (no extra API call)
+            updateCheckCountsFromTransactions(IoltaPageState.transactions);
         } else {
             renderIoltaTransactions([]);
         }
 
-        // Load pending, printed, and cleared checks counts (non-blocking)
-        loadPendingChecksCount();
-        loadPrintedChecksCount();
-        loadClearedChecksCount();
-
     } catch (error) {
         console.error('Error loading IOLTA page:', error);
         showToast('Error loading IOLTA data', 'error');
+    } finally {
+        IoltaPageState._isLoading = false;
     }
 }
 
@@ -110,7 +150,22 @@ function renderIoltaClientSidebar() {
         c.client_name.toLowerCase().includes(filter) ||
         (c.client_number && c.client_number.toLowerCase().includes(filter)) ||
         (c.case_number && c.case_number.toLowerCase().includes(filter))
-    );
+    ).sort((a, b) => {
+        // Sort by case_number descending (larger numbers first)
+        const caseA = a.case_number || a.client_number || '';
+        const caseB = b.case_number || b.client_number || '';
+        // Extract main number (before any dash) for proper comparison
+        // e.g., "202083-1" -> 202083, "202230" -> 202230
+        const mainA = parseInt((caseA.split('-')[0] || '').replace(/\D/g, '')) || 0;
+        const mainB = parseInt((caseB.split('-')[0] || '').replace(/\D/g, '')) || 0;
+        if (mainB !== mainA) {
+            return mainB - mainA; // Descending by main number
+        }
+        // If main numbers are same, sort by suffix (e.g., -1, -2)
+        const suffixA = parseInt((caseA.split('-')[1] || '0').replace(/\D/g, '')) || 0;
+        const suffixB = parseInt((caseB.split('-')[1] || '0').replace(/\D/g, '')) || 0;
+        return suffixB - suffixA; // Descending by suffix
+    });
 
     // Update total balance in header
     const balanceEl = document.getElementById('iolta-total-balance');
@@ -140,7 +195,7 @@ function renderIoltaClientSidebar() {
                     border-left: 3px solid ${IoltaPageState.selectedClientId === 'general' ? '#f59e0b' : 'transparent'};">
             <div>
                 <div style="font-weight: 500; color: #92400e;">Unassigned</div>
-                <div style="font-size: 12px; color: #b45309;">${IoltaPageState.unassignedCount || 0} imports pending</div>
+                <div style="font-size: 12px; color: #b45309;">${IoltaPageState.unassignedCount || 0} transactions</div>
             </div>
             ${IoltaPageState.unassignedCount > 0 ?
                 `<span style="background: #f59e0b; color: white; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 10px;">${IoltaPageState.unassignedCount}</span>` :
@@ -154,7 +209,7 @@ function renderIoltaClientSidebar() {
     // Client list
     filteredClients.forEach(client => {
         const isSelected = IoltaPageState.selectedClientId === client.id;
-        const balance = parseFloat(client.total_balance || 0);
+        const balance = parseFloat(client.total_balance || client.balance || 0);
         const balanceColor = balance > 0 ? '#10b981' : balance < 0 ? '#ef4444' : '#64748b';
         // Show client_number (case#) or case_number
         const caseNumber = client.client_number || client.case_number || '';
@@ -223,7 +278,7 @@ async function selectIoltaClient(clientId) {
 
             if (balanceBar) {
                 balanceBar.style.display = 'flex';
-                const bal = parseFloat(client.total_balance || 0);
+                const bal = parseFloat(client.total_balance || client.balance || 0);
                 if (balanceEl) {
                     balanceEl.textContent = formatCurrency(bal);
                     balanceEl.style.color = bal >= 0 ? '#047857' : '#ef4444';
@@ -261,14 +316,26 @@ async function loadIoltaTransactions(clientId) {
         let transactions = [];
 
         if (clientId === 'general') {
-            // Load unassigned staging items
-            const result = await apiGet(`/trust/staging.php?user_id=${userId}&status=unassigned`);
-            if (result.success) {
-                transactions = (result.data.staging || []).map(s => ({
-                    ...s,
-                    type: 'staging',
-                    isStaging: true
-                }));
+            // Load General/Unassigned client transactions
+            // First try to find the General/Unassigned client
+            const unassignedClient = IoltaPageState.clients.find(c =>
+                c.client_name === 'General/Unassigned' || c.client_name === 'Unassigned'
+            );
+            if (unassignedClient) {
+                const result = await apiGet(`/trust/transactions.php?user_id=${userId}&client_id=${unassignedClient.id}&limit=500`);
+                if (result.success) {
+                    transactions = result.data.transactions || [];
+                }
+            } else {
+                // Fallback: load staging items if no unassigned client
+                const result = await apiGet(`/trust/staging.php?user_id=${userId}&status=unassigned`);
+                if (result.success) {
+                    transactions = (result.data.staging || []).map(s => ({
+                        ...s,
+                        type: 'staging',
+                        isStaging: true
+                    }));
+                }
             }
         } else if (clientId === 'all') {
             // Load all transactions
@@ -300,12 +367,19 @@ function renderIoltaTransactions(transactions, clientId) {
     const container = document.getElementById('iolta-transactions-list');
     if (!container) return;
 
-    // Apply search filter
-    const searchTerm = (IoltaPageState.txSearchFilter || '').toLowerCase().trim();
+    // Apply status filter first (from dashboard navigation)
+    const statusFilter = IoltaPageState.statusFilter;
     let filteredTx = transactions;
 
+    if (statusFilter) {
+        filteredTx = filteredTx.filter(tx => tx.status === statusFilter);
+    }
+
+    // Apply search filter
+    const searchTerm = (IoltaPageState.txSearchFilter || '').toLowerCase().trim();
+
     if (searchTerm) {
-        filteredTx = transactions.filter(tx => {
+        filteredTx = filteredTx.filter(tx => {
             const checkNum = (tx.check_number || tx.reference_number || '').toLowerCase();
             const desc = (tx.description || tx.memo || '').toLowerCase();
             const payee = (tx.entity_name || tx.payee_name || tx.payee || '').toLowerCase();
@@ -339,12 +413,21 @@ function renderIoltaTransactions(transactions, clientId) {
     if (autoMatchBtn) autoMatchBtn.style.display = isUnassignedView ? 'block' : 'none';
     if (txCountEl) txCountEl.textContent = `${filteredTx.length} of ${transactions.length}`;
 
+    // Update status filter indicator
+    updateStatusFilterIndicator(statusFilter);
+
     if (!filteredTx || filteredTx.length === 0) {
-        const emptyMessage = searchTerm
-            ? `No results for "${escapeHtml(searchTerm)}"`
-            : (clientId === 'general'
-                ? 'No unassigned bank imports. Use "Import CSV" to import bank statement.'
-                : 'No transactions found. Use the buttons above to add deposits or write checks.');
+        let emptyMessage;
+        if (statusFilter) {
+            const statusLabels = { pending: 'Pending', printed: 'Printed', cleared: 'Cleared' };
+            emptyMessage = `No ${statusLabels[statusFilter] || statusFilter} transactions found.`;
+        } else if (searchTerm) {
+            emptyMessage = `No results for "${escapeHtml(searchTerm)}"`;
+        } else if (clientId === 'general') {
+            emptyMessage = 'No unassigned bank imports. Use "Import CSV" to import bank statement.';
+        } else {
+            emptyMessage = 'No transactions found. Use the buttons above to add deposits or write checks.';
+        }
 
         container.innerHTML = `
             <div style="padding: 60px 20px; text-align: center; color: #64748b;">
@@ -412,7 +495,10 @@ function renderIoltaTransactions(transactions, clientId) {
     sortedTx.forEach(tx => {
         const date = new Date(tx.transaction_date || tx.date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
         const amount = parseFloat(tx.amount || 0);
-        const isPositive = amount >= 0;
+        // Determine if positive based on transaction_type (deposits are positive, disbursements negative)
+        const depositTypes = ['deposit', 'transfer_in', 'refund', 'interest'];
+        const isPositive = depositTypes.includes(tx.transaction_type);
+        const displayAmount = isPositive ? amount : -amount;
         const amountColor = isPositive ? '#10b981' : '#ef4444';
 
         // Type based on transaction_type field, fallback to amount
@@ -424,24 +510,23 @@ function renderIoltaTransactions(transactions, clientId) {
             typeLabel = 'Import';
             typeBg = '#fef3c7';
             typeColor = '#92400e';
-        } else if (amount > 0) {
-            // Positive = Deposit
-            typeLabel = 'Dep';
-            typeBg = '#dcfce7';
-            typeColor = '#166534';
         } else {
-            // Negative = Use transaction_type
-            const txType = tx.transaction_type || 'payout';
+            // Use transaction_type field to determine type
+            const txType = tx.transaction_type || (amount > 0 ? 'deposit' : 'disbursement');
             const typeMap = {
+                'deposit': { label: 'Dep', bg: '#dcfce7', color: '#166534' },
+                'transfer_in': { label: 'Transfer', bg: '#eff6ff', color: '#1d4ed8' },
+                'refund': { label: 'Refund', bg: '#dcfce7', color: '#166534' },
                 'payout': { label: 'Payout', bg: '#fee2e2', color: '#991b1b' },
                 'disbursement': { label: 'Payout', bg: '#fee2e2', color: '#991b1b' },
                 'legal_fee': { label: 'Legal Fee', bg: '#fefce8', color: '#854d0e' },
                 'earned_fee': { label: 'Legal Fee', bg: '#fefce8', color: '#854d0e' },
+                'fee': { label: 'Fee', bg: '#fefce8', color: '#854d0e' },
                 'cost': { label: 'Cost', bg: '#fff7ed', color: '#c2410c' },
                 'bill': { label: 'Bill', bg: '#fef3c7', color: '#b45309' },
                 'transfer_out': { label: 'Transfer', bg: '#eff6ff', color: '#1d4ed8' }
             };
-            const typeInfo = typeMap[txType] || { label: 'Payout', bg: '#fee2e2', color: '#991b1b' };
+            const typeInfo = typeMap[txType] || { label: txType, bg: '#e2e8f0', color: '#475569' };
             typeLabel = typeInfo.label;
             typeBg = typeInfo.bg;
             typeColor = typeInfo.color;
@@ -461,6 +546,10 @@ function renderIoltaTransactions(transactions, clientId) {
         // Check number column (check_number for transactions, reference_number for staging)
         const checkNumber = tx.check_number || tx.reference_number || '';
 
+        // Split indicator - show if part of a split group
+        const isSplit = tx.split_group_id ? true : false;
+        const splitBadge = isSplit ? `<span title="Split transaction" style="margin-left: 4px; padding: 1px 4px; background: #8b5cf6; color: white; border-radius: 3px; font-size: 9px; font-weight: 600;">S</span>` : '';
+
         // Payee name (entity_name or payee_name from transaction)
         const payeeName = tx.entity_name || tx.payee_name || tx.payee || '';
 
@@ -479,16 +568,16 @@ function renderIoltaTransactions(transactions, clientId) {
         html += `
             <div class="iolta-tx-row" onclick="viewIoltaTransaction(${tx.id}, ${tx.isStaging || false})">
                 <div class="iolta-col-checkbox" onclick="event.stopPropagation()">
-                    <input type="checkbox" class="iolta-tx-checkbox" data-id="${tx.id}" data-staging="${tx.isStaging || false}" onchange="updateIoltaBulkActions()">
+                    <input type="checkbox" class="iolta-tx-checkbox" data-id="${tx.id}" data-staging="${tx.isStaging || false}" onclick="handleIoltaCheckboxClick(event, this)">
                 </div>
                 <div class="iolta-col-date">${date}</div>
-                <div class="iolta-col-checknum">${checkNumber}</div>
+                <div class="iolta-col-checknum">${checkNumber}${splitBadge}</div>
                 <div class="iolta-col-payee" title="${escapeHtml(payeeName)}">${escapeHtml(payeeName) || '—'}</div>
                 <div class="iolta-col-type">
                     <span class="iolta-type-badge" style="background: ${typeBg}; color: ${typeColor};">${typeLabel}</span>
                 </div>
                 <div class="iolta-col-desc">${escapeHtml(description)}</div>
-                <div class="iolta-col-amount" style="color: ${amountColor};">${isPositive ? '+' : ''}${formatCurrency(amount)}</div>
+                <div class="iolta-col-amount" style="color: ${amountColor};">${isPositive ? '+' : ''}${formatCurrency(displayAmount)}</div>
                 <div class="iolta-col-balance">${displayBalance !== undefined ? formatCurrency(displayBalance) : '—'}</div>
                 <div class="iolta-col-status">${statusHtml}</div>
             </div>
@@ -534,6 +623,58 @@ function clearIoltaTxSearch() {
     IoltaPageState.txSearchFilter = '';
     const input = document.getElementById('iolta-tx-search');
     if (input) input.value = '';
+    renderIoltaTransactions(IoltaPageState.transactions, IoltaPageState.selectedClientId);
+}
+
+/**
+ * Update status filter indicator in the UI
+ */
+function updateStatusFilterIndicator(statusFilter) {
+    // Find or create the filter indicator container
+    let filterIndicator = document.getElementById('iolta-status-filter-indicator');
+    const txCountEl = document.getElementById('iolta-tx-count');
+
+    if (!statusFilter) {
+        // Remove indicator if no filter
+        if (filterIndicator) {
+            filterIndicator.remove();
+        }
+        return;
+    }
+
+    // Create indicator if it doesn't exist
+    if (!filterIndicator && txCountEl) {
+        filterIndicator = document.createElement('div');
+        filterIndicator.id = 'iolta-status-filter-indicator';
+        filterIndicator.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; margin-left: 12px;';
+        txCountEl.parentNode.insertBefore(filterIndicator, txCountEl.nextSibling);
+    }
+
+    if (filterIndicator) {
+        const statusLabels = { pending: 'Pending', printed: 'Printed', cleared: 'Cleared' };
+        const statusColors = { pending: '#f59e0b', printed: '#3b82f6', cleared: '#10b981' };
+        const label = statusLabels[statusFilter] || statusFilter;
+        const color = statusColors[statusFilter] || '#6b7280';
+
+        filterIndicator.innerHTML = `
+            <span style="background: ${color}20; color: ${color}; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                Status: ${label}
+                <button onclick="clearStatusFilter()" style="background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </span>
+        `;
+    }
+}
+
+/**
+ * Clear status filter and reload transactions
+ */
+function clearStatusFilter() {
+    IoltaPageState.statusFilter = null;
     renderIoltaTransactions(IoltaPageState.transactions, IoltaPageState.selectedClientId);
 }
 
@@ -849,6 +990,31 @@ function updateIoltaBulkActions() {
 }
 
 /**
+ * Handle checkbox click with shift+click range selection
+ */
+function handleIoltaCheckboxClick(event, checkbox) {
+    const checkboxes = Array.from(document.querySelectorAll('.iolta-tx-checkbox'));
+    const currentIndex = checkboxes.indexOf(checkbox);
+
+    if (event.shiftKey && IoltaPageState.lastCheckedIndex !== null) {
+        // Shift+click: select range between last checked and current
+        const start = Math.min(IoltaPageState.lastCheckedIndex, currentIndex);
+        const end = Math.max(IoltaPageState.lastCheckedIndex, currentIndex);
+
+        // Set all checkboxes in range to the same state as current checkbox
+        const newState = checkbox.checked;
+        for (let i = start; i <= end; i++) {
+            checkboxes[i].checked = newState;
+        }
+    }
+
+    // Update last checked index
+    IoltaPageState.lastCheckedIndex = currentIndex;
+
+    updateIoltaBulkActions();
+}
+
+/**
  * Clear all selected checkboxes
  */
 function clearIoltaSelection() {
@@ -856,6 +1022,7 @@ function clearIoltaSelection() {
     checkboxes.forEach(cb => cb.checked = false);
     const selectAll = document.getElementById('iolta-select-all');
     if (selectAll) selectAll.checked = false;
+    IoltaPageState.lastCheckedIndex = null;  // Reset shift+click tracking
     updateIoltaBulkActions();
 }
 
@@ -1010,7 +1177,15 @@ async function deleteSelectedIoltaTx() {
 
         showToast(`${selected.length} transaction(s) deleted`, 'success');
         clearIoltaSelection();
-        await loadIoltaPage();
+
+        // Only refresh transactions list (not full page reload)
+        const clientId = IoltaPageState.selectedClientId || 'all';
+        await loadIoltaTransactions(clientId);
+
+        // Invalidate check status cache if any checks were deleted
+        if (typeof invalidateCheckStatusCache === 'function') {
+            invalidateCheckStatusCache();
+        }
     } catch (error) {
         console.error('Error deleting transactions:', error);
         showToast('Error deleting transactions', 'error');
@@ -1332,7 +1507,7 @@ function setupClientSearchAutocomplete() {
     if (selectedClientId && selectedClientId !== 'all' && selectedClientId !== 'general') {
         const client = clients.find(c => c.id === selectedClientId);
         if (client) {
-            const balance = parseFloat(client.total_balance || 0);
+            const balance = parseFloat(client.total_balance || client.balance || 0);
             input.value = client.client_name;
             hiddenInput.value = client.id;
 
@@ -1371,7 +1546,7 @@ function setupClientSearchAutocomplete() {
         }
 
         dropdown.innerHTML = filtered.map(c => {
-            const balance = parseFloat(c.total_balance || 0);
+            const balance = parseFloat(c.total_balance || c.balance || 0);
             return `
                 <div class="client-option" data-id="${c.id}" data-name="${escapeHtml(c.client_name)}" data-balance="${balance}"
                      style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;"
@@ -1433,7 +1608,7 @@ function setupClientSearchAutocomplete() {
  */
 function openTrustCheckModalWithClient(clientId, clientName) {
     const client = IoltaPageState.clients.find(c => c.id === clientId);
-    const balance = client ? parseFloat(client.total_balance || 0) : 0;
+    const balance = client ? parseFloat(client.total_balance || client.balance || 0) : 0;
 
     const modalHtml = `
         <div id="iolta-check-modal" class="modal-overlay active" style="display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center; opacity: 1; visibility: visible;">
@@ -1991,7 +2166,7 @@ function openIoltaFeeModal() {
         return;
     }
 
-    openTrustFeeModalWithClient(clientId, client.client_name, parseFloat(client.total_balance || 0));
+    openTrustFeeModalWithClient(clientId, client.client_name, parseFloat(client.total_balance || client.balance || 0));
 }
 
 /**
@@ -2000,7 +2175,7 @@ function openIoltaFeeModal() {
 function openTrustFeeModalGeneric() {
     const clients = IoltaPageState.clients || [];
     const clientOptions = clients.map(c => {
-        const balance = parseFloat(c.total_balance || 0);
+        const balance = parseFloat(c.total_balance || c.balance || 0);
         return `<option value="${c.id}" data-balance="${balance}">${escapeHtml(c.client_name)}${c.case_number ? ' (' + escapeHtml(c.case_number) + ')' : ''} - ${formatCurrency(balance)}</option>`;
     }).join('');
 
@@ -2149,22 +2324,10 @@ async function submitIoltaFee(form) {
  * @param {HTMLInputElement} inputElement - Optional file input element
  */
 function handleIoltaCsvImport(inputElement) {
-    if (inputElement && inputElement.files && inputElement.files.length > 0) {
-        // Called from existing file input
-        handleLedgerCsvImport(inputElement);
-        // Reset the input so the same file can be selected again
+    // CSV import for ledger - show info toast
+    showToast('CSV Import: Use Reconcile page to import bank statements', 'info');
+    if (inputElement) {
         inputElement.value = '';
-    } else {
-        // Called without input - create one
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.csv';
-        input.onchange = async (e) => {
-            if (e.target.files && e.target.files[0]) {
-                await handleLedgerCsvImport(e.target);
-            }
-        };
-        input.click();
     }
 }
 
@@ -2180,84 +2343,131 @@ function openIoltaBatchModal() {
 }
 
 /**
- * View transaction details
+ * View/Edit transaction details
  */
-function viewIoltaTransaction(id, isStaging) {
+async function viewIoltaTransaction(id, isStaging) {
     if (isStaging) {
         // Open staging assignment modal
         showToast('Staging item - assign to a client', 'info');
     } else {
-        // Open transaction detail modal using existing function
-        if (typeof openTransactionDetailModal === 'function') {
-            openTransactionDetailModal(id);
-        } else {
-            showToast('Transaction detail view not available', 'info');
-        }
+        // Open transaction edit modal
+        await openIoltaEditTransactionModal(id);
     }
 }
 
 /**
- * Close any IOLTA modal
+ * Open edit transaction modal for trust transactions
  */
-function closeIoltaModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) modal.remove();
-}
+async function openIoltaEditTransactionModal(transactionId) {
+    const userId = window.getCurrentUserId ? window.getCurrentUserId() : 1;
 
-/**
- * Add new client
- */
-function openIoltaAddClientModal() {
+    // Fetch transaction details
+    let transaction = null;
+    try {
+        const result = await apiGet('/trust/transactions.php', {
+            user_id: userId,
+            id: transactionId
+        });
+        if (result.success && result.data && result.data.transactions && result.data.transactions.length > 0) {
+            transaction = result.data.transactions[0];
+        }
+    } catch (e) {
+        console.error('Failed to load transaction:', e);
+    }
+
+    if (!transaction) {
+        showToast('Failed to load transaction details', 'error');
+        return;
+    }
+
+    // Get clients for dropdown
+    let clients = IoltaPageState.clients || ioltaState.clients || [];
+    if (clients.length === 0) {
+        try {
+            const result = await apiGet('/trust/clients.php', { user_id: userId });
+            if (result.success && result.data.clients) {
+                clients = result.data.clients;
+            }
+        } catch (e) {
+            console.error('Failed to load clients:', e);
+        }
+    }
+
+    const isDeposit = parseFloat(transaction.amount) > 0;
+    const absAmount = Math.abs(parseFloat(transaction.amount));
+
+    // Create searchable client select
+    const searchableClientSelect = createSearchableClientSelect(
+        'edit-tx-client-select',
+        'client_id',
+        clients,
+        'Search clients...',
+        true
+    );
+
     const modalHtml = `
-        <div id="iolta-add-client-modal" class="modal-overlay" style="display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
-            <div style="background: white; border-radius: 12px; width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <div id="iolta-edit-tx-modal" class="modal-overlay active" style="display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+            <div class="modal" style="background: white; border-radius: 12px; width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
                 <div style="padding: 20px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #1e293b;">Add New Client</h3>
-                    <button onclick="closeIoltaModal('iolta-add-client-modal')" style="background: none; border: none; font-size: 24px; color: #64748b; cursor: pointer;">&times;</button>
+                    <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #1e293b;">Edit Transaction</h3>
+                    <button onclick="closeIoltaModal('iolta-edit-tx-modal')" style="background: none; border: none; font-size: 24px; color: #64748b; cursor: pointer;">&times;</button>
                 </div>
-                <form id="iolta-add-client-form" style="padding: 24px;">
+                <form id="iolta-edit-tx-form" style="padding: 24px;">
+                    <input type="hidden" name="id" value="${transaction.id}">
+                    <input type="hidden" name="user_id" value="${userId}">
+
                     <div style="margin-bottom: 16px;">
-                        <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Client Name *</label>
-                        <input type="text" name="client_name" required
-                               style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;" placeholder="Full name">
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-                        <div>
-                            <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Client #</label>
-                            <input type="text" name="client_number"
-                                   style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;" placeholder="Optional">
-                        </div>
-                        <div>
-                            <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Case #</label>
-                            <input type="text" name="case_number"
-                                   style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;" placeholder="Optional">
+                        <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Type</label>
+                        <div style="padding: 10px 12px; background: #f3f4f6; border-radius: 8px; color: ${isDeposit ? '#059669' : '#dc2626'};">
+                            ${isDeposit ? 'Deposit' : 'Payout (Check)'}
                         </div>
                     </div>
+
                     <div style="margin-bottom: 16px;">
-                        <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Case Description</label>
-                        <input type="text" name="case_description"
-                               style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;" placeholder="Case type or description">
+                        <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Client</label>
+                        ${searchableClientSelect}
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-                        <div>
-                            <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Email</label>
-                            <input type="email" name="contact_email"
-                                   style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;">
-                        </div>
-                        <div>
-                            <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Phone</label>
-                            <input type="tel" name="contact_phone"
-                                   style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;">
-                        </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Amount</label>
+                        <input type="number" name="amount" step="0.01" min="0.01" value="${absAmount.toFixed(2)}" required
+                               style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;">
                     </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Date</label>
+                        <input type="date" name="transaction_date" value="${transaction.transaction_date}" required
+                               style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;">
+                    </div>
+
+                    ${!isDeposit ? `
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Check #</label>
+                        <input type="text" name="check_number" value="${transaction.check_number || ''}"
+                               style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;">
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Payee</label>
+                        <input type="text" name="payee" value="${transaction.payee || ''}"
+                               style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;">
+                    </div>
+                    ` : ''}
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-weight: 500; color: #374151; margin-bottom: 6px;">Description</label>
+                        <input type="text" name="description" value="${transaction.description || ''}"
+                               style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;">
+                    </div>
+
                     <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
-                        <button type="button" onclick="closeIoltaModal('iolta-add-client-modal')"
-                                style="padding: 10px 20px; background: #f1f5f9; color: #475569; border: none; border-radius: 8px; font-weight: 500; cursor: pointer;">
+                        <button type="button" onclick="closeIoltaModal('iolta-edit-tx-modal')"
+                                style="padding: 10px 20px; border: 1px solid #d1d5db; background: white; border-radius: 8px; cursor: pointer;">
                             Cancel
                         </button>
                         <button type="submit"
-                                style="padding: 10px 20px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer;">
-                            Add Client
+                                style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                            Save Changes
                         </button>
                     </div>
                 </form>
@@ -2267,42 +2477,58 @@ function openIoltaAddClientModal() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-    document.getElementById('iolta-add-client-form').addEventListener('submit', async (e) => {
+    // Pre-select the current client
+    if (transaction.client_id) {
+        const currentClient = clients.find(c => c.id == transaction.client_id);
+        if (currentClient) {
+            selectClient('edit-tx-client-select', currentClient.id, `${currentClient.client_name} (${currentClient.case_number || 'No case #'})`);
+        }
+    }
+
+    // Handle form submit
+    document.getElementById('iolta-edit-tx-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        await submitIoltaNewClient(e.target);
+        await submitIoltaEditTransaction(e.target, isDeposit);
     });
 }
 
-async function submitIoltaNewClient(form) {
+/**
+ * Submit edited transaction
+ */
+async function submitIoltaEditTransaction(form, isDeposit) {
     const formData = new FormData(form);
-    const userId = window.getCurrentUserId ? window.getCurrentUserId() : 1;
+    const data = Object.fromEntries(formData.entries());
 
-    const data = {
-        user_id: userId,
-        client_name: formData.get('client_name'),
-        client_number: formData.get('client_number') || null,
-        case_number: formData.get('case_number') || null,
-        case_description: formData.get('case_description') || null,
-        contact_email: formData.get('contact_email') || null,
-        contact_phone: formData.get('contact_phone') || null
-    };
+    // Set proper amount sign
+    const absAmount = Math.abs(parseFloat(data.amount));
+    data.amount = isDeposit ? absAmount : -absAmount;
 
     try {
-        const result = await apiPost('/trust/clients.php', data);
+        const result = await apiPut('/trust/transactions.php', data);
+
         if (result.success) {
-            showToast('Client added successfully', 'success');
-            closeIoltaModal('iolta-add-client-modal');
-            await loadIoltaPage();
-            // Select the new client
-            if (result.data && result.data.client) {
-                selectIoltaClient(result.data.client.id);
+            showToast('Transaction updated successfully', 'success');
+            closeIoltaModal('iolta-edit-tx-modal');
+
+            // Reload the ledger
+            if (typeof loadIoltaClientLedger === 'function') {
+                loadIoltaClientLedger();
             }
         } else {
-            showToast(result.message || 'Error adding client', 'error');
+            showToast(result.message || 'Failed to update transaction', 'error');
         }
-    } catch (error) {
-        showToast('Error adding client', 'error');
+    } catch (e) {
+        console.error('Error updating transaction:', e);
+        showToast('Error updating transaction', 'error');
     }
+}
+
+/**
+ * Close any IOLTA modal
+ */
+function closeIoltaModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.remove();
 }
 
 /**
@@ -2451,7 +2677,7 @@ async function deleteSelectedClient() {
     }
 
     // Check balance
-    const balance = parseFloat(client.total_balance || 0);
+    const balance = parseFloat(client.total_balance || client.balance || 0);
     if (balance !== 0) {
         alert('Cannot delete client with non-zero balance. Please close ledgers first.');
         return;
@@ -2489,6 +2715,8 @@ window.renderIoltaTransactions = renderIoltaTransactions;
 window.filterIoltaClients = filterIoltaClients;
 window.filterIoltaTransactions = filterIoltaTransactions;
 window.clearIoltaTxSearch = clearIoltaTxSearch;
+window.clearStatusFilter = clearStatusFilter;
+window.updateStatusFilterIndicator = updateStatusFilterIndicator;
 window.sortIoltaTable = sortIoltaTable;
 window.updateSortIcons = updateSortIcons;
 window.runAutoMatch = runAutoMatch;
@@ -2498,6 +2726,7 @@ window.toggleAllMatches = toggleAllMatches;
 // approveSelectedMatches - registered earlier (line 15883)
 window.toggleIoltaSelectAll = toggleIoltaSelectAll;
 window.updateIoltaBulkActions = updateIoltaBulkActions;
+window.handleIoltaCheckboxClick = handleIoltaCheckboxClick;
 window.clearIoltaSelection = clearIoltaSelection;
 window.getSelectedIoltaTxIds = getSelectedIoltaTxIds;
 window.openIoltaMoveModal = openIoltaMoveModal;
@@ -2510,9 +2739,9 @@ window.openIoltaFeeModal = openIoltaFeeModal;
 window.handleIoltaCsvImport = handleIoltaCsvImport;
 window.openIoltaBatchModal = openIoltaBatchModal;
 window.viewIoltaTransaction = viewIoltaTransaction;
+window.openIoltaEditTransactionModal = openIoltaEditTransactionModal;
+window.submitIoltaEditTransaction = submitIoltaEditTransaction;
 window.closeIoltaModal = closeIoltaModal;
-window.openIoltaAddClientModal = openIoltaAddClientModal;
-window.submitIoltaNewClient = submitIoltaNewClient;
 window.IoltaPageState = IoltaPageState;
 
 // Alias for toggleSelectAllIoltaTx (called from index.html)
@@ -2586,408 +2815,5 @@ async function markSelectedIoltaAsCleared() {
     }
 }
 window.markSelectedIoltaAsCleared = markSelectedIoltaAsCleared;
-
-// =====================================================
-// Dashboard Stat Card Detail Functions
-// =====================================================
-
-async function showTotalClientFundsDetail() {
-    const userId = state.currentUser || localStorage.getItem('currentUser');
-
-    // Get client breakdown from reports API (includes individual client balances)
-    const breakdownData = await apiGet('/trust/reports.php', {
-        type: 'client_breakdown',
-        user_id: userId,
-        balance_filter: 'all'
-    });
-
-    let modal = document.getElementById('stat-detail-modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'stat-detail-modal';
-        document.body.appendChild(modal);
-    }
-
-    let clientsHtml = '';
-    let grandTotal = 0;
-
-    if (breakdownData.success && breakdownData.data.client_breakdown) {
-        const clients = breakdownData.data.client_breakdown.clients || [];
-
-        // Calculate grand total from ALL clients
-        clients.forEach(client => {
-            grandTotal += parseFloat(client.current_balance || 0);
-        });
-
-        // Filter out clients with $0 balance for display
-        const activeClients = clients.filter(client => Math.abs(parseFloat(client.current_balance || 0)) >= 0.01);
-
-        if (activeClients.length > 0) {
-            clientsHtml = `
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="border-bottom: 2px solid #e5e7eb;">
-                            <th style="text-align: left; padding: 8px; font-size: 12px; color: #6b7280;">Client</th>
-                            <th style="text-align: left; padding: 8px; font-size: 12px; color: #6b7280;">Case #</th>
-                            <th style="text-align: right; padding: 8px; font-size: 12px; color: #6b7280;">Balance</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${activeClients.map(client => {
-                            const balance = parseFloat(client.current_balance || 0);
-                            const balanceColor = balance >= 0 ? '#059669' : '#dc2626';
-                            return `
-                                <tr style="border-bottom: 1px solid #f3f4f6; cursor: pointer;"
-                                    onclick="closeStatDetailModal(); localStorage.setItem('ioltaPendingClientId', '${client.client_id}'); navigateTo('iolta');"
-                                    onmouseover="this.style.background='#f9fafb';"
-                                    onmouseout="this.style.background='';">
-                                    <td style="padding: 10px 8px;">${client.client_name || 'Unknown'}</td>
-                                    <td style="padding: 10px 8px; color: #6b7280;">${client.case_number || '-'}</td>
-                                    <td style="padding: 10px 8px; text-align: right; font-weight: 600; color: ${balanceColor};">${formatCurrency(balance)}</td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            `;
-        }
-    }
-
-    if (!clientsHtml) {
-        clientsHtml = '<p style="color: #6b7280; text-align: center; padding: 40px;">No client funds found</p>';
-    }
-
-    modal.innerHTML = `
-        <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99999; display: flex; justify-content: center; align-items: center;">
-            <div style="width: 700px; max-width: 95%; max-height: 85vh; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); display: flex; flex-direction: column;">
-                <div style="padding: 20px 24px; background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: white;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span style="font-size: 24px;">&#128176;</span>
-                            <div>
-                                <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Total Client Funds</h3>
-                                <p style="margin: 4px 0 0; font-size: 24px; font-weight: 700;">${formatCurrency(grandTotal)}</p>
-                            </div>
-                        </div>
-                        <button onclick="closeStatDetailModal()" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.2); color: white; border: none; cursor: pointer; font-size: 18px;">&times;</button>
-                    </div>
-                </div>
-                <div style="flex: 1; overflow-y: auto; padding: 20px;">
-                    <p style="color: #6b7280; font-size: 13px; margin-bottom: 16px;">Click on a client to view their ledger</p>
-                    ${clientsHtml}
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-async function showTrustAccountsDetail() {
-    const userId = state.currentUser || localStorage.getItem('currentUser');
-
-    // Get balance summary with account details
-    const summaryData = await apiGet('/trust/reports.php', {
-        type: 'balance_summary',
-        user_id: userId
-    });
-
-    let modal = document.getElementById('stat-detail-modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'stat-detail-modal';
-        document.body.appendChild(modal);
-    }
-
-    let accountsHtml = '';
-    let accountCount = 0;
-    let totalBalance = 0;
-
-    if (summaryData.success && summaryData.data.balance_summary) {
-        const accounts = summaryData.data.balance_summary.accounts || [];
-        accountCount = accounts.length;
-
-        if (accounts.length > 0) {
-            accounts.forEach(account => {
-                totalBalance += parseFloat(account.account_balance || 0);
-            });
-
-            accountsHtml = `
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="border-bottom: 2px solid #e5e7eb;">
-                            <th style="text-align: left; padding: 8px; font-size: 12px; color: #6b7280;">Account Name</th>
-                            <th style="text-align: center; padding: 8px; font-size: 12px; color: #6b7280;">Ledgers</th>
-                            <th style="text-align: right; padding: 8px; font-size: 12px; color: #6b7280;">Bank Balance</th>
-                            <th style="text-align: right; padding: 8px; font-size: 12px; color: #6b7280;">Client Total</th>
-                            <th style="text-align: center; padding: 8px; font-size: 12px; color: #6b7280;">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${accounts.map(account => {
-                            const bankBalance = parseFloat(account.account_balance || 0);
-                            const clientTotal = parseFloat(account.total_client_balance || 0);
-                            const diff = Math.abs(bankBalance - clientTotal);
-                            const isBalanced = diff < 0.01;
-                            const statusColor = isBalanced ? '#059669' : '#dc2626';
-                            const statusText = isBalanced ? '&#10003; Balanced' : '&#9888; Off by ' + formatCurrency(diff);
-                            return `
-                                <tr style="border-bottom: 1px solid #f3f4f6;">
-                                    <td style="padding: 10px 8px; font-weight: 500;">${account.account_name}</td>
-                                    <td style="padding: 10px 8px; text-align: center; color: #6b7280;">${account.ledger_count || 0}</td>
-                                    <td style="padding: 10px 8px; text-align: right; font-weight: 600;">${formatCurrency(bankBalance)}</td>
-                                    <td style="padding: 10px 8px; text-align: right; color: #6b7280;">${formatCurrency(clientTotal)}</td>
-                                    <td style="padding: 10px 8px; text-align: center; font-size: 12px; color: ${statusColor};">${statusText}</td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                    <tfoot>
-                        <tr style="border-top: 2px solid #e5e7eb; background: #f9fafb;">
-                            <td style="padding: 12px 8px; font-weight: 600;">Total</td>
-                            <td style="padding: 12px 8px;"></td>
-                            <td style="padding: 12px 8px; text-align: right; font-weight: 700;">${formatCurrency(totalBalance)}</td>
-                            <td style="padding: 12px 8px;"></td>
-                            <td style="padding: 12px 8px;"></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            `;
-        }
-    }
-
-    if (!accountsHtml) {
-        accountsHtml = '<p style="color: #6b7280; text-align: center; padding: 40px;">No trust accounts found</p>';
-    }
-
-    modal.innerHTML = `
-        <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99999; display: flex; justify-content: center; align-items: center;">
-            <div style="width: 750px; max-width: 95%; max-height: 85vh; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); display: flex; flex-direction: column;">
-                <div style="padding: 20px 24px; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span style="font-size: 24px;">&#127974;</span>
-                            <div>
-                                <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Trust Accounts</h3>
-                                <p style="margin: 4px 0 0; font-size: 24px; font-weight: 700;">${accountCount} Account${accountCount !== 1 ? 's' : ''}</p>
-                            </div>
-                        </div>
-                        <button onclick="closeStatDetailModal()" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.2); color: white; border: none; cursor: pointer; font-size: 18px;">&times;</button>
-                    </div>
-                </div>
-                <div style="flex: 1; overflow-y: auto; padding: 20px;">
-                    ${accountsHtml}
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-async function showOpenLedgersDetail() {
-    const userId = state.currentUser || localStorage.getItem('currentUser');
-
-    // Get client breakdown from reports API
-    const breakdownData = await apiGet('/trust/reports.php', {
-        type: 'client_breakdown',
-        user_id: userId,
-        balance_filter: 'all'
-    });
-
-    let modal = document.getElementById('stat-detail-modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'stat-detail-modal';
-        document.body.appendChild(modal);
-    }
-
-    let ledgersHtml = '';
-    let totalLedgers = 0;
-
-    if (breakdownData.success && breakdownData.data.client_breakdown) {
-        const allClients = breakdownData.data.client_breakdown.clients || [];
-        // Filter to only clients with non-zero balance
-        const clients = allClients.filter(client => Math.abs(parseFloat(client.current_balance || 0)) >= 0.01);
-        totalLedgers = clients.length;
-
-        clients.forEach(client => {
-            const balance = parseFloat(client.current_balance || 0);
-            const balanceColor = balance >= 0 ? '#059669' : '#dc2626';
-            const statusBadge = balance > 0
-                ? '<span style="padding: 4px 8px; background: #dcfce7; color: #166534; border-radius: 4px; font-size: 11px;">Open</span>'
-                : '<span style="padding: 4px 8px; background: #fef2f2; color: #dc2626; border-radius: 4px; font-size: 11px;">Negative</span>';
-
-            ledgersHtml += `
-                <tr style="border-bottom: 1px solid #f3f4f6; cursor: pointer;"
-                    onclick="closeStatDetailModal(); localStorage.setItem('ioltaPendingClientId', '${client.client_id}'); navigateTo('iolta');"
-                    onmouseover="this.style.background='#f9fafb';"
-                    onmouseout="this.style.background='';">
-                    <td style="padding: 10px 8px; font-weight: 500;">${client.client_name || 'Unknown'}</td>
-                    <td style="padding: 10px 8px; color: #6b7280;">${client.case_number || '-'}</td>
-                    <td style="padding: 10px 8px; text-align: right; font-weight: 600; color: ${balanceColor};">${formatCurrency(balance)}</td>
-                    <td style="padding: 10px 8px; text-align: center;">${statusBadge}</td>
-                </tr>
-            `;
-        });
-    }
-
-    const tableHtml = ledgersHtml ? `
-        <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-                <tr style="border-bottom: 2px solid #e5e7eb;">
-                    <th style="text-align: left; padding: 8px; font-size: 12px; color: #6b7280;">Client</th>
-                    <th style="text-align: left; padding: 8px; font-size: 12px; color: #6b7280;">Case #</th>
-                    <th style="text-align: right; padding: 8px; font-size: 12px; color: #6b7280;">Balance</th>
-                    <th style="text-align: center; padding: 8px; font-size: 12px; color: #6b7280;">Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${ledgersHtml}
-            </tbody>
-        </table>
-    ` : '<p style="color: #6b7280; text-align: center; padding: 40px;">No open ledgers found</p>';
-
-    modal.innerHTML = `
-        <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99999; display: flex; justify-content: center; align-items: center;">
-            <div style="width: 700px; max-width: 95%; max-height: 85vh; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); display: flex; flex-direction: column;">
-                <div style="padding: 20px 24px; background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: white;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span style="font-size: 24px;">&#128210;</span>
-                            <div>
-                                <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Open Ledgers</h3>
-                                <p style="margin: 4px 0 0; font-size: 24px; font-weight: 700;">${totalLedgers}</p>
-                            </div>
-                        </div>
-                        <button onclick="closeStatDetailModal()" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.2); color: white; border: none; cursor: pointer; font-size: 18px;">&times;</button>
-                    </div>
-                </div>
-                <div style="flex: 1; overflow-y: auto; padding: 20px;">
-                    <p style="color: #6b7280; font-size: 13px; margin-bottom: 16px;">Click on a ledger to view transactions</p>
-                    ${tableHtml}
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-async function showReconciliationDetail() {
-    const userId = state.currentUser || localStorage.getItem('currentUser');
-
-    // Get balance summary
-    const summaryData = await apiGet('/trust/reports.php', {
-        type: 'balance_summary',
-        user_id: userId
-    });
-
-    let modal = document.getElementById('stat-detail-modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'stat-detail-modal';
-        document.body.appendChild(modal);
-    }
-
-    let accountTotal = 0;
-    let ledgerTotal = 0;
-    let accountsHtml = '';
-
-    if (summaryData.success && summaryData.data.balance_summary) {
-        const summary = summaryData.data.balance_summary;
-        accountTotal = summary.totals?.grand_total_account || 0;
-        ledgerTotal = summary.totals?.grand_total_client || 0;
-
-        const accounts = summary.accounts || [];
-        accountsHtml = accounts.map(account => {
-            const accBalance = parseFloat(account.account_balance || 0);
-            const clientTotal = parseFloat(account.total_client_balance || 0);
-            const diff = accBalance - clientTotal;
-            const isBalanced = Math.abs(diff) < 0.01;
-
-            return `
-                <div style="background: ${isBalanced ? '#f0fdf4' : '#fef2f2'}; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: #374151;">&#127974; ${account.account_name || 'Trust Account'}</h4>
-                        <span style="padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; ${isBalanced ? 'background: #dcfce7; color: #166534;' : 'background: #fef2f2; color: #dc2626;'}">
-                            ${isBalanced ? '&#10003; Balanced' : '&#9888; Unbalanced'}
-                        </span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
-                        <div>
-                            <div style="font-size: 11px; color: #6b7280; text-transform: uppercase;">Bank Balance</div>
-                            <div style="font-size: 16px; font-weight: 600; color: #1f2937;">${formatCurrency(accBalance)}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 11px; color: #6b7280; text-transform: uppercase;">Client Ledgers</div>
-                            <div style="font-size: 16px; font-weight: 600; color: #1f2937;">${formatCurrency(clientTotal)}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 11px; color: #6b7280; text-transform: uppercase;">Difference</div>
-                            <div style="font-size: 16px; font-weight: 600; color: ${isBalanced ? '#059669' : '#dc2626'};">${formatCurrency(diff)}</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    const difference = accountTotal - ledgerTotal;
-    const isBalanced = Math.abs(difference) < 0.01;
-
-    modal.innerHTML = `
-        <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 99999; display: flex; justify-content: center; align-items: center;">
-            <div style="width: 650px; max-width: 95%; max-height: 85vh; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); display: flex; flex-direction: column;">
-                <div style="padding: 20px 24px; background: linear-gradient(135deg, ${isBalanced ? '#059669' : '#dc2626'} 0%, ${isBalanced ? '#047857' : '#b91c1c'} 100%); color: white;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span style="font-size: 24px;">&#9878;</span>
-                            <div>
-                                <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Reconciliation Status</h3>
-                                <p style="margin: 4px 0 0; font-size: 20px; font-weight: 700;">${isBalanced ? 'All Accounts Balanced' : 'Attention Needed'}</p>
-                            </div>
-                        </div>
-                        <button onclick="closeStatDetailModal()" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.2); color: white; border: none; cursor: pointer; font-size: 18px;">&times;</button>
-                    </div>
-                </div>
-                <div style="flex: 1; overflow-y: auto; padding: 20px;">
-                    <!-- Summary -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; padding: 16px; background: #f9fafb; border-radius: 12px;">
-                        <div style="text-align: center;">
-                            <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Total Bank Balance</div>
-                            <div style="font-size: 20px; font-weight: 700; color: #1f2937;">${formatCurrency(accountTotal)}</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Total Client Ledgers</div>
-                            <div style="font-size: 20px; font-weight: 700; color: #1f2937;">${formatCurrency(ledgerTotal)}</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Difference</div>
-                            <div style="font-size: 20px; font-weight: 700; color: ${isBalanced ? '#059669' : '#dc2626'};">${formatCurrency(difference)}</div>
-                        </div>
-                    </div>
-
-                    <!-- Account Breakdown -->
-                    <h4 style="margin: 0 0 12px; font-size: 14px; font-weight: 600; color: #374151;">Account Breakdown</h4>
-                    ${accountsHtml || '<p style="color: #6b7280; text-align: center; padding: 20px;">No accounts found</p>'}
-
-                    <!-- Action Button -->
-                    <div style="margin-top: 20px; text-align: center;">
-                        <button onclick="closeStatDetailModal(); navigateTo('trust-reconcile');"
-                                style="padding: 12px 24px; background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;">
-                            Go to Reconciliation
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function closeStatDetailModal() {
-    const modal = document.getElementById('stat-detail-modal');
-    if (modal) modal.remove();
-}
-
-window.showTotalClientFundsDetail = showTotalClientFundsDetail;
-window.showTrustAccountsDetail = showTrustAccountsDetail;
-window.showOpenLedgersDetail = showOpenLedgersDetail;
-window.showReconciliationDetail = showReconciliationDetail;
-window.closeStatDetailModal = closeStatDetailModal;
 
 console.log('IOLTA Ledger module loaded');

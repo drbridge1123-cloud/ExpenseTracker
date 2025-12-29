@@ -169,8 +169,9 @@ function populateBudgetCategories(currentCategoryId = null) {
     select.innerHTML = '<option value="">Select a category...</option>';
 
     // If editing, add current category
-    if (currentCategoryId && budgetsData) {
-        const currentBudget = budgetsData.budgets.find(b => b.category_id == currentCategoryId);
+    const budgetData = budgetsState.budgetsData;
+    if (currentCategoryId && budgetData) {
+        const currentBudget = budgetData.budgets.find(b => b.category_id == currentCategoryId);
         if (currentBudget) {
             const icon = currentBudget.category_icon && currentBudget.category_icon.trim() ? currentBudget.category_icon : '📁';
             select.innerHTML += `<option value="${currentBudget.category_id}">${icon} ${currentBudget.category_name}</option>`;
@@ -179,8 +180,8 @@ function populateBudgetCategories(currentCategoryId = null) {
     }
 
     // Add unbudgeted categories - organized hierarchically
-    if (budgetsData && budgetsData.unbudgeted_categories) {
-        const categories = budgetsData.unbudgeted_categories;
+    if (budgetData && budgetData.unbudgeted_categories) {
+        const categories = budgetData.unbudgeted_categories;
 
         // Separate parents and children
         const parents = categories.filter(c => !c.parent_id);
@@ -220,6 +221,19 @@ function populateBudgetCategories(currentCategoryId = null) {
                 select.innerHTML += `<option value="${child.id}">${icon} ${parentLabel}${child.name}</option>`;
             }
         });
+
+        // Initialize custom dropdown with unbudgeted categories
+        if (typeof initCustomCategoryDropdown === 'function' && !currentCategoryId) {
+            // Map unbudgeted_categories to the format expected by custom dropdown
+            const dropdownCategories = categories.map(c => ({
+                id: c.id,
+                name: c.name,
+                parent_id: c.parent_id,
+                category_type: c.category_type || 'expense',
+                sort_order: c.sort_order || 0
+            }));
+            initCustomCategoryDropdown('budget-category', dropdownCategories, 'Select a category...');
+        }
     }
 }
 

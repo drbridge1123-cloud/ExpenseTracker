@@ -96,42 +96,24 @@ function handleGet() {
         }
 
         // Get categories without budgets (for adding new budgets)
-        // Filter by user: Personal users (1,2) see user_id IS NULL, Business user (3) sees user_id = 3
-        $isBusinessUser = ($userId == 3);
-
-        if ($isBusinessUser) {
-            // Business user sees only business categories (user_id = 3)
-            $unbugdetedCategories = $db->fetchAll(
-                "SELECT c.id, c.name, c.icon, c.color, c.category_type, c.parent_id, c.sort_order,
-                        p.name AS parent_name
-                 FROM categories c
-                 LEFT JOIN categories p ON c.parent_id = p.id
-                 WHERE c.category_type = 'expense'
-                   AND c.user_id = :user_id
-                   AND c.id NOT IN (
-                       SELECT category_id FROM budgets
-                       WHERE user_id = :user_id2 AND is_active = 1
-                   )
-                 ORDER BY COALESCE(c.parent_id, c.id), c.parent_id IS NOT NULL, c.sort_order, c.name",
-                ['user_id' => $userId, 'user_id2' => $userId]
-            );
-        } else {
-            // Personal users see only personal categories (user_id IS NULL)
-            $unbugdetedCategories = $db->fetchAll(
-                "SELECT c.id, c.name, c.icon, c.color, c.category_type, c.parent_id, c.sort_order,
-                        p.name AS parent_name
-                 FROM categories c
-                 LEFT JOIN categories p ON c.parent_id = p.id
-                 WHERE c.category_type = 'expense'
-                   AND c.user_id IS NULL
-                   AND c.id NOT IN (
-                       SELECT category_id FROM budgets
-                       WHERE user_id = :user_id AND is_active = 1
-                   )
-                 ORDER BY COALESCE(c.parent_id, c.id), c.parent_id IS NOT NULL, c.sort_order, c.name",
-                ['user_id' => $userId]
-            );
-        }
+        // Get expense categories for this user (user_id matches or user_id IS NULL for shared categories)
+        // Note: Use NOT EXISTS instead of NOT IN to handle NULL category_ids in budgets table
+        $unbugdetedCategories = $db->fetchAll(
+            "SELECT c.id, c.name, c.icon, c.color, c.category_type, c.parent_id, c.sort_order,
+                    p.name AS parent_name
+             FROM categories c
+             LEFT JOIN categories p ON c.parent_id = p.id
+             WHERE c.category_type = 'expense'
+               AND (c.user_id = :user_id OR c.user_id IS NULL)
+               AND NOT EXISTS (
+                   SELECT 1 FROM budgets b
+                   WHERE b.category_id = c.id
+                     AND b.user_id = :user_id2
+                     AND b.is_active = 1
+               )
+             ORDER BY COALESCE(c.parent_id, c.id), c.parent_id IS NOT NULL, c.sort_order, c.name",
+            ['user_id' => $userId, 'user_id2' => $userId]
+        );
 
         successResponse([
             'budgets' => $budgets,

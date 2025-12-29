@@ -8,9 +8,9 @@
 // =====================================================
 
 async function loadImportPage() {
-    // Load accounts
+    // Load accounts (general mode only - exclude IOLTA client ledgers)
     if (state.accounts.length === 0) {
-        const accountsData = await apiGet('/accounts/', { user_id: state.currentUser });
+        const accountsData = await apiGet('/accounts/', { user_id: state.currentUser, account_mode: 'general' });
         if (accountsData.success) {
             state.accounts = accountsData.data.accounts;
         }

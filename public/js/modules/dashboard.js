@@ -31,8 +31,9 @@ function initDashboardMonthSelector() {
     }
     select.innerHTML += '</optgroup>';
 
-    // Set default to current year (Full Year)
-    const defaultValue = `${currentYear}-yearly`;
+    // Set default to current month
+    const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const defaultValue = `${currentYear}-${currentMonth}`;
     select.value = defaultValue;
 
     select.addEventListener('change', () => loadDashboard());
@@ -43,26 +44,38 @@ function initDashboardMonthSelector() {
 // =====================================================
 
 async function loadDashboard() {
-    // Toggle dashboard wrappers (show personal, hide iolta)
+    // Get dashboard wrappers
     const ioltaWrapper = document.getElementById('iolta-dashboard-wrapper');
+    const costWrapper = document.getElementById('cost-dashboard-wrapper');
     const personalWrapper = document.getElementById('personal-dashboard-wrapper');
-    if (ioltaWrapper) ioltaWrapper.style.display = 'none';
-    if (personalWrapper) personalWrapper.style.display = 'block';
 
-    // Check account type - hide summary cards for Cost Account
+    // Check account type
     const accountType = typeof getAccountType === 'function' ? getAccountType() : 'general';
-    const summaryCards = document.querySelector('#page-dashboard .summary-cards');
+
+    // Hide all wrappers first
+    if (ioltaWrapper) ioltaWrapper.style.display = 'none';
+    if (costWrapper) costWrapper.style.display = 'none';
+    if (personalWrapper) personalWrapper.style.display = 'none';
+
+    // Show appropriate wrapper based on account type
+    if (accountType === 'cost') {
+        // Show Cost Dashboard
+        if (costWrapper) costWrapper.style.display = 'block';
+        // Load Cost Dashboard data
+        if (typeof loadCostDashboard === 'function') {
+            await loadCostDashboard();
+        }
+        return; // Don't load personal dashboard data
+    } else {
+        // Show Personal Dashboard for general accounts
+        if (personalWrapper) personalWrapper.style.display = 'block';
+    }
+
+    const summaryCards = document.querySelector('#personal-dashboard-wrapper .summary-cards');
     const categoryChartRow = document.getElementById('category-chart-row');
 
-    if (accountType === 'cost') {
-        // Hide Income/Expenses/Net Savings/Savings Rate cards for Cost Account
-        if (summaryCards) summaryCards.style.display = 'none';
-        // Also hide category spending chart (not relevant for cost)
-        if (categoryChartRow) categoryChartRow.style.display = 'none';
-    } else {
-        if (summaryCards) summaryCards.style.display = '';
-        if (categoryChartRow) categoryChartRow.style.display = '';
-    }
+    if (summaryCards) summaryCards.style.display = '';
+    if (categoryChartRow) categoryChartRow.style.display = '';
 
     const monthSelect = document.getElementById('dashboard-month');
     if (!monthSelect) return;
@@ -82,45 +95,86 @@ async function loadDashboard() {
     }
 
     try {
-        // Load report data - skip for cost accounts (not needed)
-        if (accountType !== 'cost') {
-            const reportParams = {
-                user_id: state.currentUser,
-                year,
-                type: reportType
-            };
-            if (month) {
-                reportParams.month = month;
-            }
-            const reportData = await apiGet('/reports/', reportParams);
+        // Load report data for general accounts
+        const reportParams = {
+            user_id: state.currentUser,
+            year,
+            type: reportType
+        };
+        if (month) {
+            reportParams.month = month;
+        }
+        const reportData = await apiGet('/reports/', reportParams);
 
-            if (reportData.success) {
-                updateDashboardSummary(reportData.data.report);
-                updateCategoryChart(reportData.data.report.category_breakdown);
+        // Load last month's report for comparison
+        let lastMonthReport = null;
+        if (reportType === 'monthly' && month) {
+            const lastMonth = month === 1 ? 12 : month - 1;
+            const lastYear = month === 1 ? year - 1 : year;
+            const lastReportData = await apiGet('/reports/', {
+                user_id: state.currentUser,
+                year: lastYear,
+                month: lastMonth,
+                type: 'monthly'
+            });
+            if (lastReportData.success) {
+                lastMonthReport = lastReportData.data.report;
             }
         }
 
-        // Load accounts summary based on account type
-        if (accountType === 'cost') {
-            // Load cost accounts
-            const costAccountsData = await apiGet('/cost/accounts.php', {
-                user_id: state.currentUser
-            });
-            if (costAccountsData.success) {
-                const costAccounts = costAccountsData.data?.accounts || costAccountsData.data || [];
-                dashboardCostAccounts = costAccounts; // Store for detail modal access
-                updateCostAccountsSummary(costAccounts);
-            }
-        } else {
-            // Load general accounts
-            const accountsData = await apiGet('/accounts/', {
-                user_id: state.currentUser
-            });
+        // Load general accounts (exclude trust/iolta)
+        const accountsData = await apiGet('/accounts/', {
+            user_id: state.currentUser,
+            account_mode: 'general'
+        });
 
-            if (accountsData.success) {
-                state.accounts = accountsData.data.accounts;
-                updateAccountsSummary(accountsData.data.accounts);
+        if (accountsData.success) {
+            state.accounts = accountsData.data.accounts;
+            updateAccountsSummary(accountsData.data.accounts);
+        }
+
+        // Load transfers for current period
+        let currentTransfers = 0;
+        let lastTransfers = 0;
+
+        if (reportType === 'monthly' && month) {
+            // Calculate date range for current month
+            const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+            const lastDay = new Date(year, month, 0).getDate();
+            const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
+
+            // Current month transfers
+            const transferData = await apiGet('/transactions/', {
+                user_id: state.currentUser,
+                type: 'transfer',
+                start_date: startDate,
+                end_date: endDate
+            });
+            if (transferData.success) {
+                currentTransfers = (transferData.data.transactions || []).reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
             }
+
+            // Last month transfers
+            const lastMonth = month === 1 ? 12 : month - 1;
+            const lastYear = month === 1 ? year - 1 : year;
+            const lastStartDate = `${lastYear}-${String(lastMonth).padStart(2, '0')}-01`;
+            const lastLastDay = new Date(lastYear, lastMonth, 0).getDate();
+            const lastEndDate = `${lastYear}-${String(lastMonth).padStart(2, '0')}-${lastLastDay}`;
+
+            const lastTransferData = await apiGet('/transactions/', {
+                user_id: state.currentUser,
+                type: 'transfer',
+                start_date: lastStartDate,
+                end_date: lastEndDate
+            });
+            if (lastTransferData.success) {
+                lastTransfers = (lastTransferData.data.transactions || []).reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+            }
+        }
+
+        if (reportData.success) {
+            updateDashboardSummary(reportData.data.report, lastMonthReport, currentTransfers, lastTransfers);
+            updateCategoryChart(reportData.data.report.category_breakdown);
         }
 
         // Load recent transactions
@@ -235,39 +289,109 @@ function goToPendingCheck(checkId) {
     setTimeout(tryEdit, 100);
 }
 
-function updateDashboardSummary(report) {
+function updateDashboardSummary(report, lastMonthReport = null, transfers = 0, lastTransfers = 0) {
     const totalIncomeEl = document.getElementById('total-income');
     const totalExpensesEl = document.getElementById('total-expenses');
     const netSavingsEl = document.getElementById('net-savings');
-    const savingsRateEl = document.getElementById('savings-rate');
+    const lastIncomeEl = document.getElementById('last-income');
+    const lastExpensesEl = document.getElementById('last-expenses');
+    const lastNetEl = document.getElementById('last-net');
+    const incomeChangeEl = document.getElementById('income-change');
+    const expensesChangeEl = document.getElementById('expenses-change');
+    const netChangeEl = document.getElementById('net-change');
+    const totalTransferEl = document.getElementById('total-transfer');
+    const lastTransferEl = document.getElementById('last-transfer');
+    const transferChangeEl = document.getElementById('transfer-change');
 
+    // Current month values
     if (totalIncomeEl) totalIncomeEl.textContent = formatCurrency(report.total_income);
     if (totalExpensesEl) totalExpensesEl.textContent = formatCurrency(report.total_expenses);
     if (netSavingsEl) {
         netSavingsEl.textContent = formatCurrency(report.net_savings);
         netSavingsEl.style.color = report.net_savings >= 0 ? 'var(--success)' : 'var(--danger)';
     }
-    if (savingsRateEl) savingsRateEl.textContent = report.savings_rate.toFixed(1) + '%';
+
+    // Last month values
+    if (lastMonthReport) {
+        if (lastIncomeEl) lastIncomeEl.textContent = formatCurrency(lastMonthReport.total_income);
+        if (lastExpensesEl) lastExpensesEl.textContent = formatCurrency(lastMonthReport.total_expenses);
+        if (lastNetEl) lastNetEl.textContent = formatCurrency(lastMonthReport.net_savings);
+
+        // Calculate and display changes
+        updateChangeBadge(incomeChangeEl, report.total_income, lastMonthReport.total_income, true);
+        updateChangeBadge(expensesChangeEl, report.total_expenses, lastMonthReport.total_expenses, false);
+        updateChangeBadge(netChangeEl, report.net_savings, lastMonthReport.net_savings, true);
+    } else {
+        if (lastIncomeEl) lastIncomeEl.textContent = '-';
+        if (lastExpensesEl) lastExpensesEl.textContent = '-';
+        if (lastNetEl) lastNetEl.textContent = '-';
+        if (incomeChangeEl) { incomeChangeEl.textContent = '-'; incomeChangeEl.className = 'change-badge'; }
+        if (expensesChangeEl) { expensesChangeEl.textContent = '-'; expensesChangeEl.className = 'change-badge'; }
+        if (netChangeEl) { netChangeEl.textContent = '-'; netChangeEl.className = 'change-badge'; }
+    }
+
+    // Transfers
+    if (totalTransferEl) {
+        totalTransferEl.textContent = formatCurrency(transfers);
+    }
+    if (lastTransferEl) lastTransferEl.textContent = formatCurrency(lastTransfers);
+    if (lastMonthReport) {
+        updateChangeBadge(transferChangeEl, transfers, lastTransfers, false);
+    } else {
+        if (transferChangeEl) { transferChangeEl.textContent = '-'; transferChangeEl.className = 'change-badge'; }
+    }
 
     // Store report for detail views
     state.currentReport = report;
+}
+
+function updateChangeBadge(el, current, previous, higherIsBetter) {
+    if (!el) return;
+
+    if (previous === 0) {
+        el.textContent = current > 0 ? '+100%' : '-';
+        el.className = 'change-badge ' + (current > 0 ? (higherIsBetter ? 'positive' : 'negative') : '');
+        return;
+    }
+
+    const change = ((current - previous) / Math.abs(previous)) * 100;
+    const isPositiveChange = change > 0;
+
+    if (Math.abs(change) < 0.1) {
+        el.textContent = '0%';
+        el.className = 'change-badge';
+    } else {
+        el.textContent = (isPositiveChange ? '+' : '') + change.toFixed(1) + '%';
+        // For income/net: increase is good (green), decrease is bad (red)
+        // For expenses: increase is bad (red), decrease is good (green)
+        const isGood = higherIsBetter ? isPositiveChange : !isPositiveChange;
+        el.className = 'change-badge ' + (isGood ? 'positive' : 'negative');
+    }
 }
 
 // =====================================================
 // Dashboard Detail Views
 // =====================================================
 
+function getMonthDateRange(year, month) {
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
+    return { startDate, endDate };
+}
+
 async function showIncomeDetail() {
     const monthSelect = document.getElementById('dashboard-month');
     const [year, month] = monthSelect.value.split('-').map(Number);
+    const { startDate, endDate } = getMonthDateRange(year, month);
 
     showLoading();
     const data = await apiGet('/transactions/', {
         user_id: state.currentUser,
         type: 'credit',
-        year: year,
-        month: month,
-        limit: 50
+        start_date: startDate,
+        end_date: endDate,
+        limit: 100
     });
     hideLoading();
 
@@ -284,30 +408,46 @@ async function showIncomeDetail() {
             <div class="detail-total text-success">${formatCurrency(total)}</div>
             <div class="detail-count">${transactions.length} transactions</div>
         </div>
-        <div class="detail-transactions-list">
-            ${transactions.length === 0 ? '<p class="text-muted text-center">No income this month</p>' :
-            transactions.map(t => `
-                <div class="detail-transaction-item" onclick="showTransactionDetail(${t.id})">
-                    <div class="detail-transaction-date">${formatDate(t.transaction_date)}</div>
-                    <div class="detail-transaction-desc">${t.description}</div>
-                    <div class="detail-transaction-amount text-success">+${formatCurrency(Math.abs(t.amount))}</div>
-                </div>
-            `).join('')}
+        <div class="detail-transactions-table">
+            <table class="detail-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Account</th>
+                        <th>Category</th>
+                        <th class="text-right">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${transactions.length === 0 ? '<tr><td colspan="5" class="text-center text-muted">No income this month</td></tr>' :
+                    transactions.map(t => `
+                        <tr class="clickable" onclick="showTransactionDetail(${t.id})">
+                            <td>${formatDate(t.transaction_date)}</td>
+                            <td class="desc-cell">${t.description}</td>
+                            <td>${t.account_name || '-'}</td>
+                            <td>${t.category_name || '-'}</td>
+                            <td class="text-right text-success">+${formatCurrency(Math.abs(t.amount))}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
         </div>
-    `);
+    `, 'modal-wide');
 }
 
 async function showExpensesDetail() {
     const monthSelect = document.getElementById('dashboard-month');
     const [year, month] = monthSelect.value.split('-').map(Number);
+    const { startDate, endDate } = getMonthDateRange(year, month);
 
     showLoading();
     const data = await apiGet('/transactions/', {
         user_id: state.currentUser,
         type: 'debit',
-        year: year,
-        month: month,
-        limit: 50
+        start_date: startDate,
+        end_date: endDate,
+        limit: 100
     });
     hideLoading();
 
@@ -324,17 +464,88 @@ async function showExpensesDetail() {
             <div class="detail-total text-danger">${formatCurrency(total)}</div>
             <div class="detail-count">${transactions.length} transactions</div>
         </div>
-        <div class="detail-transactions-list">
-            ${transactions.length === 0 ? '<p class="text-muted text-center">No expenses this month</p>' :
-            transactions.map(t => `
-                <div class="detail-transaction-item" onclick="showTransactionDetail(${t.id})">
-                    <div class="detail-transaction-date">${formatDate(t.transaction_date)}</div>
-                    <div class="detail-transaction-desc">${t.description}</div>
-                    <div class="detail-transaction-amount text-danger">-${formatCurrency(Math.abs(t.amount))}</div>
-                </div>
-            `).join('')}
+        <div class="detail-transactions-table">
+            <table class="detail-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Account</th>
+                        <th>Category</th>
+                        <th class="text-right">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${transactions.length === 0 ? '<tr><td colspan="5" class="text-center text-muted">No expenses this month</td></tr>' :
+                    transactions.map(t => `
+                        <tr class="clickable" onclick="showTransactionDetail(${t.id})">
+                            <td>${formatDate(t.transaction_date)}</td>
+                            <td class="desc-cell">${t.description}</td>
+                            <td>${t.account_name || '-'}</td>
+                            <td>${t.category_name || '-'}</td>
+                            <td class="text-right text-danger">-${formatCurrency(Math.abs(t.amount))}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
         </div>
-    `);
+    `, 'modal-wide');
+}
+
+async function showTransferDetail() {
+    const monthSelect = document.getElementById('dashboard-month');
+    const [year, month] = monthSelect.value.split('-').map(Number);
+    const { startDate, endDate } = getMonthDateRange(year, month);
+
+    showLoading();
+    const data = await apiGet('/transactions/', {
+        user_id: state.currentUser,
+        type: 'transfer',
+        start_date: startDate,
+        end_date: endDate,
+        limit: 100
+    });
+    hideLoading();
+
+    if (!data.success) {
+        showToast('Failed to load transfer details', 'error');
+        return;
+    }
+
+    const transactions = data.data.transactions || [];
+    const total = transactions.reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+
+    openModal('🔄 Transfer Details', `
+        <div class="detail-summary">
+            <div class="detail-total">${formatCurrency(total)}</div>
+            <div class="detail-count">${transactions.length} transfers</div>
+        </div>
+        <div class="detail-transactions-table">
+            <table class="detail-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Account</th>
+                        <th>Category</th>
+                        <th class="text-right">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${transactions.length === 0 ? '<tr><td colspan="5" class="text-center text-muted">No transfers this month</td></tr>' :
+                    transactions.map(t => `
+                        <tr class="clickable" onclick="showTransactionDetail(${t.id})">
+                            <td>${formatDate(t.transaction_date)}</td>
+                            <td class="desc-cell">${t.description}</td>
+                            <td>${t.account_name || '-'}</td>
+                            <td>${t.category_name || '-'}</td>
+                            <td class="text-right">${formatCurrency(Math.abs(t.amount))}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `, 'modal-wide');
 }
 
 function showSavingsDetail() {
@@ -725,6 +936,7 @@ window.showIncomeDetail = showIncomeDetail;
 window.showExpensesDetail = showExpensesDetail;
 window.showSavingsDetail = showSavingsDetail;
 window.showSavingsRateDetail = showSavingsRateDetail;
+window.showTransferDetail = showTransferDetail;
 window.showAccountDetail = showAccountDetail;
 window.updateCategoryChart = updateCategoryChart;
 window.updateAccountsSummary = updateAccountsSummary;

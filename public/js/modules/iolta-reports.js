@@ -41,26 +41,38 @@ async function loadTrustAuditLog() {
         const statsContainer = document.getElementById('audit-summary-stats');
         if (statsContainer && summary) {
             const actionIcons = {
-                'client_created': { icon: '&#128100;', color: '#10b981', bg: '#ecfdf5' },
-                'client_updated': { icon: '&#9999;', color: '#3b82f6', bg: '#eff6ff' },
-                'deposit': { icon: '&#128176;', color: '#10b981', bg: '#ecfdf5' },
-                'disbursement': { icon: '&#128228;', color: '#f59e0b', bg: '#fffbeb' },
-                'transfer_in': { icon: '&#8600;', color: '#8b5cf6', bg: '#f5f3ff' },
-                'transfer_out': { icon: '&#8599;', color: '#8b5cf6', bg: '#f5f3ff' },
-                'reconciliation_started': { icon: '&#128260;', color: '#6366f1', bg: '#eef2ff' },
-                'reconciliation_completed': { icon: '&#9989;', color: '#10b981', bg: '#ecfdf5' }
+                'update': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>', color: '#64748b', bg: '#f8fafc' },
+                'ledger_updated': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>', color: '#64748b', bg: '#f8fafc' },
+                'deposit': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>', color: '#10b981', bg: '#ecfdf5' },
+                'check': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>', color: '#64748b', bg: '#f8fafc' },
+                'client_created': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>', color: '#10b981', bg: '#ecfdf5' },
+                'client_updated': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', color: '#3b82f6', bg: '#eff6ff' },
+                'reassign': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>', color: '#64748b', bg: '#f8fafc' },
+                'bank_import': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>', color: '#64748b', bg: '#f8fafc' },
+                'cost': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>', color: '#64748b', bg: '#f8fafc' },
+                'disbursement': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>', color: '#f59e0b', bg: '#fffbeb' },
+                'transfer_in': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>', color: '#8b5cf6', bg: '#f5f3ff' },
+                'transfer_out': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>', color: '#8b5cf6', bg: '#f5f3ff' },
+                'transaction_reversed': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>', color: '#ef4444', bg: '#fef2f2' },
+                'payout': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>', color: '#f59e0b', bg: '#fffbeb' },
+                'reconciliation_started': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>', color: '#6366f1', bg: '#eef2ff' },
+                'reconciliation_completed': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>', color: '#10b981', bg: '#ecfdf5' }
             };
 
             statsContainer.innerHTML = summary.map(s => {
-                const config = actionIcons[s.action] || { icon: '&#128203;', color: '#64748b', bg: '#f8fafc' };
+                const config = actionIcons[s.action] || { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>', color: '#64748b', bg: '#f8fafc' };
                 const label = s.action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                 return `
-                    <div style="background: ${config.bg}; padding: 16px; border-radius: 10px; border: 1px solid ${config.color}20;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 20px;">${config.icon}</span>
-                            <div>
-                                <div style="font-size: 22px; font-weight: 600; color: ${config.color};">${s.count}</div>
-                                <div style="font-size: 12px; color: #64748b;">${label}</div>
+                    <div style="background: white; padding: 16px 14px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.04); transition: all 0.2s;"
+                         onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.08)'; this.style.transform='translateY(-2px)'"
+                         onmouseout="this.style.boxShadow='0 1px 2px rgba(0,0,0,0.04)'; this.style.transform='translateY(0)'">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 36px; height: 36px; border-radius: 10px; background: ${config.bg}; display: flex; align-items: center; justify-content: center; color: ${config.color}; flex-shrink: 0;">
+                                ${config.icon}
+                            </div>
+                            <div style="min-width: 0;">
+                                <div style="font-size: 24px; font-weight: 700; color: ${config.color}; line-height: 1;">${s.count}</div>
+                                <div style="font-size: 11px; color: #64748b; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${label}</div>
                             </div>
                         </div>
                     </div>
@@ -97,7 +109,7 @@ async function loadTrustAuditLog() {
                 });
 
                 html += `
-                    <div style="padding: 12px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 13px; font-weight: 600; color: #475569; position: sticky; top: 0;">
+                    <div style="padding: 14px 24px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-bottom: 1px solid #e2e8f0; font-size: 13px; font-weight: 600; color: #475569; position: sticky; top: 0; z-index: 10;">
                         ${displayDate}
                     </div>
                 `;
@@ -108,26 +120,33 @@ async function loadTrustAuditLog() {
                     const details = formatAuditDetails(entry);
 
                     html += `
-                        <div style="display: flex; align-items: flex-start; gap: 16px; padding: 16px 20px; border-bottom: 1px solid #f1f5f9; transition: background 0.15s; background: white;"
-                             onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                        <div style="display: flex; align-items: flex-start; gap: 16px; padding: 18px 24px; border-bottom: 1px solid #f1f5f9; transition: all 0.15s; background: white; cursor: pointer;"
+                             onmouseover="this.style.background='#fafbfc'; this.style.paddingLeft='28px'"
+                             onmouseout="this.style.background='white'; this.style.paddingLeft='24px'">
 
                             <!-- Icon -->
-                            <div style="width: 40px; height: 40px; border-radius: 10px; background: ${actionConfig.bg}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                <span style="font-size: 18px;">${actionConfig.icon}</span>
+                            <div style="width: 44px; height: 44px; border-radius: 12px; background: ${actionConfig.bg}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: ${actionConfig.color};">
+                                ${actionConfig.icon}
                             </div>
 
                             <!-- Content -->
                             <div style="flex: 1; min-width: 0;">
-                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                                    <span style="font-weight: 600; color: #1e293b; font-size: 14px;">${actionConfig.label}</span>
-                                    <span style="font-size: 11px; padding: 2px 8px; background: ${actionConfig.bg}; color: ${actionConfig.color}; border-radius: 4px; font-weight: 500;">${entry.entity_type?.replace('trust_', '') || 'system'}</span>
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                                    <span style="font-weight: 600; color: #1e293b; font-size: 15px;">${actionConfig.label}</span>
+                                    <span style="font-size: 11px; padding: 3px 10px; background: ${actionConfig.bg}; color: ${actionConfig.color}; border-radius: 20px; font-weight: 600; text-transform: lowercase;">${entry.entity_type?.replace('trust_', '') || 'system'}</span>
                                 </div>
-                                <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">
-                                    ${entry.client_name ? `<strong>${entry.client_name}</strong> • ` : ''}${details}
+                                <div style="font-size: 13px; color: #64748b; margin-bottom: 8px; line-height: 1.5;">
+                                    ${entry.client_name ? `<span style="color: #334155; font-weight: 500;">${entry.client_name}</span> &bull; ` : ''}${details}
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #94a3b8;">
-                                    <span>🕐 ${time}</span>
-                                    <span>&#128100; ${entry.username || 'System'}</span>
+                                <div style="display: flex; align-items: center; gap: 16px; font-size: 12px; color: #94a3b8;">
+                                    <span style="display: flex; align-items: center; gap: 4px;">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                        ${time}
+                                    </span>
+                                    <span style="display: flex; align-items: center; gap: 4px;">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                        ${entry.username || 'System'}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -142,18 +161,26 @@ async function loadTrustAuditLog() {
 
 function getAuditActionConfig(action) {
     const configs = {
-        'client_created': { icon: '&#128100;', color: '#10b981', bg: '#ecfdf5', label: 'Client Created' },
-        'client_updated': { icon: '&#9999;', color: '#3b82f6', bg: '#eff6ff', label: 'Client Updated' },
-        'ledger_created': { icon: '&#128210;', color: '#8b5cf6', bg: '#f5f3ff', label: 'Ledger Created' },
-        'deposit': { icon: '&#128176;', color: '#10b981', bg: '#ecfdf5', label: 'Deposit' },
-        'disbursement': { icon: '&#128228;', color: '#f59e0b', bg: '#fffbeb', label: 'Disbursement' },
-        'transfer_in': { icon: '&#8600;', color: '#06b6d4', bg: '#ecfeff', label: 'Transfer In' },
-        'transfer_out': { icon: '&#8599;', color: '#f97316', bg: '#fff7ed', label: 'Transfer Out' },
-        'earned_fee': { icon: '&#128181;', color: '#84cc16', bg: '#f7fee7', label: 'Earned Fee' },
-        'reconciliation_started': { icon: '&#128260;', color: '#6366f1', bg: '#eef2ff', label: 'Reconciliation Started' },
-        'reconciliation_completed': { icon: '&#9989;', color: '#10b981', bg: '#ecfdf5', label: 'Reconciliation Completed' }
+        'client_created': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>', color: '#10b981', bg: '#ecfdf5', label: 'Client Created' },
+        'client_updated': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', color: '#3b82f6', bg: '#eff6ff', label: 'Client Updated' },
+        'ledger_created': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>', color: '#8b5cf6', bg: '#f5f3ff', label: 'Ledger Created' },
+        'ledger_updated': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>', color: '#64748b', bg: '#f8fafc', label: 'Ledger Updated' },
+        'deposit': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>', color: '#10b981', bg: '#ecfdf5', label: 'Deposit' },
+        'check': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>', color: '#64748b', bg: '#f8fafc', label: 'Check' },
+        'disbursement': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>', color: '#f59e0b', bg: '#fffbeb', label: 'Disbursement' },
+        'transfer_in': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>', color: '#06b6d4', bg: '#ecfeff', label: 'Transfer In' },
+        'transfer_out': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>', color: '#f97316', bg: '#fff7ed', label: 'Transfer Out' },
+        'earned_fee': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>', color: '#84cc16', bg: '#f7fee7', label: 'Earned Fee' },
+        'update': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>', color: '#64748b', bg: '#f8fafc', label: 'Update' },
+        'reassign': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>', color: '#64748b', bg: '#f8fafc', label: 'Reassign' },
+        'bank_import': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>', color: '#3b82f6', bg: '#eff6ff', label: 'Bank Import' },
+        'cost': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>', color: '#64748b', bg: '#f8fafc', label: 'Cost' },
+        'transaction_reversed': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>', color: '#ef4444', bg: '#fef2f2', label: 'Transaction Reversed' },
+        'payout': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>', color: '#f59e0b', bg: '#fffbeb', label: 'Payout' },
+        'reconciliation_started': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>', color: '#6366f1', bg: '#eef2ff', label: 'Reconciliation Started' },
+        'reconciliation_completed': { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>', color: '#10b981', bg: '#ecfdf5', label: 'Reconciliation Completed' }
     };
-    return configs[action] || { icon: '&#128203;', color: '#64748b', bg: '#f8fafc', label: action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) };
+    return configs[action] || { icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>', color: '#64748b', bg: '#f8fafc', label: action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) };
 }
 
 function formatAuditDetails(entry) {

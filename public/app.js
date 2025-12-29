@@ -188,9 +188,12 @@ function navigateTo(page) {
         item.classList.toggle('active', item.dataset.page === page);
     });
 
+    // Map general-dashboard to dashboard page
+    const pageId = page === 'general-dashboard' ? 'dashboard' : page;
+
     // Show corresponding page
     document.querySelectorAll('.page').forEach(p => {
-        p.classList.toggle('active', p.id === `page-${page}`);
+        p.classList.toggle('active', p.id === `page-${pageId}`);
     });
 
     state.currentPage = page;
@@ -230,11 +233,13 @@ async function loadPageData(page) {
     try {
         switch (page) {
             case 'dashboard':
+            case 'general-dashboard':
                 // Check account type for dashboard
                 const accountType = typeof getAccountType === 'function' ? getAccountType() : 'personal';
                 if (accountType === 'iolta') {
                     await loadIoltaDashboard();
                 } else {
+                    // loadDashboard handles both 'cost' and 'general' account types
                     await loadDashboard();
                 }
                 break;
@@ -300,6 +305,9 @@ async function loadPageData(page) {
                 break;
             case 'trust-data-management':
                 if (typeof loadTrustDataManagement === 'function') await loadTrustDataManagement();
+                break;
+            case 'trust-staging':
+                if (typeof loadStagingPage === 'function') await loadStagingPage();
                 break;
             // Cost Account Pages (mirrors IOLTA structure)
             case 'cost-accounts':
@@ -656,6 +664,10 @@ document.addEventListener('DOMContentLoaded', function () {
 // Expose mobile functions globally
 window.toggleMobileSidebar = toggleMobileSidebar;
 window.closeMobileSidebar = closeMobileSidebar;
+
+// Expose modal functions globally
+window.openModal = openModal;
+window.closeModal = closeModal;
 
 // =====================================================
 // Password Visibility Toggle

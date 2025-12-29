@@ -11,18 +11,32 @@
 // - Save progress and complete reconciliation
 // =====================================================
 
+// Prevent duplicate page loads
+let _reconcilePageLoading = false;
+
 /**
  * Load Trust Reconciliation page (entry point)
  */
 async function loadTrustReconcile() {
-    // Load IOLTA data first to populate the account dropdown
-    await loadIOLTAData();
+    // Prevent duplicate concurrent loads
+    if (_reconcilePageLoading) {
+        console.log('Reconcile page load already in progress, skipping...');
+        return;
+    }
+    _reconcilePageLoading = true;
 
-    const container = document.getElementById('trust-reconcile-page');
-    if (!container) return;
+    try {
+        // Load IOLTA data first to populate the account dropdown
+        await loadIOLTAData();
 
-    // Show start reconciliation form (with recent history that allows continuing in-progress)
-    renderReconcileStartForm(container);
+        const container = document.getElementById('trust-reconcile-page');
+        if (!container) return;
+
+        // Show start reconciliation form (with recent history that allows continuing in-progress)
+        renderReconcileStartForm(container);
+    } finally {
+        _reconcilePageLoading = false;
+    }
 }
 
 function onTrustReconAccountChange() {

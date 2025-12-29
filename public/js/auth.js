@@ -113,13 +113,19 @@ function updateUserInfo() {
     const avatarEl = document.getElementById('user-avatar');
     const nameEl = document.getElementById('current-user-name');
     const roleEl = document.getElementById('current-user-role');
+    const topbarNameEl = document.getElementById('topbar-user-name');
 
     if (state.userData) {
+        const displayName = state.userData.display_name || state.userData.username;
+
         if (avatarEl) {
-            avatarEl.textContent = (state.userData.display_name || state.userData.username || 'U').charAt(0).toUpperCase();
+            avatarEl.textContent = (displayName || 'U').charAt(0).toUpperCase();
         }
         if (nameEl) {
-            nameEl.textContent = state.userData.display_name || state.userData.username;
+            nameEl.textContent = displayName;
+        }
+        if (topbarNameEl) {
+            topbarNameEl.textContent = displayName;
         }
         if (roleEl) {
             roleEl.textContent = state.isAdmin ? 'Administrator' : 'User';

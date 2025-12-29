@@ -4,6 +4,11 @@
 
 let currentTransactionTab = 'deposit';
 
+// Global entities cache for payee dropdown
+let _entitiesCache = null;
+let _entitiesCacheTime = 0;
+const _ENTITIES_CACHE_TTL = 60000; // 60 seconds
+
 // Helper to get current user ID
 function getCurrentUserIdForModal() {
     return window.getCurrentUserId?.() || window.IoltaPageState?.currentUser || localStorage.getItem('currentUser') || 1;
@@ -264,22 +269,58 @@ function initializeFeeForm() {
     document.getElementById('txn-fee-date').value = today;
 }
 
-// Load clients for select dropdown (legacy - kept for compatibility)
+// Shared client cache for modal
+let _modalClientsCache = null;
+let _modalClientsFetchPromise = null;
+
+async function getClientsForModal() {
+    // Return cached data if available
+    if (_modalClientsCache && _modalClientsCache.length > 0) {
+        return _modalClientsCache;
+    }
+
+    // Check window state caches
+    let clients = window.ioltaState?.clients || window.IoltaPageState?.clients || [];
+    if (clients.length > 0) {
+        _modalClientsCache = clients;
+        return clients;
+    }
+
+    // If already fetching, wait for that promise
+    if (_modalClientsFetchPromise) {
+        return _modalClientsFetchPromise;
+    }
+
+    // Fetch from API (only once)
+    _modalClientsFetchPromise = (async () => {
+        try {
+            const userId = getCurrentUserIdForModal();
+            const result = await apiGet('/trust/clients.php', { user_id: userId });
+            if (result.success && result.data) {
+                _modalClientsCache = result.data.clients || result.data;
+                return _modalClientsCache;
+            }
+        } catch (e) {
+            console.error('Error loading clients:', e);
+        }
+        return [];
+    })();
+
+    return _modalClientsFetchPromise;
+}
+
+// Load clients for select dropdown - use cached data from ioltaState
 async function loadClientsForSelect(selectElement) {
     try {
-        const userId = window.IoltaPageState?.currentUser || localStorage.getItem('currentUser');
-        const result = await apiGet('/trust/clients.php', { user_id: userId });
+        const clients = await getClientsForModal();
 
-        if (result.success && result.data) {
-            const clients = result.data.clients || result.data;
-            selectElement.innerHTML = '<option value="">Select client...</option>';
-            clients.forEach(client => {
-                const option = document.createElement('option');
-                option.value = client.id;
-                option.textContent = client.client_name || client.name;
-                selectElement.appendChild(option);
-            });
-        }
+        selectElement.innerHTML = '<option value="">Select client...</option>';
+        clients.forEach(client => {
+            const option = document.createElement('option');
+            option.value = client.id;
+            option.textContent = client.client_name || client.name;
+            selectElement.appendChild(option);
+        });
     } catch (e) {
         console.error('Error loading clients:', e);
     }
@@ -293,17 +334,8 @@ async function setupSearchableClientDropdown(prefix) {
 
     if (!searchInput || !hiddenInput || !dropdown) return;
 
-    // Load clients
-    let clients = [];
-    try {
-        const userId = getCurrentUserIdForModal();
-        const result = await apiGet('/trust/clients.php', { user_id: userId });
-        if (result.success && result.data) {
-            clients = result.data.clients || result.data;
-        }
-    } catch (e) {
-        console.error('Error loading clients:', e);
-    }
+    // Use shared client cache
+    const clients = await getClientsForModal();
 
     // Store clients for filtering
     window[`${prefix}_clients`] = clients;
@@ -400,29 +432,31 @@ async function setupSearchablePayeeDropdown(prefix) {
 
     if (!searchInput || !hiddenInput || !dropdown) return;
 
-    let searchTimeout = null;
-    let cachedEntities = []; // Cache for initial/empty search
+    let cachedEntities = []; // Local cache reference
 
-    // Function to search entities from API
-    async function searchEntities(query) {
+    // Function to load entities with global caching
+    async function loadEntities() {
+        const now = Date.now();
+        // Use cached data if fresh
+        if (_entitiesCache && (now - _entitiesCacheTime) < _ENTITIES_CACHE_TTL) {
+            return _entitiesCache;
+        }
         try {
             const userId = getCurrentUserIdForModal();
-            const params = { user_id: userId, limit: 50 };
-            if (query && query.trim()) {
-                params.search = query.trim();
-            }
-            const result = await apiGet('/entities/', params);
+            const result = await apiGet('/entities/', { user_id: userId, limit: 100 });
             if (result.success && result.data) {
-                return result.data.entities || [];
+                _entitiesCache = result.data.entities || [];
+                _entitiesCacheTime = now;
+                return _entitiesCache;
             }
         } catch (e) {
-            console.error('Error searching entities:', e);
+            console.error('Error loading entities:', e);
         }
-        return [];
+        return _entitiesCache || [];
     }
 
-    // Load initial entities (cache for empty search)
-    cachedEntities = await searchEntities('');
+    // Load initial entities (use global cache)
+    cachedEntities = await loadEntities();
     window[`${prefix}_payees`] = cachedEntities;
 
     // Render dropdown options
@@ -541,23 +575,14 @@ async function setupSearchablePayeeDropdown(prefix) {
         `;
     }
 
-    // Show dropdown on focus - show immediately with cached data, then refresh
+    // Show dropdown on focus - show immediately with cached data
     searchInput.addEventListener('focus', () => {
-        // Show immediately with what we have
+        // Show immediately with cached data
         renderPayeeOptions(cachedEntities, searchInput.value);
         dropdown.style.display = 'block';
-
-        // Refresh cache in background
-        searchEntities('').then(results => {
-            cachedEntities = results;
-            // Only update if still focused and no search query
-            if (document.activeElement === searchInput && !searchInput.value.trim()) {
-                renderPayeeOptions(cachedEntities, '');
-            }
-        });
     });
 
-    // Live search on input with debounce
+    // Filter cached data on input - no API calls on keystroke
     searchInput.addEventListener('input', () => {
         const query = searchInput.value.trim();
 
@@ -567,12 +592,7 @@ async function setupSearchablePayeeDropdown(prefix) {
         // Show dropdown immediately
         dropdown.style.display = 'block';
 
-        // Clear previous timeout
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
-        }
-
-        // Show "Use" option immediately with any cached matches
+        // Filter cached entities locally
         const filtered = query === '' ? cachedEntities : cachedEntities.filter(e => {
             const name = (e.name || '').toLowerCase();
             const displayName = (e.display_name || '').toLowerCase();
@@ -580,17 +600,6 @@ async function setupSearchablePayeeDropdown(prefix) {
             return name.includes(query.toLowerCase()) || displayName.includes(query.toLowerCase()) || company.includes(query.toLowerCase());
         });
         renderPayeeOptions(filtered, query);
-
-        // If there's a query, also search API for more results
-        if (query) {
-            searchTimeout = setTimeout(async () => {
-                const results = await searchEntities(query);
-                // Only update if the query hasn't changed
-                if (searchInput.value.trim() === query) {
-                    renderPayeeOptions(results, query);
-                }
-            }, 300);
-        }
     });
 
     // Hide dropdown when clicking outside - use mousedown to catch before focus changes
@@ -779,29 +788,34 @@ async function refreshCurrentPageData() {
         return;
     }
 
-    // IOLTA Dashboard/Transactions page
-    if (typeof window.refreshIoltaUI === 'function') {
-        await window.refreshIoltaUI({
-            ledgers: true,
-            transactions: true,
-            sidebar: true
-        });
-    }
+    // Only refresh IOLTA data if in IOLTA mode
+    const currentAccountType = typeof window.getAccountType === 'function' ? window.getAccountType() : 'general';
 
-    // IOLTA Dashboard
-    if (typeof window.loadIOLTAData === 'function') {
-        window.loadIOLTAData(true);
-    }
-    // Trust Clients list
-    if (typeof window.loadTrustClients === 'function') {
-        window.loadTrustClients();
-    }
-    // Check Status page
-    if (typeof window.loadCheckStatusList === 'function') {
-        const activeTab = document.querySelector('.check-status-tab.active');
-        if (activeTab) {
-            const status = activeTab.dataset.status || 'pending';
-            window.loadCheckStatusList(status);
+    if (currentAccountType === 'iolta') {
+        // IOLTA Dashboard/Transactions page
+        if (typeof window.refreshIoltaUI === 'function') {
+            await window.refreshIoltaUI({
+                ledgers: true,
+                transactions: true,
+                sidebar: true
+            });
+        }
+
+        // IOLTA Dashboard
+        if (typeof window.loadIOLTAData === 'function') {
+            window.loadIOLTAData(true);
+        }
+        // Trust Clients list
+        if (typeof window.loadTrustClients === 'function') {
+            window.loadTrustClients();
+        }
+        // Check Status page
+        if (typeof window.loadCheckStatusList === 'function') {
+            const activeTab = document.querySelector('.check-status-tab.active');
+            if (activeTab) {
+                const status = activeTab.dataset.status || 'pending';
+                window.loadCheckStatusList(status);
+            }
         }
     }
 }
@@ -1023,6 +1037,10 @@ async function submitAddEntityForm(event) {
         const result = await apiPost('/entities/', data);
 
         if (result.success) {
+            // Invalidate entities cache so next modal open fetches fresh data
+            _entitiesCache = null;
+            _entitiesCacheTime = 0;
+
             // Set the payee field with display name
             if (addEntitySearchInput) addEntitySearchInput.value = displayName;
             if (addEntityHiddenInput) addEntityHiddenInput.value = displayName;

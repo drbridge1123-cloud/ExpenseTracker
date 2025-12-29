@@ -198,6 +198,9 @@ function handlePost(Database $db, PDO $pdo): void {
             case 'auto_match':
                 handleAutoMatch($db, $pdo, $input);
                 return;
+            case 'bulk_import':
+                handleBulkImport($db, $pdo, $input);
+                return;
         }
     }
 
@@ -1542,4 +1545,163 @@ function autoMatchAndClearTransactions(Database $db, PDO $pdo, int $userId, int 
     }
 
     return $cleared;
+}
+
+/**
+ * Handle bulk import of transactions via JSON (from parsed CSV in frontend)
+ */
+function handleBulkImport(Database $db, PDO $pdo, array $input): void {
+    $userId = !empty($input['user_id']) ? (int)$input['user_id'] : null;
+    $accountId = !empty($input['account_id']) ? (int)$input['account_id'] : null;
+    $transactions = $input['transactions'] ?? [];
+
+    if (!$userId || !$accountId) {
+        errorResponse('user_id and account_id are required');
+    }
+
+    if (empty($transactions) || !is_array($transactions)) {
+        errorResponse('transactions array is required');
+    }
+
+    // Generate batch ID
+    $batchId = 'IMPORT_' . date('YmdHis') . '_' . substr(md5(uniqid()), 0, 6);
+
+    $imported = 0;
+    $skipped = 0;
+    $duplicates = 0;
+    $errors = [];
+
+    // Pre-load existing transactions for duplicate checking
+    $existingTransactions = $db->fetchAll(
+        "SELECT reference_number, amount FROM trust_transactions t
+         JOIN trust_ledger l ON t.ledger_id = l.id
+         WHERE t.user_id = :user_id AND l.account_id = :account_id
+         AND t.reference_number IS NOT NULL AND t.reference_number != ''",
+        ['user_id' => $userId, 'account_id' => $accountId]
+    );
+
+    $existingStaging = $db->fetchAll(
+        "SELECT reference_number, amount FROM trust_staging
+         WHERE user_id = :user_id AND account_id = :account_id
+         AND reference_number IS NOT NULL AND reference_number != ''",
+        ['user_id' => $userId, 'account_id' => $accountId]
+    );
+
+    // Build lookup map
+    $existingMap = [];
+    foreach ($existingTransactions as $tx) {
+        $key = trim($tx['reference_number']) . '|' . round((float)$tx['amount'], 2);
+        $existingMap[$key] = true;
+    }
+    foreach ($existingStaging as $st) {
+        $key = trim($st['reference_number']) . '|' . round((float)$st['amount'], 2);
+        $existingMap[$key] = true;
+    }
+
+    $pdo->beginTransaction();
+
+    try {
+        $rowNum = 0;
+        foreach ($transactions as $tx) {
+            $rowNum++;
+
+            $date = $tx['transaction_date'] ?? null;
+            $amount = isset($tx['amount']) ? (float)$tx['amount'] : 0;
+            $description = $tx['description'] ?? '';
+            $reference = $tx['reference_number'] ?? null;
+            $payee = $tx['payee'] ?? null;
+            $type = $tx['transaction_type'] ?? 'other';
+
+            if (empty($date)) {
+                $errors[] = "Row $rowNum: Missing date";
+                $skipped++;
+                continue;
+            }
+
+            if ($amount == 0) {
+                $skipped++;
+                continue;
+            }
+
+            // Determine type if not set
+            if ($type === 'other') {
+                $type = $amount > 0 ? 'deposit' : 'check';
+            }
+
+            if (empty($description)) {
+                $description = $type === 'deposit' ? 'Deposit' : 'Check/Withdrawal';
+            }
+
+            // Check for duplicates
+            if ($reference) {
+                $dupKey = trim($reference) . '|' . round($amount, 2);
+                if (isset($existingMap[$dupKey])) {
+                    $duplicates++;
+                    continue;
+                }
+                $existingMap[$dupKey] = true;
+            }
+
+            // Insert staging record
+            $sql = "INSERT INTO trust_staging
+                    (user_id, account_id, transaction_date, transaction_type, amount,
+                     description, reference_number, payee, import_batch_id, csv_row_number, status)
+                    VALUES
+                    (:user_id, :account_id, :date, :type, :amount,
+                     :description, :reference, :payee, :batch_id, :row_num, 'unassigned')";
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                'user_id' => $userId,
+                'account_id' => $accountId,
+                'date' => $date,
+                'type' => $type,
+                'amount' => $amount,
+                'description' => $description,
+                'reference' => $reference,
+                'payee' => $payee,
+                'batch_id' => $batchId,
+                'row_num' => $rowNum
+            ]);
+
+            $imported++;
+        }
+
+        $pdo->commit();
+
+        // Log import
+        $db->insert('trust_audit_log', [
+            'user_id' => $userId,
+            'action' => 'deposit',
+            'entity_type' => 'trust_staging',
+            'entity_id' => 0,
+            'new_values' => json_encode(['batch_id' => $batchId, 'imported' => $imported]),
+            'description' => "Bulk Import: $imported records imported",
+            'ip_address' => getClientIp()
+        ]);
+
+        // Auto-match transactions
+        $autoCleared = autoMatchAndClearTransactions($db, $pdo, $userId, $accountId, $batchId);
+
+        $message = "$imported transactions imported to staging";
+        if ($duplicates > 0) {
+            $message .= ", $duplicates duplicates skipped";
+        }
+        if ($autoCleared > 0) {
+            $message .= ", $autoCleared auto-cleared";
+        }
+
+        successResponse([
+            'imported' => $imported,
+            'skipped' => $skipped,
+            'duplicates' => $duplicates,
+            'auto_cleared' => $autoCleared,
+            'batch_id' => $batchId,
+            'errors' => $errors
+        ], $message);
+
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        errorResponse('Import failed: ' . $e->getMessage());
+    }
 }

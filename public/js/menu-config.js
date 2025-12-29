@@ -10,10 +10,18 @@ const menuConfigs = {
         color: '#7c3aed',
         sections: [
             {
+                id: 'main',
+                label: '',
+                items: [
+                    { page: 'dashboard', icon: '📊', label: 'Dashboard' }
+                ]
+            },
+            {
                 id: 'trust',
                 label: 'TRUST',
                 items: [
-                    { page: 'iolta', icon: '⚖️', label: 'Trust Ledger' }
+                    { page: 'iolta', icon: '⚖️', label: 'Trust Ledger' },
+                    { page: 'trust-staging', icon: '📥', label: 'Transaction Staging' }
                 ]
             },
             {
@@ -42,7 +50,7 @@ const menuConfigs = {
                 id: 'reports',
                 label: 'REPORTS',
                 collapsible: true,
-                defaultExpanded: false,
+                defaultExpanded: true,
                 items: [
                     { page: 'trust-reports', icon: '📈', label: 'Trust Reports' }
                 ]
@@ -55,6 +63,13 @@ const menuConfigs = {
         icon: '🏢',
         color: '#0891b2',
         sections: [
+            {
+                id: 'main',
+                label: '',
+                items: [
+                    { page: 'general-dashboard', icon: '📊', label: 'Dashboard' }
+                ]
+            },
             {
                 id: 'money',
                 label: 'MONEY',
@@ -94,7 +109,7 @@ const menuConfigs = {
                 id: 'reports',
                 label: 'REPORTS',
                 collapsible: true,
-                defaultExpanded: false,
+                defaultExpanded: true,
                 items: [
                     { page: 'reports', icon: '📈', label: 'Reports' },
                     { page: 'cpa-portal', icon: '👤', label: 'CPA Portal' }
@@ -109,7 +124,14 @@ const menuConfigs = {
         color: '#059669',
         sections: [
             {
-                id: 'trust',
+                id: 'main',
+                label: '',
+                items: [
+                    { page: 'dashboard', icon: '📊', label: 'Dashboard' }
+                ]
+            },
+            {
+                id: 'cost',
                 label: 'COST',
                 items: [
                     { page: 'cost-client-ledger', icon: '📄', label: 'Client Ledger' },
@@ -141,7 +163,7 @@ const menuConfigs = {
                 id: 'reports',
                 label: 'REPORTS',
                 collapsible: true,
-                defaultExpanded: false,
+                defaultExpanded: true,
                 items: [
                     { page: 'cost-reports', icon: '📈', label: 'Cost Reports' }
                 ]

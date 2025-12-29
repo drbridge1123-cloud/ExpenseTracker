@@ -85,9 +85,9 @@ function setNextCheckNumber() {
 
 async function loadCheckAccounts() {
     try {
-        const result = await apiGet('/accounts/', { user_id: state.currentUser });
+        const result = await apiGet('/accounts/', { user_id: state.currentUser, account_type: 'checking' });
         if (result.success) {
-            const accounts = result.data.accounts.filter(a => a.account_type === 'checking');
+            const accounts = result.data.accounts || [];
             const select = document.getElementById('check-account');
             if (select) {
                 select.innerHTML = '<option value="">Select account</option>' +
@@ -135,6 +135,11 @@ async function loadCheckCategories() {
                 });
 
                 select.innerHTML = options;
+
+                // Initialize custom dropdown with search
+                if (typeof initCustomCategoryDropdown === 'function') {
+                    initCustomCategoryDropdown('check-category', expenseCategories, 'Select category');
+                }
             }
         }
     } catch (error) {
@@ -332,6 +337,10 @@ function resetCheckForm() {
     document.getElementById('check-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('create-transaction').checked = true;
     document.getElementById('check-status').value = 'pending';
+    // Reset custom dropdown
+    if (typeof resetCustomDropdown === 'function') {
+        resetCustomDropdown('check-category', 'Select category');
+    }
     // Hide delete button when creating new check
     const deleteBtn = document.getElementById('delete-check-btn');
     if (deleteBtn) deleteBtn.style.display = 'none';
@@ -352,6 +361,11 @@ function editCheck(id) {
     document.getElementById('check-memo').value = check.memo || '';
     document.getElementById('check-category').value = check.category_id || '';
     document.getElementById('check-status').value = check.status || 'pending';
+
+    // Update custom dropdown if initialized
+    if (typeof setCustomDropdownValue === 'function' && check.category_id) {
+        setCustomDropdownValue('check-category', check.category_id, check.category_name || '');
+    }
 
     // Show delete button when editing
     const deleteBtn = document.getElementById('delete-check-btn');

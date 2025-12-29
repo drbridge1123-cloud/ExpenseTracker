@@ -662,7 +662,7 @@ function setupImportFormatToggle() {
 async function loadAccountsForImport() {
     try {
         // Only show active accounts (matches Accounts page)
-        const response = await fetch(`${API_BASE}/accounts/index.php?user_id=${state.currentUser}`);
+        const response = await fetch(`${API_BASE}/accounts/index.php?user_id=${state.currentUser}&account_mode=general`);
         const result = await response.json();
         if (result.success && result.data && result.data.accounts) {
             const accounts = result.data.accounts;
@@ -939,7 +939,7 @@ async function exportCategoriesXlsx(workbook, headerStyle, applyRowStyle) {
 }
 
 async function exportAccountsXlsx(workbook, headerStyle, applyRowStyle) {
-    const response = await fetch(`${API_BASE}/accounts/?user_id=${state.currentUser}`);
+    const response = await fetch(`${API_BASE}/accounts/?user_id=${state.currentUser}&account_mode=general`);
     const result = await response.json();
     const data = result.success ? result.data : [];
 
@@ -2514,3 +2514,363 @@ window.closePendingDuplicatesModal = closePendingDuplicatesModal;
 window.togglePendingDuplicate = togglePendingDuplicate;
 window.toggleAllPendingDuplicates = toggleAllPendingDuplicates;
 window.importSelectedDuplicates = importSelectedDuplicates;
+
+// =====================================================
+// IOLTA Trust Data Management Functions
+// =====================================================
+
+function setupTrustDataManagement() {
+    // Setup Trust DM tabs
+    document.querySelectorAll('#page-trust-data-management .dm-nav-item').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('#page-trust-data-management .dm-nav-item').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('#page-trust-data-management .dm-tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            const tabId = btn.dataset.tab + '-content';
+            document.getElementById(tabId)?.classList.add('active');
+        };
+    });
+
+    // Set default active tab
+    const defaultTab = document.querySelector('#page-trust-data-management .dm-nav-item[data-tab="trust-export"]');
+    if (defaultTab) {
+        defaultTab.click();
+    }
+}
+
+function updateTrustFileName(input) {
+    const fileName = input.files && input.files[0] ? input.files[0].name : 'No file selected';
+    const hint = document.getElementById('trust-import-file-name');
+    if (hint) hint.textContent = fileName;
+}
+
+async function importTrustData() {
+    const fileInput = document.getElementById('trust-import-file');
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+        showToast('Please select a CSV file to import', 'warning');
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const loading = document.getElementById('trust-import-loading');
+    const resultBox = document.getElementById('trust-import-result');
+
+    loading?.classList.add('active');
+    if (resultBox) resultBox.style.display = 'none';
+
+    try {
+        // Get the IOLTA trust account
+        let accountId = document.getElementById('trust-import-account')?.value;
+
+        if (!accountId) {
+            // Load trust accounts if not cached
+            const trustAccounts = await loadTrustAccounts();
+            if (trustAccounts && trustAccounts.length > 0) {
+                accountId = trustAccounts[0].id;
+            } else {
+                throw new Error('No IOLTA trust account found. Please create one first.');
+            }
+        }
+
+        const text = await file.text();
+        const lines = text.trim().split('\n');
+
+        if (lines.length < 2) {
+            throw new Error('CSV file is empty or has no data rows');
+        }
+
+        // Parse CSV (Chase format)
+        const transactions = parseBankStatementForTrust(text);
+
+        if (transactions.length === 0) {
+            throw new Error('No valid transactions found in the CSV file');
+        }
+
+        // Validate transactions have required fields
+        const validTransactions = transactions.filter(t => t.transaction_date && t.amount !== 0);
+        if (validTransactions.length === 0) {
+            throw new Error('No valid transactions with dates found in the CSV file');
+        }
+
+        console.log('Importing transactions:', validTransactions);
+
+        // Import to staging
+        const result = await apiPost('/trust/staging.php', {
+            user_id: state.currentUser,
+            account_id: accountId,
+            action: 'bulk_import',
+            transactions: validTransactions
+        });
+
+        if (result.success) {
+            const imported = result.data?.imported || transactions.length;
+            const skipped = result.data?.skipped || 0;
+
+            showToast(`Imported ${imported} transactions to staging`, 'success');
+
+            // Clear file input
+            fileInput.value = '';
+            document.getElementById('trust-import-file-name').textContent = 'No file selected';
+
+            // Refresh staging badge
+            if (typeof loadStagingSummary === 'function') {
+                loadStagingSummary(true);
+            }
+
+            // Auto-navigate to staging page after import
+            setTimeout(() => {
+                if (typeof navigateTo === 'function') {
+                    navigateTo('trust-staging');
+                }
+            }, 500);
+        } else {
+            throw new Error(result.message || 'Import failed');
+        }
+    } catch (error) {
+        console.error('Trust import error:', error);
+        showToast('Import failed: ' + error.message, 'error');
+
+        if (resultBox) {
+            resultBox.style.display = 'block';
+            resultBox.style.background = '#fef2f2';
+            resultBox.style.border = '1px solid #fca5a5';
+            resultBox.style.color = '#991b1b';
+            resultBox.innerHTML = `<strong>Import Failed</strong><br>${error.message}`;
+        }
+    } finally {
+        loading?.classList.remove('active');
+    }
+}
+
+function parseBankStatementForTrust(csvText) {
+    const lines = csvText.trim().split('\n');
+    if (lines.length < 2) return [];
+
+    const transactions = [];
+    const header = lines[0].toLowerCase();
+
+    // Detect format based on headers
+    const isChase = header.includes('posting date') || header.includes('details');
+
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Parse CSV line (handle quoted fields)
+        const fields = parseCSVLineForTrust(line);
+
+        if (isChase && fields.length >= 4) {
+            // Chase format: Details, Posting Date, Description, Amount, Type, Balance, Check or Slip #
+            const amount = parseFloat(fields[3]?.replace(/[,$]/g, '') || 0);
+            const date = fields[1] || '';
+            const description = fields[2] || '';
+            const checkNum = fields[6] || '';
+
+            if (amount !== 0) {
+                transactions.push({
+                    transaction_date: parseDateForTrust(date),
+                    amount: amount,
+                    description: description,
+                    check_number: checkNum ? checkNum.replace(/\D/g, '') : null,
+                    transaction_type: amount < 0 ? 'check' : 'deposit'
+                });
+            }
+        } else if (fields.length >= 3) {
+            // Generic format: Date, Description, Amount
+            const amount = parseFloat(fields[2]?.replace(/[,$]/g, '') || fields[1]?.replace(/[,$]/g, '') || 0);
+            const date = fields[0] || '';
+            const description = fields[1] || '';
+
+            if (amount !== 0) {
+                transactions.push({
+                    transaction_date: parseDateForTrust(date),
+                    amount: amount,
+                    description: description,
+                    check_number: null,
+                    transaction_type: amount < 0 ? 'check' : 'deposit'
+                });
+            }
+        }
+    }
+
+    return transactions;
+}
+
+function parseCSVLineForTrust(line) {
+    const fields = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            fields.push(current.trim());
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    fields.push(current.trim());
+
+    return fields;
+}
+
+function parseDateForTrust(dateStr) {
+    if (!dateStr) return null;
+
+    // Clean up
+    const cleaned = dateStr.replace(/"/g, '').trim();
+    if (!cleaned) return null;
+
+    // Try MM/DD/YYYY format first (common US format)
+    const usMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (usMatch) {
+        const [, month, day, year] = usMatch;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    // Try YYYY-MM-DD format
+    const isoMatch = cleaned.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (isoMatch) {
+        const [, year, month, day] = isoMatch;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    // Try MM-DD-YYYY format
+    const dashMatch = cleaned.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (dashMatch) {
+        const [, month, day, year] = dashMatch;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    // Fallback to Date parsing
+    const date = new Date(cleaned);
+    if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+    }
+
+    return null;
+}
+
+async function exportTrustData() {
+    const selected = Array.from(document.querySelectorAll('input[name="trust-export"]:checked'))
+        .map(cb => cb.value);
+
+    if (selected.length === 0) {
+        showToast('Please select at least one data type', 'warning');
+        return;
+    }
+
+    const loading = document.getElementById('trust-export-loading');
+    loading?.classList.add('active');
+
+    try {
+        for (const type of selected) {
+            await exportTrustDataAsCsv(type);
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        showToast(`${selected.length} file(s) exported`, 'success');
+    } catch (error) {
+        console.error('Trust export error:', error);
+        showToast('Export failed: ' + error.message, 'error');
+    } finally {
+        loading?.classList.remove('active');
+    }
+}
+
+async function exportTrustDataAsCsv(type) {
+    const userId = state.currentUser;
+    let data = [];
+    let headers = [];
+    let filename = '';
+
+    switch (type) {
+        case 'clients':
+            const clientsResult = await apiGet('/trust/clients.php', { user_id: userId });
+            if (clientsResult.success) {
+                data = clientsResult.data?.clients || clientsResult.data || [];
+                headers = ['id', 'case_number', 'client_name', 'display_name', 'contact_email', 'contact_phone', 'address', 'balance'];
+                filename = 'trust_clients.csv';
+            }
+            break;
+        case 'ledger':
+            const ledgerResult = await apiGet('/trust/ledger.php', { user_id: userId });
+            if (ledgerResult.success) {
+                data = ledgerResult.data?.ledgers || ledgerResult.data || [];
+                headers = ['id', 'client_id', 'client_name', 'case_number', 'balance', 'created_at'];
+                filename = 'trust_ledgers.csv';
+            }
+            break;
+        case 'transactions':
+            const txResult = await apiGet('/trust/transactions.php', { user_id: userId, limit: 10000 });
+            if (txResult.success) {
+                data = txResult.data?.transactions || [];
+                headers = ['id', 'ledger_id', 'client_name', 'transaction_date', 'transaction_type', 'amount', 'check_number', 'payee', 'description', 'status'];
+                filename = 'trust_transactions.csv';
+            }
+            break;
+        case 'checks':
+            const checksResult = await apiGet('/trust/transactions.php', { user_id: userId, type: 'check', limit: 10000 });
+            if (checksResult.success) {
+                data = (checksResult.data?.transactions || []).filter(t => t.check_number);
+                headers = ['id', 'check_number', 'check_date', 'payee', 'amount', 'status', 'client_name'];
+                filename = 'trust_checks.csv';
+            }
+            break;
+        case 'reconciliations':
+            const reconResult = await apiGet('/trust/reconcile.php', { user_id: userId, action: 'history' });
+            if (reconResult.success) {
+                data = reconResult.data?.reconciliations || [];
+                headers = ['id', 'account_name', 'statement_date', 'ending_balance', 'cleared_balance', 'difference', 'status', 'completed_at'];
+                filename = 'trust_reconciliations.csv';
+            }
+            break;
+        case 'audit':
+            const auditResult = await apiGet('/trust/audit.php', { user_id: userId, limit: 10000 });
+            if (auditResult.success) {
+                data = auditResult.data?.entries || [];
+                headers = ['id', 'action', 'entity_type', 'entity_id', 'details', 'created_at', 'user_name'];
+                filename = 'trust_audit_log.csv';
+            }
+            break;
+    }
+
+    if (data.length === 0) {
+        showToast(`No ${type} data to export`, 'info');
+        return;
+    }
+
+    // Build CSV
+    let csv = headers.join(',') + '\n';
+    data.forEach(row => {
+        const values = headers.map(h => {
+            let val = row[h] ?? '';
+            if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
+                val = '"' + val.replace(/"/g, '""') + '"';
+            }
+            return val;
+        });
+        csv += values.join(',') + '\n';
+    });
+
+    // Download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+}
+
+// Load Trust Data Management page (called from app.js)
+function loadTrustDataManagement() {
+    setupTrustDataManagement();
+}
+
+// Expose Trust Data Management functions
+window.setupTrustDataManagement = setupTrustDataManagement;
+window.loadTrustDataManagement = loadTrustDataManagement;
+window.updateTrustFileName = updateTrustFileName;
+window.importTrustData = importTrustData;
+window.exportTrustData = exportTrustData;

@@ -440,19 +440,25 @@ async function loadCheckStatusList(status) {
     const userId = state.currentUser || localStorage.getItem('currentUser');
 
     try {
-        const result = await apiGet('/trust/transactions.php', {
-            user_id: userId,
-            status: status,
-            all: 1
-        });
+        // Try to use cached data first (from loadAllCheckStatusCounts)
+        let checks = getCachedChecksByStatus(status);
 
-        const allTransactions = result.success && result.data && result.data.transactions ? result.data.transactions : [];
+        // If no cache, fetch from API
+        if (!checks) {
+            const result = await apiGet('/trust/transactions.php', {
+                user_id: userId,
+                status: status,
+                all: 1
+            });
 
-        // Filter to only include transactions with check_number (actual checks)
-        const checks = allTransactions.filter(t =>
-            (t.check_number && t.check_number.trim() !== '') ||
-            (t.reference_number && t.reference_number.trim() !== '')
-        );
+            const allTransactions = result.success && result.data && result.data.transactions ? result.data.transactions : [];
+
+            // Filter to only include transactions with check_number (actual checks)
+            checks = allTransactions.filter(t =>
+                (t.check_number && t.check_number.trim() !== '') ||
+                (t.reference_number && t.reference_number.trim() !== '')
+            );
+        }
 
         checkStatusModalState.checks = checks;
         checkStatusModalState.filteredChecks = [...checks];
@@ -744,15 +750,10 @@ async function markSelectedCheckStatusCleared() {
 
         showToast(`${successCount} check(s) marked as cleared`, 'success');
 
-        // Refresh counts and lists
-        await loadAllCheckStatusCounts();
+        // Invalidate cache and refresh (single API call)
+        invalidateCheckStatusCache();
+        await loadAllCheckStatusCounts(true);
         await switchCheckStatusTab('printed');
-
-        // Refresh IOLTA Ledger page if active
-        if (typeof window.loadIoltaTransactions === 'function') {
-            const clientId = window.IoltaPageState?.selectedClientId || 'all';
-            await window.loadIoltaTransactions(clientId);
-        }
 
     } catch (error) {
         console.error('Error marking checks as cleared:', error);
@@ -784,24 +785,39 @@ async function reprintSelectedCheckStatus() {
 }
 
 // Load all check status counts
-async function loadAllCheckStatusCounts() {
+// Cache for check status data to avoid duplicate API calls
+let _checkStatusCache = null;
+let _checkStatusCacheTime = 0;
+const CHECK_STATUS_CACHE_TTL = 5000; // 5 seconds
+
+// Invalidate cache (call after delete/update operations)
+function invalidateCheckStatusCache() {
+    _checkStatusCache = null;
+    _checkStatusCacheTime = 0;
+}
+
+async function loadAllCheckStatusCounts(forceRefresh = false) {
     const userId = state.currentUser || localStorage.getItem('currentUser');
 
     try {
-        const [pendingRes, printedRes, clearedRes] = await Promise.all([
-            apiGet('/trust/transactions.php', { user_id: userId, status: 'pending', all: 1 }),
-            apiGet('/trust/transactions.php', { user_id: userId, status: 'printed', all: 1 }),
-            apiGet('/trust/transactions.php', { user_id: userId, status: 'cleared', all: 1 })
-        ]);
+        // Use single API call and cache results
+        const now = Date.now();
+        if (forceRefresh || !_checkStatusCache || (now - _checkStatusCacheTime) > CHECK_STATUS_CACHE_TTL) {
+            const result = await apiGet('/trust/transactions.php', { user_id: userId, all: 1 });
+            if (result.success && result.data && result.data.transactions) {
+                _checkStatusCache = result.data.transactions.filter(t =>
+                    (t.check_number && t.check_number.trim() !== '') ||
+                    (t.reference_number && t.reference_number.trim() !== '')
+                );
+                _checkStatusCacheTime = now;
+            } else {
+                _checkStatusCache = [];
+            }
+        }
 
-        const filterChecks = (res) => {
-            const txs = res.success && res.data && res.data.transactions ? res.data.transactions : [];
-            return txs.filter(t => (t.check_number && t.check_number.trim() !== '') || (t.reference_number && t.reference_number.trim() !== '')).length;
-        };
-
-        const pendingCount = filterChecks(pendingRes);
-        const printedCount = filterChecks(printedRes);
-        const clearedCount = filterChecks(clearedRes);
+        const pendingCount = _checkStatusCache.filter(t => t.status === 'pending').length;
+        const printedCount = _checkStatusCache.filter(t => t.status === 'printed').length;
+        const clearedCount = _checkStatusCache.filter(t => t.status === 'cleared').length;
 
         // Update tab counts
         updateCheckStatusTabCount('pending', pendingCount);
@@ -816,6 +832,14 @@ async function loadAllCheckStatusCounts() {
     } catch (error) {
         console.error('Error loading check status counts:', error);
     }
+}
+
+// Get cached checks by status (for loadCheckStatusList to reuse)
+function getCachedChecksByStatus(status) {
+    if (_checkStatusCache) {
+        return _checkStatusCache.filter(t => t.status === status);
+    }
+    return null;
 }
 
 // Legacy functions - redirect to unified modal
@@ -963,29 +987,47 @@ function updatePendingChecksCount(count) {
     });
 }
 
-// Load pending checks count (for button display)
-async function loadPendingChecksCount() {
+// Load ALL check counts in a single API call (pending, printed, cleared)
+async function loadAllChecksCounts() {
     const userId = state.currentUser || localStorage.getItem('currentUser');
     try {
+        // Single API call to get all transactions with check numbers
         const result = await apiGet('/trust/transactions.php', {
             user_id: userId,
-            status: 'pending',
             all: 1
         });
         if (result.success && result.data.transactions) {
-            // Filter to count transactions with check_number OR reference_number (actual checks)
-            const checks = result.data.transactions.filter(t =>
+            // Filter to transactions with check_number OR reference_number (actual checks)
+            const allChecks = result.data.transactions.filter(t =>
                 (t.check_number && t.check_number.trim() !== '') ||
                 (t.reference_number && t.reference_number.trim() !== '')
             );
-            updatePendingChecksCount(checks.length);
+
+            // Count by status
+            const pendingCount = allChecks.filter(t => t.status === 'pending').length;
+            const printedCount = allChecks.filter(t => t.status === 'printed').length;
+            const clearedCount = allChecks.filter(t => t.status === 'cleared').length;
+
+            updatePendingChecksCount(pendingCount);
+            updatePrintedChecksCount(printedCount);
+            updateClearedChecksCount(clearedCount);
         } else {
             updatePendingChecksCount(0);
+            updatePrintedChecksCount(0);
+            updateClearedChecksCount(0);
         }
     } catch (error) {
-        console.error('Error loading pending checks count:', error);
+        console.error('Error loading checks counts:', error);
         updatePendingChecksCount(0);
+        updatePrintedChecksCount(0);
+        updateClearedChecksCount(0);
     }
+}
+
+// Load pending checks count (for button display) - legacy, calls combined function
+async function loadPendingChecksCount() {
+    // For backward compatibility, just call the combined function
+    await loadAllChecksCounts();
 }
 
 // Handle pending checkbox click with shift-select support
@@ -1196,22 +1238,10 @@ async function printChecksAndUpdateStatus(checksData) {
         showToast(`Failed to update ${errorCount} check(s)`, 'error');
     }
 
-    // Refresh all related UI
+    // Refresh all related UI (single API call)
+    invalidateCheckStatusCache();
+    await loadAllCheckStatusCounts(true);
     await loadPendingChecksList();
-    await loadPendingChecksCount();
-    await loadPrintedChecksCount();
-    await loadAllCheckStatusCounts();
-
-    // Refresh IOLTA Ledger page if active
-    if (typeof window.loadIoltaTransactions === 'function') {
-        const clientId = window.IoltaPageState?.selectedClientId || 'all';
-        await window.loadIoltaTransactions(clientId);
-    }
-
-    // Also refresh legacy iolta.js UI
-    if (typeof refreshIoltaUI === 'function') {
-        await refreshIoltaUI({ transactions: true, sidebar: true });
-    }
 }
 
 // =====================================================
@@ -1346,26 +1376,8 @@ function updatePrintedChecksCount(count) {
 
 // Load printed checks count (for button display)
 async function loadPrintedChecksCount() {
-    const userId = state.currentUser || localStorage.getItem('currentUser');
-    try {
-        const result = await apiGet('/trust/transactions.php', {
-            user_id: userId,
-            status: 'printed',
-            all: 1
-        });
-        if (result.success && result.data.transactions) {
-            const checks = result.data.transactions.filter(t =>
-                (t.check_number && t.check_number.trim() !== '') ||
-                (t.reference_number && t.reference_number.trim() !== '')
-            );
-            updatePrintedChecksCount(checks.length);
-        } else {
-            updatePrintedChecksCount(0);
-        }
-    } catch (error) {
-        console.error('Error loading printed checks count:', error);
-        updatePrintedChecksCount(0);
-    }
+    // No-op: counts are now loaded by loadAllChecksCounts()
+    // Kept for backward compatibility
 }
 
 // Handle printed checkbox click with shift-select support
@@ -1633,26 +1645,8 @@ function updateClearedChecksCount(count) {
 
 // Load cleared checks count (for button display)
 async function loadClearedChecksCount() {
-    const userId = state.currentUser || localStorage.getItem('currentUser');
-    try {
-        const result = await apiGet('/trust/transactions.php', {
-            user_id: userId,
-            status: 'cleared',
-            all: 1
-        });
-        if (result.success && result.data.transactions) {
-            const checks = result.data.transactions.filter(t =>
-                (t.check_number && t.check_number.trim() !== '') ||
-                (t.reference_number && t.reference_number.trim() !== '')
-            );
-            updateClearedChecksCount(checks.length);
-        } else {
-            updateClearedChecksCount(0);
-        }
-    } catch (error) {
-        console.error('Error loading cleared checks count:', error);
-        updateClearedChecksCount(0);
-    }
+    // No-op: counts are now loaded by loadAllChecksCounts()
+    // Kept for backward compatibility
 }
 
 // Helper: Convert number to words for check printing
@@ -1716,6 +1710,7 @@ window.printAllCheckStatus = printAllCheckStatus;
 window.markSelectedCheckStatusCleared = markSelectedCheckStatusCleared;
 window.reprintSelectedCheckStatus = reprintSelectedCheckStatus;
 window.loadAllCheckStatusCounts = loadAllCheckStatusCounts;
+window.loadAllChecksCounts = loadAllChecksCounts;
 
 // Pending Checks
 window.openPendingChecksModal = openPendingChecksModal;

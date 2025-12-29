@@ -194,33 +194,71 @@ function selectClient(containerId, clientId, clientName, caseNumber) {
 // Common API Functions
 // =====================================================
 
-async function loadTrustClients() {
-    try {
-        const result = await apiGet('/trust/clients.php', { user_id: state.currentUser });
-        if (result.success) {
-            ioltaState.clients = result.data || [];
-            return ioltaState.clients;
-        }
-    } catch (error) {
-        console.error('Error loading trust clients:', error);
+// Cache timestamps and pending requests to prevent duplicate calls
+let _clientsLoadedAt = 0;
+let _accountsLoadedAt = 0;
+let _stagingSummaryLoadedAt = 0;
+let _clientsLoadingPromise = null; // Track in-flight request
+let _accountsLoadingPromise = null;
+const _IOLTA_CACHE_TTL = 30000; // 30 seconds
+
+async function loadTrustClients(forceRefresh = false) {
+    // Return cached data if fresh
+    if (!forceRefresh && ioltaState.clients.length > 0 && (Date.now() - _clientsLoadedAt) < _IOLTA_CACHE_TTL) {
+        return ioltaState.clients;
     }
-    return [];
+    // If a request is already in flight, wait for it
+    if (_clientsLoadingPromise) {
+        return _clientsLoadingPromise;
+    }
+    // Start new request
+    _clientsLoadingPromise = (async () => {
+        try {
+            const result = await apiGet('/trust/clients.php', { user_id: state.currentUser });
+            if (result.success) {
+                ioltaState.clients = result.data?.clients || result.data || [];
+                _clientsLoadedAt = Date.now();
+                return ioltaState.clients;
+            }
+        } catch (error) {
+            console.error('Error loading trust clients:', error);
+        } finally {
+            _clientsLoadingPromise = null;
+        }
+        return [];
+    })();
+    return _clientsLoadingPromise;
 }
 
-async function loadTrustAccounts() {
-    try {
-        const result = await apiGet('/accounts/', {
-            user_id: state.currentUser,
-            account_type: 'iolta'
-        });
-        if (result.success) {
-            ioltaState.trustAccounts = result.data.accounts || [];
-            return ioltaState.trustAccounts;
-        }
-    } catch (error) {
-        console.error('Error loading trust accounts:', error);
+async function loadTrustAccounts(forceRefresh = false) {
+    // Return cached data if fresh
+    if (!forceRefresh && ioltaState.trustAccounts.length > 0 && (Date.now() - _accountsLoadedAt) < _IOLTA_CACHE_TTL) {
+        return ioltaState.trustAccounts;
     }
-    return [];
+    // If a request is already in flight, wait for it
+    if (_accountsLoadingPromise) {
+        return _accountsLoadingPromise;
+    }
+    // Start new request
+    _accountsLoadingPromise = (async () => {
+        try {
+            const result = await apiGet('/accounts/', {
+                user_id: state.currentUser,
+                account_type: 'iolta'
+            });
+            if (result.success) {
+                ioltaState.trustAccounts = result.data.accounts || [];
+                _accountsLoadedAt = Date.now();
+                return ioltaState.trustAccounts;
+            }
+        } catch (error) {
+            console.error('Error loading trust accounts:', error);
+        } finally {
+            _accountsLoadingPromise = null;
+        }
+        return [];
+    })();
+    return _accountsLoadingPromise;
 }
 
 // Update staging badge in menu
@@ -234,7 +272,12 @@ function updateStagingBadge() {
 }
 
 // Load staging summary for badge
-async function loadStagingSummary() {
+async function loadStagingSummary(forceRefresh = false) {
+    // Return cached if fresh
+    if (!forceRefresh && ioltaState.stagingUnassignedTotal !== undefined && (Date.now() - _stagingSummaryLoadedAt) < _IOLTA_CACHE_TTL) {
+        updateStagingBadge();
+        return;
+    }
     try {
         const result = await apiGet('/trust/staging.php', {
             user_id: state.currentUser,
@@ -243,6 +286,7 @@ async function loadStagingSummary() {
         if (result.success && result.data) {
             ioltaState.stagingUnassignedTotal = result.data.unassigned || 0;
             ioltaState.stagingTotal = result.data.total || 0;
+            _stagingSummaryLoadedAt = Date.now();
             updateStagingBadge();
         }
     } catch (error) {
@@ -330,14 +374,12 @@ window.loadStagingSummary = loadStagingSummary;
 
 async function loadIOLTAData(forceRefresh = false) {
     try {
-        // Load trust accounts
-        await loadTrustAccounts();
-
-        // Load trust clients
-        await loadTrustClients();
-
-        // Load staging summary for badge
-        await loadStagingSummary();
+        // Load all data in parallel for speed
+        await Promise.all([
+            loadTrustAccounts(),
+            loadTrustClients(),
+            loadStagingSummary()
+        ]);
 
         return true;
     } catch (error) {
@@ -353,20 +395,27 @@ window.loadIOLTAData = loadIOLTAData;
 // =====================================================
 
 async function loadIoltaDashboard() {
-    // Toggle dashboard wrappers (show iolta, hide personal)
+    // Toggle dashboard wrappers (show iolta, hide others)
     const ioltaWrapper = document.getElementById('iolta-dashboard-wrapper');
     const personalWrapper = document.getElementById('personal-dashboard-wrapper');
+    const costWrapper = document.getElementById('cost-dashboard-wrapper');
     if (ioltaWrapper) ioltaWrapper.style.display = 'block';
     if (personalWrapper) personalWrapper.style.display = 'none';
+    if (costWrapper) costWrapper.style.display = 'none';
 
-    // Load IOLTA data if not already loaded
-    await loadIOLTAData();
-
-    // Load dashboard stats
+    // Load dashboard stats (also updates ioltaState.clients and trustAccounts)
     const stats = await loadIoltaDashboardStats();
 
+    // Separate pending and printed checks
+    const allPendingChecks = stats.pendingChecksList || [];
+    const pendingOnly = allPendingChecks.filter(c => c.status === 'pending');
+    const printedOnly = allPendingChecks.filter(c => c.status === 'printed');
+
     // Build pending checks HTML
-    const pendingChecksHtml = buildPendingChecksHtml(stats.pendingChecksList || []);
+    const pendingChecksHtml = buildPendingChecksHtml(pendingOnly);
+
+    // Build printed checks HTML
+    const printedChecksHtml = buildPrintedChecksHtml(printedOnly);
 
     // Build recent transactions HTML
     const recentTransactionsHtml = buildRecentTransactionsHtml(stats.recentTransactions || []);
@@ -436,15 +485,24 @@ async function loadIoltaDashboard() {
                 </div>
             </div>
 
-            <!-- Pending Checks + Recent Transactions Row -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <!-- Pending Checks + Printed Checks + Recent Transactions Row -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
                 <!-- Pending Checks -->
                 <div class="card" style="padding: 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                         <h3 style="font-size: 16px; font-weight: 600; color: #1e293b;">Pending Checks</h3>
-                        <button onclick="navigateTo('trust-checks')" class="btn btn-sm btn-secondary" style="padding: 6px 12px; font-size: 12px;">View All Checks</button>
+                        <button onclick="navigateToLedgerWithFilter('pending')" class="btn btn-sm btn-secondary" style="padding: 6px 12px; font-size: 12px;">View All</button>
                     </div>
                     ${pendingChecksHtml}
+                </div>
+
+                <!-- Printed Checks -->
+                <div class="card" style="padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="font-size: 16px; font-weight: 600; color: #1e293b;">Printed Checks</h3>
+                        <button onclick="navigateToLedgerWithFilter('printed')" class="btn btn-sm btn-secondary" style="padding: 6px 12px; font-size: 12px;">View All</button>
+                    </div>
+                    ${printedChecksHtml}
                 </div>
 
                 <!-- Recent Transactions -->
@@ -465,7 +523,7 @@ async function loadIoltaDashboard() {
         });
         document.getElementById('stat-card-trust-accounts')?.addEventListener('click', (e) => {
             e.preventDefault();
-            openTrustAccountsModal();
+            openActiveClientsModal();
         });
         document.getElementById('stat-card-ledgers')?.addEventListener('click', (e) => {
             e.preventDefault();
@@ -550,15 +608,52 @@ function buildPendingChecksHtml(checks) {
 
     return `
         <div style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto;">
-            ${checks.slice(0, 10).map(check => `
+            ${checks.slice(0, 10).map(check => {
+                const checkNum = check.check_number && check.check_number !== '-' ? `#${ioltaEscapeHtml(check.check_number)}` : '';
+                const payeeInfo = check.payee || check.client_name || 'Unknown';
+                return `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #fefce8; border-radius: 8px; border-left: 3px solid #eab308;">
-                    <div>
-                        <div style="font-weight: 500; color: #1e293b;">Check #${ioltaEscapeHtml(check.check_number)}</div>
-                        <div style="font-size: 12px; color: #6b7280;">${ioltaEscapeHtml(check.payee)} - ${ioltaFormatDateShort(check.check_date)}</div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 500; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${ioltaEscapeHtml(check.client_name || 'Unknown Client')}
+                        </div>
+                        <div style="font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${checkNum ? checkNum + ' - ' : ''}${ioltaEscapeHtml(payeeInfo)} - ${ioltaFormatDateShort(check.check_date)}
+                        </div>
                     </div>
-                    <div style="font-weight: 600; color: #92400e;">${ioltaFormatCurrency(check.amount)}</div>
+                    <div style="font-weight: 600; color: #92400e; margin-left: 12px; white-space: nowrap;">${ioltaFormatCurrency(check.amount)}</div>
                 </div>
-            `).join('')}
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+// Build Printed Checks HTML
+function buildPrintedChecksHtml(checks) {
+    if (!checks || checks.length === 0) {
+        return '<p style="color: #6b7280; text-align: center; padding: 20px;">No printed checks</p>';
+    }
+
+    return `
+        <div style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto;">
+            ${checks.slice(0, 10).map(check => {
+                const checkNum = check.check_number && check.check_number !== '-' ? `#${ioltaEscapeHtml(check.check_number)}` : '';
+                const payeeInfo = check.payee || check.client_name || 'Unknown';
+                return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #eff6ff; border-radius: 8px; border-left: 3px solid #3b82f6;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 500; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${ioltaEscapeHtml(check.client_name || 'Unknown Client')}
+                        </div>
+                        <div style="font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${checkNum ? checkNum + ' - ' : ''}${ioltaEscapeHtml(payeeInfo)} - ${ioltaFormatDateShort(check.check_date)}
+                        </div>
+                    </div>
+                    <div style="font-weight: 600; color: #1d4ed8; margin-left: 12px; white-space: nowrap;">${ioltaFormatCurrency(check.amount)}</div>
+                </div>
+                `;
+            }).join('')}
         </div>
     `;
 }
@@ -612,76 +707,44 @@ async function loadIoltaDashboardStats() {
     try {
         const userId = state.currentUser;
 
-        // Get trust account count and total balance
-        const trustAccounts = Array.isArray(ioltaState.trustAccounts) ? ioltaState.trustAccounts : [];
-        const clients = Array.isArray(ioltaState.clients) ? ioltaState.clients : [];
+        // Single API call for all dashboard data (fast like Cost dashboard)
+        const result = await apiGet('/trust/dashboard.php', { user_id: userId });
 
-        stats.trustAccountCount = trustAccounts.length;
-        stats.totalClientFunds = trustAccounts.reduce((sum, acc) => sum + (parseFloat(acc.balance) || 0), 0);
+        if (result.success && result.data) {
+            const data = result.data;
 
-        // Get active clients (clients with positive balance)
-        stats.activeClients = clients.filter(c => parseFloat(c.balance) > 0).length;
+            // Map API response to stats
+            stats.totalClientFunds = data.total_client_funds || 0;
+            stats.trustAccountCount = data.trust_account_count || 0;
+            stats.activeClients = data.active_clients || 0;
+            stats.openLedgers = data.open_ledgers || 0;
+            stats.reconcileIssues = data.reconcile_issues || 0;
+            stats.pendingChecks = data.pending_checks || 0;
+            stats.pendingAmount = data.pending_amount || 0;
+            stats.printedChecks = data.printed_checks || 0;
+            stats.printedAmount = data.printed_amount || 0;
+            stats.recentTransactions = data.recent_transactions || [];
 
-        // Get open ledgers count (clients with active ledgers)
-        stats.openLedgers = clients.length;
+            // Map pending checks list
+            stats.pendingChecksList = (data.pending_checks_list || []).map(t => ({
+                id: t.id,
+                check_number: t.check_number || t.reference_number || '-',
+                payee: t.payee || t.description,
+                amount: parseFloat(t.amount) || 0,
+                check_date: t.check_date,
+                status: t.status,
+                client_name: t.client_name,
+                ledger_id: t.ledger_id
+            }));
 
-        // Get checks data
-        const checksResult = await apiGet('/trust/checks.php', { user_id: userId, all: true });
-        if (checksResult.success && checksResult.data) {
-            const checks = checksResult.data.checks || [];
+            // Update shared state with clients and trust accounts
+            ioltaState.clients = data.clients || [];
+            ioltaState.trustAccounts = data.trust_accounts || [];
 
-            // Pending checks list for display
-            stats.pendingChecksList = checks.filter(c => c.status === 'pending' || c.status === 'printed');
-
-            checks.forEach(check => {
-                const amount = parseFloat(check.amount) || 0;
-                if (check.status === 'pending') {
-                    stats.pendingChecks++;
-                    stats.pendingAmount += amount;
-                } else if (check.status === 'printed') {
-                    stats.printedChecks++;
-                    stats.printedAmount += amount;
-                } else if (check.status === 'cleared') {
-                    stats.clearedChecks++;
-                    stats.clearedAmount += amount;
-                }
-            });
+            // Update cache timestamps to prevent duplicate API calls
+            _clientsLoadedAt = Date.now();
+            _accountsLoadedAt = Date.now();
         }
-
-        // Get recent transactions
-        const transResult = await apiGet('/trust/transactions.php', { user_id: userId, limit: 10 });
-        if (transResult.success && transResult.data) {
-            stats.recentTransactions = transResult.data.transactions || [];
-        }
-
-        // Get spending by category (transaction types)
-        const spendingMap = {};
-        if (stats.recentTransactions.length > 0) {
-            // Get more transactions to calculate spending
-            const allTransResult = await apiGet('/trust/transactions.php', { user_id: userId, limit: 500 });
-            if (allTransResult.success && allTransResult.data) {
-                const allTrans = allTransResult.data.transactions || [];
-                allTrans.forEach(tx => {
-                    const amount = parseFloat(tx.amount) || 0;
-                    if (amount < 0) { // Only count disbursements
-                        const category = tx.transaction_type || 'Other';
-                        const displayName = getCategoryDisplayName(category);
-                        if (!spendingMap[displayName]) {
-                            spendingMap[displayName] = 0;
-                        }
-                        spendingMap[displayName] += Math.abs(amount);
-                    }
-                });
-            }
-        }
-
-        // Convert spending map to array and sort by amount
-        stats.spendingByCategory = Object.entries(spendingMap)
-            .map(([name, amount]) => ({ name, amount }))
-            .sort((a, b) => b.amount - a.amount);
-
-        // Check for reconciliation issues (unreconciled accounts)
-        stats.reconcileIssues = 0;
 
     } catch (error) {
         console.error('Error loading dashboard stats:', error);
@@ -708,6 +771,14 @@ function getCategoryDisplayName(category) {
 
 window.loadIoltaDashboard = loadIoltaDashboard;
 window.loadIoltaDashboardStats = loadIoltaDashboardStats;
+
+// Navigate to Trust Ledger with status filter
+function navigateToLedgerWithFilter(statusFilter) {
+    // Store filter in session storage for the Trust Ledger page to pick up
+    sessionStorage.setItem('ioltaStatusFilter', statusFilter);
+    navigateTo('iolta');
+}
+window.navigateToLedgerWithFilter = navigateToLedgerWithFilter;
 
 // =====================================================
 // Dashboard Detail Modals
@@ -744,7 +815,7 @@ async function openClientFundsModal() {
             <div style="background: white; border-radius: 12px; width: 90%; max-width: 700px; max-height: 80vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
                 <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                     <h2 style="font-size: 20px; font-weight: 600; color: #1e293b;">💰 Client Funds Breakdown</h2>
-                    <button onclick="closeModal('client-funds-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+                    <button onclick="closeIoltaModal('client-funds-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
                 </div>
                 <div style="padding: 20px; overflow-y: auto; max-height: calc(80vh - 140px);">
                     <table style="width: 100%; border-collapse: collapse;">
@@ -772,7 +843,76 @@ async function openClientFundsModal() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     document.getElementById('client-funds-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'client-funds-modal') closeModal('client-funds-modal');
+        if (e.target.id === 'client-funds-modal') closeIoltaModal('client-funds-modal');
+    });
+}
+
+// Active Clients Modal - shows only clients with non-zero balance
+async function openActiveClientsModal() {
+    const clients = Array.isArray(ioltaState.clients) ? ioltaState.clients : [];
+
+    // Filter only active clients (with non-zero balance)
+    const activeClients = clients.filter(c => {
+        const balance = parseFloat(c.balance || c.total_balance) || 0;
+        return balance !== 0;
+    });
+
+    let tableRows = '';
+    let totalBalance = 0;
+
+    activeClients.forEach(client => {
+        const balance = parseFloat(client.balance || client.total_balance) || 0;
+        totalBalance += balance;
+        tableRows += `
+            <tr style="border-bottom: 1px solid #e5e7eb; cursor: pointer;" onclick="closeIoltaModal('active-clients-modal'); navigateTo('iolta'); setTimeout(() => { if(typeof selectIoltaClient === 'function') selectIoltaClient(${client.id}); }, 500);">
+                <td style="padding: 12px; font-weight: 500;">${ioltaEscapeHtml(client.client_name)}</td>
+                <td style="padding: 12px; color: #6b7280;">${ioltaEscapeHtml(client.case_number || '-')}</td>
+                <td style="padding: 12px; text-align: right; font-weight: 600; color: ${balance >= 0 ? '#059669' : '#dc2626'};">
+                    ${ioltaFormatCurrency(balance)}
+                </td>
+            </tr>
+        `;
+    });
+
+    if (activeClients.length === 0) {
+        tableRows = '<tr><td colspan="3" style="padding: 24px; text-align: center; color: #6b7280;">No active clients found</td></tr>';
+    }
+
+    const modalHtml = `
+        <div id="active-clients-modal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
+            <div style="background: white; border-radius: 12px; width: 90%; max-width: 700px; max-height: 80vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+                <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="font-size: 20px; font-weight: 600; color: #1e293b;">👥 Active Clients</h2>
+                    <button onclick="closeIoltaModal('active-clients-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+                </div>
+                <div style="padding: 20px; overflow-y: auto; max-height: calc(80vh - 140px);">
+                    <p style="color: #6b7280; font-size: 13px; margin-bottom: 16px;">Clients with non-zero balance. Click to view ledger.</p>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f8fafc;">
+                                <th style="padding: 12px; text-align: left; font-weight: 600; color: #475569;">Client Name</th>
+                                <th style="padding: 12px; text-align: left; font-weight: 600; color: #475569;">Case Number</th>
+                                <th style="padding: 12px; text-align: right; font-weight: 600; color: #475569;">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background: #f1f5f9; font-weight: 700;">
+                                <td colspan="2" style="padding: 12px;">Total (${activeClients.length} clients)</td>
+                                <td style="padding: 12px; text-align: right; color: #059669;">${ioltaFormatCurrency(totalBalance)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.getElementById('active-clients-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'active-clients-modal') closeIoltaModal('active-clients-modal');
     });
 }
 
@@ -807,7 +947,7 @@ async function openTrustAccountsModal() {
             <div style="background: white; border-radius: 12px; width: 90%; max-width: 800px; max-height: 80vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
                 <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                     <h2 style="font-size: 20px; font-weight: 600; color: #1e293b;">🏦 Trust Accounts</h2>
-                    <button onclick="closeModal('trust-accounts-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+                    <button onclick="closeIoltaModal('trust-accounts-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
                 </div>
                 <div style="padding: 20px; overflow-y: auto; max-height: calc(80vh - 140px);">
                     <table style="width: 100%; border-collapse: collapse;">
@@ -836,7 +976,7 @@ async function openTrustAccountsModal() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     document.getElementById('trust-accounts-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'trust-accounts-modal') closeModal('trust-accounts-modal');
+        if (e.target.id === 'trust-accounts-modal') closeIoltaModal('trust-accounts-modal');
     });
 }
 
@@ -876,7 +1016,7 @@ async function openLedgersModal() {
             <div style="background: white; border-radius: 12px; width: 90%; max-width: 800px; max-height: 80vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
                 <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                     <h2 style="font-size: 20px; font-weight: 600; color: #1e293b;">📒 Open Ledgers</h2>
-                    <button onclick="closeModal('ledgers-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+                    <button onclick="closeIoltaModal('ledgers-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
                 </div>
                 <div style="padding: 20px; overflow-y: auto; max-height: calc(80vh - 140px);">
                     <p style="margin-bottom: 16px; color: #6b7280; font-size: 14px;">Click on a ledger to view transactions</p>
@@ -900,7 +1040,7 @@ async function openLedgersModal() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     document.getElementById('ledgers-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'ledgers-modal') closeModal('ledgers-modal');
+        if (e.target.id === 'ledgers-modal') closeIoltaModal('ledgers-modal');
     });
 }
 
@@ -927,7 +1067,7 @@ async function openReconcileStatusModal() {
                 </td>
                 <td style="padding: 12px; color: #6b7280;">${statusText}</td>
                 <td style="padding: 12px; text-align: center;">
-                    <button onclick="closeModal('reconcile-status-modal'); navigateTo('trust-reconcile');" class="btn btn-sm btn-secondary" style="padding: 6px 12px; font-size: 12px;">
+                    <button onclick="closeIoltaModal('reconcile-status-modal'); navigateTo('trust-reconcile');" class="btn btn-sm btn-secondary" style="padding: 6px 12px; font-size: 12px;">
                         Reconcile
                     </button>
                 </td>
@@ -944,7 +1084,7 @@ async function openReconcileStatusModal() {
             <div style="background: white; border-radius: 12px; width: 90%; max-width: 800px; max-height: 80vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
                 <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                     <h2 style="font-size: 20px; font-weight: 600; color: #1e293b;">📊 Reconciliation Status</h2>
-                    <button onclick="closeModal('reconcile-status-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+                    <button onclick="closeIoltaModal('reconcile-status-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
                 </div>
                 <div style="padding: 20px; overflow-y: auto; max-height: calc(80vh - 140px);">
                     <table style="width: 100%; border-collapse: collapse;">
@@ -967,7 +1107,7 @@ async function openReconcileStatusModal() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     document.getElementById('reconcile-status-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'reconcile-status-modal') closeModal('reconcile-status-modal');
+        if (e.target.id === 'reconcile-status-modal') closeIoltaModal('reconcile-status-modal');
     });
 }
 
@@ -979,17 +1119,18 @@ function isWithinMonth(dateStr) {
     return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
 }
 
-// Close modal helper
-function closeModal(modalId) {
+// Close modal helper for IOLTA dynamic modals
+function closeIoltaModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) modal.remove();
 }
 
 window.openClientFundsModal = openClientFundsModal;
+window.openActiveClientsModal = openActiveClientsModal;
 window.openTrustAccountsModal = openTrustAccountsModal;
 window.openLedgersModal = openLedgersModal;
 window.openReconcileStatusModal = openReconcileStatusModal;
-window.closeModal = closeModal;
+window.closeIoltaModal = closeIoltaModal;
 
 // =====================================================
 // Quick Action List Modals
@@ -1003,7 +1144,7 @@ async function openDepositListModal() {
     try {
         const result = await apiGet('/trust/transactions.php', {
             user_id: userId,
-            transaction_type: 'deposit',
+            type: 'deposit',
             limit: 100
         });
         if (result.success && result.data) {
@@ -1031,7 +1172,7 @@ async function openDepositListModal() {
             <div style="background: white; border-radius: 12px; width: 90%; max-width: 800px; max-height: 80vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
                 <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                     <h2 style="font-size: 20px; font-weight: 600; color: #1e293b;">💰 Deposit List</h2>
-                    <button onclick="closeModal('deposit-list-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+                    <button onclick="closeIoltaModal('deposit-list-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
                 </div>
                 <div style="padding: 20px; overflow-y: auto; max-height: calc(80vh - 80px);">
                     <table style="width: 100%; border-collapse: collapse;">
@@ -1052,7 +1193,7 @@ async function openDepositListModal() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     document.getElementById('deposit-list-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'deposit-list-modal') closeModal('deposit-list-modal');
+        if (e.target.id === 'deposit-list-modal') closeIoltaModal('deposit-list-modal');
     });
 }
 
@@ -1062,29 +1203,34 @@ async function openPayoutListModal() {
     let payouts = [];
 
     try {
-        // Get all transactions and filter for payout/disbursement types
+        // Get all transactions and filter for payouts (negative amounts = outgoing money)
         const result = await apiGet('/trust/transactions.php', {
             user_id: userId,
             limit: 500
         });
         if (result.success && result.data) {
             const allTx = result.data.transactions || [];
-            payouts = allTx.filter(t => t.transaction_type === 'payout' || t.transaction_type === 'disbursement');
+            // Payouts are all negative amount transactions (checks, disbursements, etc.)
+            payouts = allTx.filter(t => parseFloat(t.amount) < 0);
         }
     } catch (e) {
         console.error('Error loading payouts:', e);
     }
 
     // Format type for display
-    function formatType(type) {
+    function formatType(type, hasCheckNumber) {
         const types = {
             'payout': 'Payout',
             'disbursement': 'Disbursement',
             'legal_fee': 'Legal Fee',
             'cost': 'Cost',
-            'transfer_out': 'Transfer Out'
+            'transfer_out': 'Transfer Out',
+            'check': 'Check'
         };
-        return types[type] || type || 'Payout';
+        if (types[type]) return types[type];
+        // If no type but has check number, it's a check
+        if (hasCheckNumber) return 'Check';
+        return 'Disbursement';
     }
 
     let tableRows = payouts.map(p => `
@@ -1093,10 +1239,10 @@ async function openPayoutListModal() {
             <td style="padding: 12px; color: #6b7280;">${ioltaEscapeHtml(p.check_number ? '#' + p.check_number : '-')}</td>
             <td style="padding: 12px;">
                 <span style="padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; background: #fee2e2; color: #dc2626;">
-                    ${formatType(p.transaction_type)}
+                    ${formatType(p.transaction_type, p.check_number)}
                 </span>
             </td>
-            <td style="padding: 12px; color: #374151;">${ioltaEscapeHtml(p.payee || p.description || '-')}</td>
+            <td style="padding: 12px; color: #374151;">${ioltaEscapeHtml(p.payee || p.entity_name || p.description || '-')}</td>
             <td style="padding: 12px; text-align: right; font-weight: 600; color: #dc2626;">${ioltaFormatCurrency(Math.abs(p.amount))}</td>
         </tr>
     `).join('');
@@ -1110,7 +1256,7 @@ async function openPayoutListModal() {
             <div style="background: white; border-radius: 12px; width: 90%; max-width: 900px; max-height: 80vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
                 <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                     <h2 style="font-size: 20px; font-weight: 600; color: #1e293b;">📄 Payout List</h2>
-                    <button onclick="closeModal('payout-list-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+                    <button onclick="closeIoltaModal('payout-list-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
                 </div>
                 <div style="padding: 20px; overflow-y: auto; max-height: calc(80vh - 80px);">
                     <table style="width: 100%; border-collapse: collapse;">
@@ -1132,7 +1278,7 @@ async function openPayoutListModal() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     document.getElementById('payout-list-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'payout-list-modal') closeModal('payout-list-modal');
+        if (e.target.id === 'payout-list-modal') closeIoltaModal('payout-list-modal');
     });
 }
 
@@ -1178,7 +1324,7 @@ async function openCostListModal() {
             <div style="background: white; border-radius: 12px; width: 90%; max-width: 900px; max-height: 80vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
                 <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                     <h2 style="font-size: 20px; font-weight: 600; color: #1e293b;">💳 Cost List</h2>
-                    <button onclick="closeModal('cost-list-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+                    <button onclick="closeIoltaModal('cost-list-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
                 </div>
                 <div style="padding: 20px; overflow-y: auto; max-height: calc(80vh - 80px);">
                     <table style="width: 100%; border-collapse: collapse;">
@@ -1200,7 +1346,7 @@ async function openCostListModal() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     document.getElementById('cost-list-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'cost-list-modal') closeModal('cost-list-modal');
+        if (e.target.id === 'cost-list-modal') closeIoltaModal('cost-list-modal');
     });
 }
 
@@ -1246,7 +1392,7 @@ async function openLegalFeeListModal() {
             <div style="background: white; border-radius: 12px; width: 90%; max-width: 800px; max-height: 80vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
                 <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
                     <h2 style="font-size: 20px; font-weight: 600; color: #1e293b;">Legal Fee List</h2>
-                    <button onclick="closeModal('legal-fee-list-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
+                    <button onclick="closeIoltaModal('legal-fee-list-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
                 </div>
                 <div style="padding: 20px; overflow-y: auto; max-height: calc(80vh - 80px);">
                     <table style="width: 100%; border-collapse: collapse;">
@@ -1268,95 +1414,14 @@ async function openLegalFeeListModal() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     document.getElementById('legal-fee-list-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'legal-fee-list-modal') closeModal('legal-fee-list-modal');
+        if (e.target.id === 'legal-fee-list-modal') closeIoltaModal('legal-fee-list-modal');
     });
 }
 
-// New Client Modal
-async function openNewClientModal() {
-    const modalHtml = `
-        <div id="new-client-modal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
-            <div style="background: white; border-radius: 12px; width: 90%; max-width: 500px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
-                <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
-                    <h2 style="font-size: 20px; font-weight: 600; color: #1e293b;">➕ New Trust Client</h2>
-                    <button onclick="closeModal('new-client-modal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280;">&times;</button>
-                </div>
-                <form id="new-client-form" style="padding: 20px;">
-                    <div style="margin-bottom: 16px;">
-                        <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Client Name *</label>
-                        <input type="text" id="new-client-name" required placeholder="Enter client name"
-                               style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
-                    </div>
-                    <div style="margin-bottom: 16px;">
-                        <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Case/Matter Number</label>
-                        <input type="text" id="new-client-case" placeholder="e.g., 2024-001"
-                               style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
-                    </div>
-                    <div style="margin-bottom: 16px;">
-                        <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Email</label>
-                        <input type="email" id="new-client-email" placeholder="client@email.com"
-                               style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
-                    </div>
-                    <div style="margin-bottom: 16px;">
-                        <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Phone</label>
-                        <input type="tel" id="new-client-phone" placeholder="(555) 123-4567"
-                               style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
-                    </div>
-                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
-                        <button type="button" onclick="closeModal('new-client-modal')" class="btn btn-secondary">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Create Client</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-    // Handle form submission
-    document.getElementById('new-client-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const clientName = document.getElementById('new-client-name').value.trim();
-        const caseNumber = document.getElementById('new-client-case').value.trim();
-        const email = document.getElementById('new-client-email').value.trim();
-        const phone = document.getElementById('new-client-phone').value.trim();
-
-        if (!clientName) {
-            showToast('Client name is required', 'error');
-            return;
-        }
-
-        try {
-            const result = await apiPost('/trust/clients.php', {
-                user_id: state.currentUser,
-                client_name: clientName,
-                case_number: caseNumber || null,
-                email: email || null,
-                phone: phone || null
-            });
-
-            if (result.success) {
-                closeModal('new-client-modal');
-                showToast('Client created successfully', 'success');
-                // Refresh clients list
-                await loadTrustClients();
-                // Refresh dashboard if on dashboard
-                if (typeof loadIoltaDashboard === 'function') {
-                    await loadIoltaDashboard();
-                }
-            } else {
-                showToast(result.message || 'Error creating client', 'error');
-            }
-        } catch (e) {
-            console.error('Error creating client:', e);
-            showToast('Error creating client', 'error');
-        }
-    });
-
-    document.getElementById('new-client-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'new-client-modal') closeModal('new-client-modal');
-    });
+// New Client Modal - Use professional Trust Client modal
+function openNewClientModal() {
+    // Use the professional-style Trust Client modal
+    openTrustClientModal();
 }
 
 window.openDepositListModal = openDepositListModal;
@@ -1395,5 +1460,196 @@ async function refreshIoltaUI(options = {}) {
 }
 
 window.refreshIoltaUI = refreshIoltaUI;
+
+// =====================================================
+// Trust Client Modal (Professional Style - Same as Cost)
+// =====================================================
+
+window.openTrustClientModal = function(client) {
+    var modal = document.getElementById('trust-client-modal');
+    if (modal) modal.remove();
+    var isEdit = !!client;
+    var title = isEdit ? 'Edit Client' : 'Add New Client';
+    modal = document.createElement('div');
+    modal.id = 'trust-client-modal';
+    modal.style.cssText = 'display: flex; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 99999; justify-content: center; align-items: center; padding: 20px;';
+    var clientId = client ? client.id : '';
+    var caseNumber = client ? (client.case_number || '') : '';
+    var clientName = client ? (client.client_name || '') : '';
+    var displayName = client ? (client.display_name || '') : '';
+    var email = client ? (client.contact_email || '') : '';
+    var phone = client ? (client.contact_phone || '') : '';
+    var address = client ? (client.address || '') : '';
+    var notes = client ? (client.notes || '') : '';
+
+    // Parse address into components if available
+    var street = '', street2 = '', city = '', stateCode = '', zip = '';
+    if (address) {
+        var parts = address.split(',').map(function(p) { return p.trim(); });
+        if (parts.length >= 1) street = parts[0] || '';
+        if (parts.length >= 2) street2 = parts[1] || '';
+        if (parts.length >= 3) city = parts[2] || '';
+        if (parts.length >= 4) {
+            var stateZip = parts[3].trim().split(' ');
+            stateCode = stateZip[0] || '';
+            zip = stateZip[1] || '';
+        }
+    }
+
+    // Input style for cleaner look
+    var inputStyle = 'width: 100%; padding: 11px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; box-sizing: border-box; background: #fff; transition: all 0.15s ease; outline: none;';
+    var inputFocus = "this.style.borderColor='#7c3aed'; this.style.boxShadow='0 0 0 3px rgba(124,58,237,0.1)'";
+    var inputBlur = "this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'";
+
+    modal.innerHTML = `
+        <div style="width: 480px; max-width: 95%; max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.15);">
+            <div style="padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600; color: #1e293b;">${title}</h2>
+                <button onclick="closeTrustClientModal()" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: #f8fafc; border: none; border-radius: 6px; font-size: 16px; color: #64748b; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">&times;</button>
+            </div>
+
+            <form id="trust-client-form" onsubmit="saveTrustClient(event)" style="padding: 20px 24px;">
+                <input type="hidden" id="trust-client-id" value="${clientId}">
+
+                <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Name <span style="color: #ef4444;">*</span></label>
+                        <input type="text" id="trust-client-name" required value="${clientName}" placeholder="Full name"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Case #</label>
+                        <input type="text" id="trust-client-case" value="${caseNumber}" placeholder="Case number"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Display Name <span style="color: #94a3b8; font-weight: 400;">(for checks)</span></label>
+                    <input type="text" id="trust-client-display-name" value="${displayName}" placeholder="Name as printed on checks"
+                           style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Email</label>
+                        <input type="email" id="trust-client-email" value="${email}" placeholder="email@example.com"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Phone</label>
+                        <input type="tel" id="trust-client-phone" value="${phone}" placeholder="(555) 123-4567"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 16px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Address</label>
+
+                    <div style="margin-bottom: 10px;">
+                        <input type="text" id="trust-client-street" value="${street}" placeholder="Street address"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <input type="text" id="trust-client-street2" value="${street2}" placeholder="Suite, unit, building (optional)"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1.2fr; gap: 10px;">
+                        <input type="text" id="trust-client-city" value="${city}" placeholder="City"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                        <input type="text" id="trust-client-state" value="${stateCode}" placeholder="State" maxlength="2"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                        <input type="text" id="trust-client-zip" value="${zip}" placeholder="Zip"
+                               style="${inputStyle}" onfocus="${inputFocus}" onblur="${inputBlur}">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px;">Notes</label>
+                    <textarea id="trust-client-notes" rows="2" placeholder="Additional notes (optional)"
+                              style="${inputStyle} resize: vertical; min-height: 60px;" onfocus="${inputFocus}" onblur="${inputBlur}">${notes}</textarea>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 16px; border-top: 1px solid #f1f5f9;">
+                    <button type="button" onclick="closeTrustClientModal()"
+                            style="padding: 10px 20px; background: #fff; color: #64748b; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s;"
+                            onmouseover="this.style.background='#f8fafc'; this.style.borderColor='#cbd5e1'" onmouseout="this.style.background='#fff'; this.style.borderColor='#e2e8f0'">Cancel</button>
+                    <button type="submit"
+                            style="padding: 10px 20px; background: #7c3aed; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; box-shadow: 0 1px 2px rgba(124,58,237,0.2);"
+                            onmouseover="this.style.background='#6d28d9'; this.style.boxShadow='0 2px 4px rgba(124,58,237,0.3)'" onmouseout="this.style.background='#7c3aed'; this.style.boxShadow='0 1px 2px rgba(124,58,237,0.2)'">Save Client</button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+};
+
+window.closeTrustClientModal = function() {
+    var modal = document.getElementById('trust-client-modal');
+    if (modal) modal.remove();
+};
+
+window.saveTrustClient = async function(event) {
+    event.preventDefault();
+    var id = document.getElementById('trust-client-id').value;
+
+    // Build address from components
+    var street = document.getElementById('trust-client-street')?.value.trim() || '';
+    var street2 = document.getElementById('trust-client-street2')?.value.trim() || '';
+    var city = document.getElementById('trust-client-city')?.value.trim() || '';
+    var stateCode = document.getElementById('trust-client-state')?.value.trim() || '';
+    var zip = document.getElementById('trust-client-zip')?.value.trim() || '';
+
+    var address = '';
+    if (street) address += street;
+    if (street2) address += (address ? ', ' : '') + street2;
+    if (city) address += (address ? ', ' : '') + city;
+    if (stateCode) address += (address ? ', ' : '') + stateCode;
+    if (zip) address += (address ? ' ' : '') + zip;
+
+    var userId = (typeof state !== 'undefined' && state.currentUser) || localStorage.getItem('currentUser') || '1';
+
+    var data = {
+        user_id: userId,
+        case_number: document.getElementById('trust-client-case').value,
+        client_name: document.getElementById('trust-client-name').value,
+        display_name: document.getElementById('trust-client-display-name')?.value || null,
+        contact_email: document.getElementById('trust-client-email').value,
+        contact_phone: document.getElementById('trust-client-phone').value,
+        address: address || null,
+        notes: document.getElementById('trust-client-notes').value
+    };
+
+    try {
+        var result;
+        if (id) {
+            data.id = id;
+            result = await apiPut('/trust/clients.php', data);
+        } else {
+            result = await apiPost('/trust/clients.php', data);
+        }
+
+        if (result.success) {
+            closeTrustClientModal();
+            // Refresh client list
+            if (typeof loadTrustClients === 'function') {
+                await loadTrustClients();
+            }
+            if (typeof window.renderIoltaClientSidebar === 'function') {
+                window.renderIoltaClientSidebar();
+            }
+            if (typeof showToast === 'function') {
+                showToast(id ? 'Client updated' : 'Client added', 'success');
+            }
+        } else {
+            alert(result.message || 'Error saving client');
+        }
+    } catch (error) {
+        console.error('Error saving client:', error);
+        alert('Error saving client');
+    }
+};
 
 console.log('IOLTA Common module loaded');

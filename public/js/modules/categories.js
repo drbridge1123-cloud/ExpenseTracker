@@ -233,7 +233,8 @@ async function loadCategories(forceRefresh = false) {
 
     const data = await apiGet('/categories/', {
         user_id: userId,
-        include_stats: '1'
+        include_stats: '1',
+        include_accounts: '1'  // Include bank accounts under Assets for Chart of Accounts view
     });
 
     if (data.success) {
@@ -1435,6 +1436,10 @@ function openBulkCategorizeModal() {
 
 function closeBulkCategorizeModal() {
     document.getElementById('bulk-categorize-overlay').classList.remove('open');
+    // Reset custom dropdown
+    if (typeof resetCustomDropdown === 'function') {
+        resetCustomDropdown('bulk-cat-select', 'Select category');
+    }
 }
 
 function toggleRuleSettings() {
@@ -1448,6 +1453,17 @@ function toggleRuleSettings() {
 function populateBulkCategorySelect() {
     const select = document.getElementById('bulk-cat-select');
     select.innerHTML = '<option value="">Select category...</option>' + buildHierarchicalCategoryOptions(false);
+
+    // Initialize custom dropdown if available
+    if (typeof initCustomCategoryDropdown === 'function' && state.categories) {
+        // Filter out uncategorized and accounts
+        const categories = state.categories.filter(c =>
+            c.slug !== 'uncategorized' &&
+            !c.is_account &&
+            c.category_type !== 'asset'
+        );
+        initCustomCategoryDropdown('bulk-cat-select', categories, 'Select category');
+    }
 }
 
 // Check for existing similar rules

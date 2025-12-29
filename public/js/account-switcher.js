@@ -194,20 +194,26 @@ function renderSidebarMenu(accountType) {
     // Find or create the dynamic menu container
     let dynamicMenu = document.getElementById('dynamic-sidebar-menu');
     if (!dynamicMenu) {
-        // Create dynamic menu container after fixed menu
-        const fixedMenu = sidebar.querySelector('.fixed-menu');
+        // Create dynamic menu container before admin section or user area
+        const adminSection = document.getElementById('nav-admin-section');
+        const userArea = sidebar.querySelector('.user-area');
         dynamicMenu = document.createElement('div');
         dynamicMenu.id = 'dynamic-sidebar-menu';
         dynamicMenu.className = 'dynamic-sidebar-menu';
-        if (fixedMenu && fixedMenu.nextSibling) {
-            sidebar.insertBefore(dynamicMenu, fixedMenu.nextSibling);
+
+        // Insert before admin section if exists, otherwise before user area
+        if (adminSection) {
+            sidebar.insertBefore(dynamicMenu, adminSection);
+        } else if (userArea) {
+            sidebar.insertBefore(dynamicMenu, userArea);
         } else {
             sidebar.appendChild(dynamicMenu);
         }
     }
 
     // Hide all existing static menu sections (they will be replaced by dynamic menu)
-    const staticMenuElements = sidebar.querySelectorAll('.nav-section, .collapsible-section, .section-divider');
+    // But keep admin section visible (it will be shown/hidden based on user role)
+    const staticMenuElements = sidebar.querySelectorAll('.nav-section, .collapsible-section:not(#nav-admin-section), .section-divider');
     staticMenuElements.forEach(element => {
         element.style.display = 'none';
     });

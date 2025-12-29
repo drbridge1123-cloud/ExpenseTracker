@@ -219,10 +219,24 @@ async function showAccountDetailModal(accountId) {
 
             <div style="display: flex; gap: 12px; margin-top: 24px;">
                 <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal(); showEditAccountModal(${accountId});">Edit Account</button>
-                <button class="btn btn-primary" style="flex: 1;" onclick="closeModal(); navigateTo('transactions'); setTimeout(() => { document.getElementById('txn-account-filter').value = ${accountId}; document.getElementById('txn-account-filter').dispatchEvent(new Event('change')); }, 300);">View All Transactions</button>
+                <button class="btn btn-primary" style="flex: 1;" onclick="closeModal(); viewAccountTransactions(${accountId});">View All Transactions</button>
             </div>
         </div>
     `);
+}
+
+// =====================================================
+// View Account Transactions
+// =====================================================
+
+function viewAccountTransactions(accountId) {
+    // Set the filter in state before navigating
+    if (typeof state !== 'undefined') {
+        state.filters = state.filters || {};
+        state.filters.pendingAccountFilter = accountId; // Flag for transactions page
+    }
+
+    navigateTo('transactions');
 }
 
 // =====================================================
@@ -325,5 +339,6 @@ window.getAccountIconHTML = getAccountIconHTML;
 window.formatAccountTypeName = formatAccountTypeName;
 window.showAddAccountModal = showAddAccountModal;
 window.showAccountDetailModal = showAccountDetailModal;
+window.viewAccountTransactions = viewAccountTransactions;
 window.showEditAccountModal = showEditAccountModal;
 window.deleteAccount = deleteAccount;

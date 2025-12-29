@@ -111,6 +111,9 @@ async function openRecurringModal(id = null) {
     document.getElementById('recurring-modal-title').textContent = 'Add Recurring Transaction';
     updateDayOfMonthVisibility();
 
+    // Update Type options based on account mode
+    updateRecurringTypeOptions();
+
     // Hide delete button by default
     const deleteBtn = document.getElementById('recurring-delete-btn');
     if (deleteBtn) deleteBtn.style.display = 'none';
@@ -126,6 +129,28 @@ async function openRecurringModal(id = null) {
     document.getElementById('recurring-modal').classList.add('active');
 }
 
+function updateRecurringTypeOptions() {
+    const typeSelect = document.getElementById('recurring-type');
+    if (!typeSelect) return;
+
+    const accountMode = typeof getAccountType === 'function' ? getAccountType() : 'general';
+
+    if (accountMode === 'cost') {
+        // Cost Account: Deposit, Check, Credit Card
+        typeSelect.innerHTML = `
+            <option value="credit">Deposit</option>
+            <option value="debit">Check</option>
+            <option value="credit_card">Credit Card</option>
+        `;
+    } else {
+        // General Account: Expense and Income
+        typeSelect.innerHTML = `
+            <option value="debit">Expense (Debit)</option>
+            <option value="credit">Income (Credit)</option>
+        `;
+    }
+}
+
 function closeRecurringModal() {
     document.getElementById('recurring-modal').classList.remove('active');
 }
@@ -133,24 +158,34 @@ function closeRecurringModal() {
 async function loadRecurringFormData() {
     try {
         const [accountsResult, categoriesResult] = await Promise.all([
-            apiGet('/accounts/', { user_id: state.currentUser }),
+            apiGet('/accounts/', { user_id: state.currentUser, account_mode: 'general' }),
             apiGet('/categories/', { user_id: state.currentUser })
         ]);
 
-        // Populate accounts
+        // Populate accounts with custom dropdown
         const accountSelect = document.getElementById('recurring-account');
         if (accountSelect && accountsResult.success) {
             const accounts = accountsResult.data.accounts || [];
             accountSelect.innerHTML = '<option value="">Select account</option>' +
                 accounts.map(a => `<option value="${a.id}">${a.account_name}</option>`).join('');
+
+            // Initialize custom dropdown for accounts
+            if (typeof initCustomDropdown === 'function') {
+                initCustomDropdown('recurring-account', 'Select account');
+            }
         }
 
-        // Populate categories with hierarchical structure
+        // Populate categories with custom dropdown
         const categorySelect = document.getElementById('recurring-category');
         if (categorySelect && categoriesResult.success) {
             state.categories = categoriesResult.data.categories || [];
             categorySelect.innerHTML = '<option value="">Select category</option>' +
                 buildHierarchicalCategoryOptions(false);
+
+            // Initialize custom category dropdown
+            if (typeof initCustomCategoryDropdown === 'function') {
+                initCustomCategoryDropdown('recurring-category', state.categories, 'Select category');
+            }
         }
     } catch (error) {
         console.error('Error loading recurring form data:', error);
@@ -167,13 +202,20 @@ async function loadRecurringForEdit(id) {
                 document.getElementById('recurring-description').value = recurring.description || '';
                 document.getElementById('recurring-amount').value = recurring.amount;
                 document.getElementById('recurring-type').value = recurring.transaction_type || 'debit';
-                document.getElementById('recurring-account').value = recurring.account_id || '';
-                document.getElementById('recurring-category').value = recurring.category_id || '';
                 document.getElementById('recurring-frequency').value = recurring.frequency || 'monthly';
                 document.getElementById('recurring-day').value = recurring.day_of_month || '';
                 document.getElementById('recurring-start').value = recurring.start_date || '';
                 document.getElementById('recurring-end').value = recurring.end_date || '';
                 document.getElementById('recurring-auto-create').checked = recurring.auto_create == 1;
+
+                // Update custom dropdowns
+                if (recurring.account_id && typeof setCustomDropdownValue === 'function') {
+                    setCustomDropdownValue('recurring-account', recurring.account_id, recurring.account_name || '');
+                }
+                if (recurring.category_id && typeof setCustomDropdownValue === 'function') {
+                    setCustomDropdownValue('recurring-category', recurring.category_id, recurring.category_name || '');
+                }
+
                 updateDayOfMonthVisibility();
             }
         }
@@ -300,3 +342,4 @@ window.deleteRecurring = deleteRecurring;
 window.deleteRecurringFromModal = deleteRecurringFromModal;
 window.toggleRecurringActive = toggleRecurringActive;
 window.updateDayOfMonthVisibility = updateDayOfMonthVisibility;
+window.updateRecurringTypeOptions = updateRecurringTypeOptions;

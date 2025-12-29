@@ -329,7 +329,7 @@ function showAddRuleModal() {
             </div>
             <div class="form-group">
                 <label>Category</label>
-                <select class="form-select" name="category_id" required>
+                <select class="form-select" name="category_id" id="rule-category-select" required>
                     ${buildHierarchicalCategoryOptions(false)}
                 </select>
             </div>
@@ -340,6 +340,13 @@ function showAddRuleModal() {
             <button type="submit" class="btn btn-primary btn-block">Create Rule</button>
         </form>
     `);
+
+    // Initialize custom category dropdown
+    setTimeout(() => {
+        if (typeof initCustomCategoryDropdown === 'function' && state.categories) {
+            initCustomCategoryDropdown('rule-category-select', state.categories, 'Select category');
+        }
+    }, 50);
 
     document.getElementById('add-rule-form').onsubmit = async (e) => {
         e.preventDefault();
@@ -403,7 +410,7 @@ function editRule(id) {
             </div>
             <div class="form-group">
                 <label>Category</label>
-                <select class="form-select" name="category_id" required>
+                <select class="form-select" name="category_id" id="rule-category-select-edit" required>
                     ${buildHierarchicalCategoryOptionsWithSelected(rule.category_id)}
                 </select>
             </div>
@@ -414,6 +421,18 @@ function editRule(id) {
             <button type="submit" class="btn btn-primary btn-block">Update Rule</button>
         </form>
     `);
+
+    // Initialize custom category dropdown with current selection
+    setTimeout(() => {
+        if (typeof initCustomCategoryDropdown === 'function' && state.categories) {
+            initCustomCategoryDropdown('rule-category-select-edit', state.categories, 'Select category');
+            // Set current value
+            const category = state.categories.find(c => c.id == rule.category_id);
+            if (category && typeof setCustomDropdownValue === 'function') {
+                setCustomDropdownValue('rule-category-select-edit', rule.category_id, category.name);
+            }
+        }
+    }, 50);
 
     document.getElementById('edit-rule-form').onsubmit = async (e) => {
         e.preventDefault();

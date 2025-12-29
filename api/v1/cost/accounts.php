@@ -62,11 +62,15 @@ function handleGet($db) {
     }
 
     if ($accountId) {
-        // Get single account
+        // Get single account with calculated balance (sum of all transactions only)
         $account = $db->fetch(
-            "SELECT id, user_id, account_name, account_type, account_number_last4 as account_number,
-                    current_balance as balance, is_active, color, created_at, updated_at
-             FROM cost_accounts WHERE id = :id AND user_id = :user_id",
+            "SELECT ca.id, ca.user_id, ca.account_name, ca.account_type,
+                    ca.account_number_last4 as account_number,
+                    COALESCE((SELECT SUM(ct.amount)
+                              FROM cost_transactions ct
+                              WHERE ct.account_id = ca.id), 0) as balance,
+                    ca.is_active, ca.color, ca.created_at, ca.updated_at
+             FROM cost_accounts ca WHERE ca.id = :id AND ca.user_id = :user_id",
             ['id' => $accountId, 'user_id' => $userId]
         );
 
@@ -77,10 +81,13 @@ function handleGet($db) {
             jsonResponse(['success' => false, 'message' => 'Account not found'], 404);
         }
     } else {
-        // Get all accounts with this month stats
+        // Get all accounts with this month stats and calculated balance from transactions
         $accounts = $db->fetchAll(
             "SELECT ca.id, ca.user_id, ca.account_name, ca.account_type,
-                    ca.account_number_last4 as account_number, ca.current_balance as balance,
+                    ca.account_number_last4 as account_number,
+                    COALESCE((SELECT SUM(ct.amount)
+                              FROM cost_transactions ct
+                              WHERE ct.account_id = ca.id), 0) as balance,
                     ca.is_active, ca.color, ca.created_at, ca.updated_at,
                     COALESCE((SELECT SUM(CASE WHEN ct.amount > 0 THEN ct.amount ELSE 0 END)
                               FROM cost_transactions ct

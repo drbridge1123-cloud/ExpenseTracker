@@ -671,13 +671,21 @@
    View Toggle Styles
    ===================================================== */
 
+/* Receipts page header actions - inline layout */
+#page-receipts .header-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 12px;
+}
+
 .view-toggle {
     display: flex;
     background: #f3f4f6;
     border-radius: 8px;
     padding: 4px;
     gap: 4px;
-    margin-right: 12px;
 }
 
 .view-btn {
@@ -983,14 +991,16 @@
 
 /* Container */
 .dm-container {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 0 24px;
+    max-width: 100%;
+    margin: 0;
+    padding: 0 32px;
 }
 
 /* Header */
 .dm-header {
-    margin-bottom: 32px;
+    margin: -32px -32px 32px -32px;
+    padding: 32px;
+    border-radius: 0;
 }
 
 .dm-header h1 {

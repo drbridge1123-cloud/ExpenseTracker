@@ -35,6 +35,10 @@ async function apiPost(endpoint, data) {
     return apiRequest(endpoint, 'POST', data);
 }
 
+async function apiPut(endpoint, data) {
+    return apiRequest(endpoint, 'PUT', data);
+}
+
 async function apiDelete(endpoint, data = null) {
     try {
         const options = {
@@ -77,7 +81,13 @@ async function apiRequest(endpoint, method, data) {
     try {
         const response = await fetch(API_BASE + endpoint, options);
         if (!response.ok) {
-            return { success: false, message: `HTTP ${response.status}: ${response.statusText}` };
+            // Try to parse error response body for detailed message
+            try {
+                const errorData = await response.json();
+                return { success: false, message: errorData.message || `HTTP ${response.status}: ${response.statusText}` };
+            } catch {
+                return { success: false, message: `HTTP ${response.status}: ${response.statusText}` };
+            }
         }
         return await response.json();
     } catch (error) {
@@ -87,12 +97,13 @@ async function apiRequest(endpoint, method, data) {
 }
 
 // Export for module usage
-export { APP_BASE, API_BASE, apiGet, apiPost, apiDelete, apiRequest };
+export { APP_BASE, API_BASE, apiGet, apiPost, apiPut, apiDelete, apiRequest };
 
 // Legacy Compatibility
 window.APP_BASE = APP_BASE;
 window.API_BASE = API_BASE;
 window.apiGet = apiGet;
 window.apiPost = apiPost;
+window.apiPut = apiPut;
 window.apiDelete = apiDelete;
 window.apiRequest = apiRequest;

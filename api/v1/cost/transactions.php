@@ -87,6 +87,7 @@ function handlePost($db) {
     $payee = $input['payee'] ?? null;
     $referenceNumber = $input['reference_number'] ?? null;
     $accountId = $input['account_id'] ?? null;
+    $category = $input['category'] ?? null;
 
     if (!$userId || !$clientId) {
         jsonResponse(['success' => false, 'message' => 'user_id and client_id are required'], 400);
@@ -127,7 +128,8 @@ function handlePost($db) {
         'amount' => $amount,
         'transaction_type' => $dbTransactionType,
         'reference_number' => $referenceNumber,
-        'status' => 'posted'
+        'category' => $category,
+        'status' => 'pending'
     ]);
 
     // Update account balance
@@ -168,6 +170,7 @@ function handlePut($db) {
     if (isset($input['description'])) $updateData['description'] = $input['description'];
     if (isset($input['reference_number'])) $updateData['reference_number'] = $input['reference_number'];
     if (isset($input['status'])) $updateData['status'] = $input['status'];
+    if (isset($input['category'])) $updateData['category'] = $input['category'];
 
     // Handle amount change - adjust account balance
     if (isset($input['amount']) && $input['amount'] != $transaction['amount']) {
