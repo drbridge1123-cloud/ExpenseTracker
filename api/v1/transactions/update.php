@@ -138,17 +138,9 @@ try {
         }
     }
 
-    // Log the change
-    $db->insert('audit_log', [
-        'user_id' => $transaction['user_id'],
-        'action' => 'update',
-        'entity_type' => 'transaction',
-        'entity_id' => $id,
-        'old_values' => json_encode($oldValues),
-        'new_values' => json_encode($newValues),
-        'ip_address' => getClientIp(),
-        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null
-    ]);
+    // Log the change using AuditService
+    $audit = new AuditService($transaction['user_id']);
+    $audit->logUpdate('transaction', $id, $oldValues, $newValues);
 
     // Get updated transaction
     $updated = $db->fetch(

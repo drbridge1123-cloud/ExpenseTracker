@@ -3,8 +3,10 @@
  * Transaction Import API
  * POST /api/transactions/import.php
  *
+ * Supports: CSV files, ZIP files (auto-extracts CSVs), Multiple files
+ *
  * Form data:
- * - csv_file: The CSV file
+ * - csv_file: The CSV or ZIP file (or csv_file[] for multiple)
  * - account_id: Target account ID
  * - institution_code: Bank/institution code for CSV format
  * - user_id: User ID (required)
@@ -32,35 +34,29 @@ if (empty($_POST['user_id'])) {
 }
 
 if (empty($_FILES['csv_file'])) {
-    errorResponse('CSV file is required');
+    errorResponse('File is required');
 }
 
 $accountId = (int)$_POST['account_id'];
 $institutionCode = strtoupper($_POST['institution_code']);
 $userId = (int)$_POST['user_id'];
-$file = $_FILES['csv_file'];
 
-// Validate file
-if ($file['error'] !== UPLOAD_ERR_OK) {
-    $errors = [
-        UPLOAD_ERR_INI_SIZE => 'File exceeds server limit',
-        UPLOAD_ERR_FORM_SIZE => 'File exceeds form limit',
-        UPLOAD_ERR_PARTIAL => 'File was only partially uploaded',
-        UPLOAD_ERR_NO_FILE => 'No file was uploaded',
-        UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
-        UPLOAD_ERR_CANT_WRITE => 'Failed to write file',
-        UPLOAD_ERR_EXTENSION => 'Upload blocked by extension'
-    ];
-    errorResponse($errors[$file['error']] ?? 'Upload error');
-}
-
-if ($file['size'] > MAX_UPLOAD_SIZE) {
-    errorResponse('File size exceeds maximum allowed (' . (MAX_UPLOAD_SIZE / 1024 / 1024) . 'MB)');
-}
-
-$ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-if (!in_array($ext, ALLOWED_EXTENSIONS)) {
-    errorResponse('Invalid file type. Only CSV files are allowed.');
+// Handle single or multiple file uploads
+$uploadedFiles = [];
+if (is_array($_FILES['csv_file']['name'])) {
+    // Multiple files
+    for ($i = 0; $i < count($_FILES['csv_file']['name']); $i++) {
+        $uploadedFiles[] = [
+            'name' => $_FILES['csv_file']['name'][$i],
+            'type' => $_FILES['csv_file']['type'][$i],
+            'tmp_name' => $_FILES['csv_file']['tmp_name'][$i],
+            'error' => $_FILES['csv_file']['error'][$i],
+            'size' => $_FILES['csv_file']['size'][$i]
+        ];
+    }
+} else {
+    // Single file
+    $uploadedFiles[] = $_FILES['csv_file'];
 }
 
 try {
@@ -76,33 +72,74 @@ try {
         errorResponse('Account not found or access denied', 404);
     }
 
-    // Create import batch record
-    $fileHash = hash_file('sha256', $file['tmp_name']);
-
-    // Check for duplicate file
-    $existingBatch = $db->fetch(
-        "SELECT id, created_at FROM import_batches WHERE file_hash = :hash AND account_id = :account_id",
-        ['hash' => $fileHash, 'account_id' => $accountId]
-    );
-
-    if ($existingBatch) {
-        errorResponse(
-            'This file was already imported on ' . $existingBatch['created_at'],
-            409
-        );
-    }
-
-    // Move file to uploads directory
     $uploadPath = UPLOAD_DIR . '/BankTransaction';
     if (!is_dir($uploadPath)) {
         mkdir($uploadPath, 0755, true);
     }
 
-    $filename = $fileHash . '_' . basename($file['name']);
-    $destination = $uploadPath . '/' . $filename;
+    // Collect all CSV files to process
+    $csvFilesToProcess = [];
 
-    if (!move_uploaded_file($file['tmp_name'], $destination)) {
-        errorResponse('Failed to save uploaded file', 500);
+    foreach ($uploadedFiles as $file) {
+        // Validate file
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            continue;
+        }
+
+        if ($file['size'] > MAX_UPLOAD_SIZE) {
+            continue;
+        }
+
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, ['csv', 'zip'])) {
+            continue;
+        }
+
+        $fileHash = hash_file('sha256', $file['tmp_name']);
+        $filename = $fileHash . '_' . basename($file['name']);
+        $destination = $uploadPath . '/' . $filename;
+
+        if (!move_uploaded_file($file['tmp_name'], $destination)) {
+            continue;
+        }
+
+        // Handle ZIP files
+        if ($ext === 'zip') {
+            $zip = new ZipArchive();
+            if ($zip->open($destination) === TRUE) {
+                $extractPath = $uploadPath . '/temp_' . $fileHash;
+                if (!is_dir($extractPath)) {
+                    mkdir($extractPath, 0755, true);
+                }
+
+                $zip->extractTo($extractPath);
+                $zip->close();
+
+                // Find all CSV files in extracted content
+                $iterator = new RecursiveIteratorIterator(
+                    new RecursiveDirectoryIterator($extractPath, RecursiveDirectoryIterator::SKIP_DOTS)
+                );
+                foreach ($iterator as $extractedFile) {
+                    if (strtolower($extractedFile->getExtension()) === 'csv') {
+                        $csvFilesToProcess[] = [
+                            'path' => $extractedFile->getPathname(),
+                            'name' => $extractedFile->getFilename(),
+                            'source' => $file['name']
+                        ];
+                    }
+                }
+            }
+        } else {
+            $csvFilesToProcess[] = [
+                'path' => $destination,
+                'name' => $file['name'],
+                'source' => $file['name']
+            ];
+        }
+    }
+
+    if (empty($csvFilesToProcess)) {
+        errorResponse('No valid CSV files to import');
     }
 
     // Get institution ID
@@ -111,112 +148,173 @@ try {
         ['code' => $institutionCode]
     );
 
-    // Create import batch
-    $batchId = $db->insert('import_batches', [
-        'user_id' => $userId,
-        'account_id' => $accountId,
-        'institution_id' => $institution ? $institution['id'] : null,
-        'filename' => $file['name'],
-        'file_hash' => $fileHash,
-        'file_size' => $file['size'],
-        'status' => 'processing',
-        'started_at' => date('Y-m-d H:i:s')
-    ]);
-
-    // Parse CSV
-    $parser = new CSVParser();
-    $parseResult = $parser->parse($destination, $institutionCode, $accountId);
-
+    // Process all CSV files
+    $totalImported = 0;
+    $totalDuplicates = 0;
+    $totalRows = 0;
+    $allErrors = [];
+    $fileResults = [];
     $categorizer = new Categorizer($userId);
 
-    // Begin transaction for inserts
-    $db->beginTransaction();
+    foreach ($csvFilesToProcess as $csvInfo) {
+        $csvFile = $csvInfo['path'];
+        $csvFilename = $csvInfo['name'];
+        $csvHash = hash_file('sha256', $csvFile);
 
-    $imported = 0;
-    $duplicates = 0;
-    $errors = [];
-
-    try {
-        foreach ($parseResult['transactions'] as $index => $txn) {
-            // Check for duplicate using import hash
-            if ($db->exists('transactions', 'import_hash = :hash', ['hash' => $txn['import_hash']])) {
-                $duplicates++;
-                continue;
-            }
-
-            // Categorize transaction
-            $categoryResult = $categorizer->categorize($txn);
-
-            // Insert transaction
-            $db->insert('transactions', [
-                'user_id' => $userId,
-                'account_id' => $accountId,
-                'category_id' => $categoryResult['category_id'],
-                'transaction_date' => $txn['transaction_date'],
-                'post_date' => $txn['post_date'],
-                'description' => $txn['description'],
-                'original_description' => $txn['original_description'],
-                'vendor_name' => $txn['vendor_name'],
-                'amount' => $txn['amount'],
-                'currency' => $account['currency'],
-                'transaction_type' => $txn['transaction_type'],
-                'status' => 'posted',
-                'check_number' => $txn['check_number'],
-                'memo' => $txn['memo'],
-                'import_hash' => $txn['import_hash'],
-                'import_batch_id' => $batchId,
-                'categorized_by' => $categoryResult['categorized_by'],
-                'categorization_confidence' => $categoryResult['confidence']
-            ]);
-
-            $imported++;
-        }
-
-        $db->commit();
-
-        // Update batch status
-        $db->update('import_batches', [
-            'status' => 'completed',
-            'total_rows' => $parseResult['total_rows'],
-            'imported_rows' => $imported,
-            'duplicate_rows' => $duplicates,
-            'error_rows' => count($parseResult['errors']),
-            'error_log' => !empty($parseResult['errors']) ? json_encode($parseResult['errors']) : null,
-            'completed_at' => date('Y-m-d H:i:s')
-        ], 'id = :id', ['id' => $batchId]);
-
-        // Update account last synced and recalculate balance
-        $balanceResult = $db->fetch(
-            "SELECT COALESCE(SUM(amount), 0) as balance FROM transactions WHERE account_id = :account_id",
-            ['account_id' => $accountId]
+        // Check for duplicate file
+        $existingBatch = $db->fetch(
+            "SELECT id, created_at FROM import_batches WHERE file_hash = :hash AND account_id = :account_id",
+            ['hash' => $csvHash, 'account_id' => $accountId]
         );
 
-        $db->update('accounts', [
-            'current_balance' => $balanceResult['balance'],
-            'last_synced_at' => date('Y-m-d H:i:s')
-        ], 'id = :id', ['id' => $accountId]);
+        if ($existingBatch) {
+            $fileResults[] = [
+                'file' => $csvFilename,
+                'status' => 'skipped',
+                'message' => 'Already imported on ' . $existingBatch['created_at'],
+                'imported' => 0,
+                'duplicates' => 0
+            ];
+            continue;
+        }
 
-        successResponse([
-            'batch_id' => $batchId,
-            'total_rows' => $parseResult['total_rows'],
-            'imported' => $imported,
-            'duplicates' => $duplicates,
-            'errors' => $parseResult['errors'],
-            'warnings' => $parseResult['warnings'] ?? []
-        ], "Import completed: $imported transactions imported, $duplicates duplicates skipped");
+        // Create import batch for this CSV
+        $batchId = $db->insert('import_batches', [
+            'user_id' => $userId,
+            'account_id' => $accountId,
+            'institution_id' => $institution ? $institution['id'] : null,
+            'filename' => $csvFilename,
+            'file_hash' => $csvHash,
+            'file_size' => filesize($csvFile),
+            'status' => 'processing',
+            'started_at' => date('Y-m-d H:i:s')
+        ]);
 
-    } catch (Exception $e) {
-        $db->rollback();
+        try {
+            // Parse CSV
+            $parser = new CSVParser();
+            $parseResult = $parser->parse($csvFile, $institutionCode, $accountId);
 
-        // Update batch status to failed
-        $db->update('import_batches', [
-            'status' => 'failed',
-            'error_log' => json_encode(['fatal' => $e->getMessage()]),
-            'completed_at' => date('Y-m-d H:i:s')
-        ], 'id = :id', ['id' => $batchId]);
+            $db->beginTransaction();
 
-        throw $e;
+            $imported = 0;
+            $duplicates = 0;
+
+            foreach ($parseResult['transactions'] as $txn) {
+                // Check for duplicate using import hash
+                if ($db->exists('transactions', 'import_hash = :hash', ['hash' => $txn['import_hash']])) {
+                    $duplicates++;
+                    continue;
+                }
+
+                // Categorize transaction
+                $categoryResult = $categorizer->categorize($txn);
+
+                // Insert transaction
+                $db->insert('transactions', [
+                    'user_id' => $userId,
+                    'account_id' => $accountId,
+                    'category_id' => $categoryResult['category_id'],
+                    'transaction_date' => $txn['transaction_date'],
+                    'post_date' => $txn['post_date'],
+                    'description' => $txn['description'],
+                    'original_description' => $txn['original_description'],
+                    'vendor_name' => $txn['vendor_name'],
+                    'amount' => $txn['amount'],
+                    'currency' => $account['currency'],
+                    'transaction_type' => $txn['transaction_type'],
+                    'status' => 'posted',
+                    'check_number' => $txn['check_number'],
+                    'memo' => $txn['memo'],
+                    'import_hash' => $txn['import_hash'],
+                    'import_batch_id' => $batchId,
+                    'categorized_by' => $categoryResult['categorized_by'],
+                    'categorization_confidence' => $categoryResult['confidence']
+                ]);
+
+                $imported++;
+            }
+
+            $db->commit();
+
+            // Update batch status
+            $db->update('import_batches', [
+                'status' => 'completed',
+                'total_rows' => $parseResult['total_rows'],
+                'imported_rows' => $imported,
+                'duplicate_rows' => $duplicates,
+                'error_rows' => count($parseResult['errors']),
+                'error_log' => !empty($parseResult['errors']) ? json_encode($parseResult['errors']) : null,
+                'completed_at' => date('Y-m-d H:i:s')
+            ], 'id = :id', ['id' => $batchId]);
+
+            $totalImported += $imported;
+            $totalDuplicates += $duplicates;
+            $totalRows += $parseResult['total_rows'];
+            $allErrors = array_merge($allErrors, $parseResult['errors']);
+
+            $fileResults[] = [
+                'file' => $csvFilename,
+                'status' => 'success',
+                'imported' => $imported,
+                'duplicates' => $duplicates,
+                'total_rows' => $parseResult['total_rows']
+            ];
+
+        } catch (Exception $e) {
+            if ($db->inTransaction()) {
+                $db->rollback();
+            }
+
+            $db->update('import_batches', [
+                'status' => 'failed',
+                'error_log' => json_encode(['fatal' => $e->getMessage()]),
+                'completed_at' => date('Y-m-d H:i:s')
+            ], 'id = :id', ['id' => $batchId]);
+
+            $fileResults[] = [
+                'file' => $csvFilename,
+                'status' => 'failed',
+                'message' => $e->getMessage(),
+                'imported' => 0,
+                'duplicates' => 0
+            ];
+        }
     }
+
+    // Update account balance
+    $balanceResult = $db->fetch(
+        "SELECT COALESCE(SUM(amount), 0) as balance FROM transactions WHERE account_id = :account_id AND deleted_at IS NULL",
+        ['account_id' => $accountId]
+    );
+
+    $db->update('accounts', [
+        'current_balance' => $balanceResult['balance'],
+        'last_synced_at' => date('Y-m-d H:i:s')
+    ], 'id = :id', ['id' => $accountId]);
+
+    // Log the import
+    $audit = new AuditService($userId);
+    $audit->logImport('transaction', $totalImported, count($csvFilesToProcess) . ' file(s)');
+
+    // Cleanup temp directories
+    $tempDirs = glob($uploadPath . '/temp_*', GLOB_ONLYDIR);
+    foreach ($tempDirs as $tempDir) {
+        $files = glob($tempDir . '/*');
+        foreach ($files as $f) {
+            if (is_file($f)) unlink($f);
+        }
+        @rmdir($tempDir);
+    }
+
+    successResponse([
+        'total_files' => count($csvFilesToProcess),
+        'total_rows' => $totalRows,
+        'imported' => $totalImported,
+        'duplicates' => $totalDuplicates,
+        'errors' => $allErrors,
+        'file_results' => $fileResults
+    ], "Import completed: $totalImported transactions imported from " . count($csvFilesToProcess) . " file(s)");
 
 } catch (Exception $e) {
     appLog('Import error: ' . $e->getMessage(), 'error');

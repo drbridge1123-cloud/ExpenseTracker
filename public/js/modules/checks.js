@@ -1,5 +1,5 @@
 // =====================================================
-// Checks Module - v20251225d
+// Checks Module
 // =====================================================
 // Dependencies: state, apiGet, apiPost, formatCurrency, formatDate, showToast, buildHierarchicalCategoryOptions
 
@@ -41,8 +41,6 @@ async function loadChecksPage() {
     }
 }
 
-const DEFAULT_START_CHECK_NUMBER = 3100;
-
 async function loadChecks() {
     const params = { user_id: state.currentUser };
     if (currentCheckFilter) params.status = currentCheckFilter;
@@ -56,38 +54,17 @@ async function loadChecks() {
             checksState.nextCheckNumbers = nextCheckNumbers;
             renderChecks();
             updateChecksSummary();
-            // Set next check number for new checks
-            setNextCheckNumber();
         }
     } catch (error) {
         console.error('Error loading checks:', error);
     }
 }
 
-// Calculate and set the next check number
-function setNextCheckNumber() {
-    const checkNumberInput = document.getElementById('check-number');
-    const checkIdInput = document.getElementById('check-id');
-
-    // Only set for new checks (not editing)
-    if (!checkNumberInput || (checkIdInput && checkIdInput.value)) return;
-
-    const checks = checksData?.checks || [];
-    if (checks.length === 0) {
-        checkNumberInput.value = DEFAULT_START_CHECK_NUMBER;
-    } else {
-        // Find the highest check number and add 1
-        const maxNumber = Math.max(...checks.map(c => parseInt(c.check_number) || 0));
-        checkNumberInput.value = Math.max(maxNumber + 1, DEFAULT_START_CHECK_NUMBER);
-    }
-    updateCheckPreview();
-}
-
 async function loadCheckAccounts() {
     try {
-        const result = await apiGet('/accounts/', { user_id: state.currentUser, account_type: 'checking' });
+        const result = await apiGet('/accounts/', { user_id: state.currentUser });
         if (result.success) {
-            const accounts = result.data.accounts || [];
+            const accounts = result.data.accounts.filter(a => a.account_type === 'checking');
             const select = document.getElementById('check-account');
             if (select) {
                 select.innerHTML = '<option value="">Select account</option>' +
@@ -103,47 +80,15 @@ async function loadCheckCategories() {
     try {
         const result = await apiGet('/categories/', { user_id: state.currentUser });
         if (result.success) {
-            const categories = result.data.categories || [];
+            state.categories = result.data.categories || [];
             const select = document.getElementById('check-category');
             if (select) {
-                // Filter expense categories for checks
-                const expenseCategories = categories.filter(c =>
-                    c.category_type === 'expense'
-                );
-
-                // Group by parent using optgroup for better UX
-                const parents = expenseCategories.filter(c => !c.parent_id);
-                const children = expenseCategories.filter(c => c.parent_id);
-
-                let options = '<option value="">Select category</option>';
-
-                parents.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-                parents.forEach(parent => {
-                    const subs = children.filter(c => c.parent_id === parent.id);
-                    if (subs.length > 0) {
-                        // Parent with children - use optgroup
-                        options += `<optgroup label="${parent.name}">`;
-                        subs.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-                        subs.forEach(sub => {
-                            options += `<option value="${sub.id}">${sub.name}</option>`;
-                        });
-                        options += '</optgroup>';
-                    } else {
-                        // Parent without children - show as option
-                        options += `<option value="${parent.id}">${parent.name}</option>`;
-                    }
-                });
-
-                select.innerHTML = options;
-
-                // Initialize custom dropdown with search
-                if (typeof initCustomCategoryDropdown === 'function') {
-                    initCustomCategoryDropdown('check-category', expenseCategories, 'Select category');
-                }
+                select.innerHTML = '<option value="">Select category</option>' +
+                    buildHierarchicalCategoryOptions(false, 'expense');
             }
         }
     } catch (error) {
-        console.error('Error loading categories for checks:', error);
+        console.error('Error loading categories:', error);
     }
 }
 
@@ -276,43 +221,23 @@ function numberToWords(amount) {
     return words + ' and ' + cents.toString().padStart(2, '0') + '/100 dollars';
 }
 
-// Check if check number is already used (for new checks only)
-function isCheckNumberUsed(checkNumber, excludeId = null) {
-    const checks = checksData?.checks || [];
-    return checks.some(c =>
-        c.check_number == checkNumber &&
-        (excludeId === null || c.id != excludeId)
-    );
-}
-
 async function saveCheck(e) {
     e.preventDefault();
 
-    // Default to Chase Checking account (ID: 522)
-    const DEFAULT_CHECK_ACCOUNT_ID = 522;
-
-    const checkNumber = document.getElementById('check-number').value;
-    const checkId = document.getElementById('check-id').value;
-
-    // For new checks, validate check number is not already used
-    if (!checkId && isCheckNumberUsed(checkNumber)) {
-        showToast(`Check #${checkNumber} already exists. Please use a different number.`, 'error');
-        return;
-    }
-
     const data = {
         user_id: state.currentUser,
-        account_id: DEFAULT_CHECK_ACCOUNT_ID,
-        check_number: checkNumber,
+        account_id: parseInt(document.getElementById('check-account').value),
+        check_number: document.getElementById('check-number').value,
         payee: document.getElementById('check-payee').value,
         amount: parseFloat(document.getElementById('check-amount').value),
         check_date: document.getElementById('check-date').value,
         memo: document.getElementById('check-memo').value,
         category_id: document.getElementById('check-category').value || null,
-        status: 'pending',
-        create_transaction: true
+        status: document.getElementById('check-status').value,
+        create_transaction: document.getElementById('create-transaction').checked
     };
 
+    const checkId = document.getElementById('check-id').value;
     if (checkId) data.id = parseInt(checkId);
 
     try {
@@ -337,15 +262,10 @@ function resetCheckForm() {
     document.getElementById('check-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('create-transaction').checked = true;
     document.getElementById('check-status').value = 'pending';
-    // Reset custom dropdown
-    if (typeof resetCustomDropdown === 'function') {
-        resetCustomDropdown('check-category', 'Select category');
-    }
     // Hide delete button when creating new check
     const deleteBtn = document.getElementById('delete-check-btn');
     if (deleteBtn) deleteBtn.style.display = 'none';
-    // Set next check number
-    setNextCheckNumber();
+    updateCheckPreview();
 }
 
 function editCheck(id) {
@@ -361,11 +281,6 @@ function editCheck(id) {
     document.getElementById('check-memo').value = check.memo || '';
     document.getElementById('check-category').value = check.category_id || '';
     document.getElementById('check-status').value = check.status || 'pending';
-
-    // Update custom dropdown if initialized
-    if (typeof setCustomDropdownValue === 'function' && check.category_id) {
-        setCustomDropdownValue('check-category', check.category_id, check.category_name || '');
-    }
 
     // Show delete button when editing
     const deleteBtn = document.getElementById('delete-check-btn');
@@ -407,37 +322,28 @@ function printCheck() {
 
 // Save check from button click (not form submit)
 async function saveCheckFromButton() {
-    // Default to Chase Checking account (ID: 522)
-    const DEFAULT_CHECK_ACCOUNT_ID = 522;
-
-    const checkNumber = document.getElementById('check-number').value;
-    const checkId = document.getElementById('check-id').value;
-
-    // Validation
-    if (!checkNumber) {
-        showToast('Please enter a check number', 'error');
-        return;
-    }
-
-    // For new checks, validate check number is not already used
-    if (!checkId && isCheckNumberUsed(checkNumber)) {
-        showToast(`Check #${checkNumber} already exists. Please use a different number.`, 'error');
-        return;
-    }
-
     const data = {
         user_id: state.currentUser,
-        account_id: DEFAULT_CHECK_ACCOUNT_ID,
-        check_number: checkNumber,
+        account_id: parseInt(document.getElementById('check-account').value),
+        check_number: document.getElementById('check-number').value,
         payee: document.getElementById('check-payee').value,
         amount: parseFloat(document.getElementById('check-amount').value),
         check_date: document.getElementById('check-date').value,
         memo: document.getElementById('check-memo').value,
         category_id: document.getElementById('check-category').value || null,
-        status: 'pending',
-        create_transaction: true
+        status: document.getElementById('check-status').value,
+        create_transaction: document.getElementById('create-transaction').checked
     };
 
+    // Validation
+    if (!data.account_id) {
+        showToast('Please select a bank account', 'error');
+        return;
+    }
+    if (!data.check_number) {
+        showToast('Please enter a check number', 'error');
+        return;
+    }
     if (!data.payee) {
         showToast('Please enter payee name', 'error');
         return;
@@ -451,6 +357,7 @@ async function saveCheckFromButton() {
         return;
     }
 
+    const checkId = document.getElementById('check-id').value;
     if (checkId) data.id = parseInt(checkId);
 
     try {
@@ -482,4 +389,3 @@ window.resetCheckForm = resetCheckForm;
 window.editCheck = editCheck;
 window.deleteCheck = deleteCheck;
 window.printCheck = printCheck;
-

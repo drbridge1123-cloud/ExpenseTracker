@@ -41,7 +41,7 @@ define('SESSION_LIFETIME', env('SESSION_LIFETIME', 86400 * 7));
 // File Upload Settings
 define('UPLOAD_DIR', APP_ROOT . '/storage');
 define('MAX_UPLOAD_SIZE', 10 * 1024 * 1024); // 10MB
-define('ALLOWED_EXTENSIONS', ['csv', 'CSV']);
+define('ALLOWED_EXTENSIONS', ['csv', 'CSV', 'zip', 'ZIP']);
 
 // Timezone
 define('APP_TIMEZONE', env('APP_TIMEZONE', 'America/New_York'));

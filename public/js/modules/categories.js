@@ -1450,6 +1450,14 @@ function toggleRuleSettings() {
     }
 }
 
+function toggleRuleSettings() {
+    const checkbox = document.getElementById('bulk-cat-create-rule');
+    const settings = document.getElementById('bulk-cat-rule-settings');
+    if (settings) {
+        settings.style.display = checkbox.checked ? 'block' : 'none';
+    }
+}
+
 function populateBulkCategorySelect() {
     const select = document.getElementById('bulk-cat-select');
     select.innerHTML = '<option value="">Select category...</option>' + buildHierarchicalCategoryOptions(false);
@@ -1463,6 +1471,26 @@ function populateBulkCategorySelect() {
             c.category_type !== 'asset'
         );
         initCustomCategoryDropdown('bulk-cat-select', categories, 'Select category');
+    }
+}
+
+// Check for existing similar rules
+async function checkExistingRules(matchValue) {
+    try {
+        const response = await fetch(`${API_BASE}/rules/?user_id=${state.currentUser}&search=${encodeURIComponent(matchValue)}`);
+        const data = await response.json();
+
+        if (data.success && data.data.rules && data.data.rules.length > 0) {
+            const warning = document.getElementById('existing-rule-warning');
+            const text = document.getElementById('existing-rule-text');
+            const similarRule = data.data.rules[0];
+            text.textContent = `Similar rule exists: "${similarRule.rule_name}" → ${similarRule.category_name}`;
+            warning.style.display = 'flex';
+        } else {
+            document.getElementById('existing-rule-warning').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error checking rules:', error);
     }
 }
 

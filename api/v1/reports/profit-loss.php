@@ -8,12 +8,86 @@
  *   - start_date: required (YYYY-MM-DD)
  *   - end_date: required (YYYY-MM-DD)
  *   - compare: optional ('previous_period', 'previous_year')
- *   - include_transactions: optional (1 to include transaction details)
  */
 
 require_once __DIR__ . '/../../../config/config.php';
 
 setCorsHeaders();
+
+/**
+ * Build hierarchical category structure from flat list
+ */
+function buildCategoryHierarchy(array $categories, Database $db): array {
+    $hierarchy = [];
+    $childrenByParent = [];
+    $parentIds = [];
+
+    // First pass: separate parents and children
+    foreach ($categories as $cat) {
+        $cat['total'] = (float)$cat['total'];
+
+        if (empty($cat['parent_id']) || $cat['parent_id'] == 0) {
+            // This is a parent category
+            $hierarchy[$cat['category_id']] = [
+                'category_id' => $cat['category_id'],
+                'category_name' => $cat['category_name'],
+                'category_icon' => $cat['category_icon'],
+                'total' => $cat['total'],
+                'children' => []
+            ];
+        } else {
+            // This is a child category
+            $parentIds[$cat['parent_id']] = true;
+            if (!isset($childrenByParent[$cat['parent_id']])) {
+                $childrenByParent[$cat['parent_id']] = [];
+            }
+            $childrenByParent[$cat['parent_id']][] = $cat;
+        }
+    }
+
+    // Get parent info for orphan children (parent has no transactions but children do)
+    foreach ($parentIds as $parentId => $_) {
+        if (!isset($hierarchy[$parentId])) {
+            $parent = $db->fetch(
+                "SELECT id, name, icon FROM categories WHERE id = :id",
+                ['id' => $parentId]
+            );
+            if ($parent) {
+                $hierarchy[$parentId] = [
+                    'category_id' => $parent['id'],
+                    'category_name' => $parent['name'],
+                    'category_icon' => $parent['icon'],
+                    'total' => 0,
+                    'children' => []
+                ];
+            }
+        }
+    }
+
+    // Second pass: attach children to parents
+    foreach ($childrenByParent as $parentId => $children) {
+        if (isset($hierarchy[$parentId])) {
+            foreach ($children as $child) {
+                $hierarchy[$parentId]['children'][] = [
+                    'category_id' => $child['category_id'],
+                    'category_name' => $child['category_name'],
+                    'category_icon' => $child['category_icon'],
+                    'total' => $child['total']
+                ];
+                // Add child total to parent total
+                $hierarchy[$parentId]['total'] += $child['total'];
+            }
+            // Sort children by total descending
+            usort($hierarchy[$parentId]['children'], fn($a, $b) => $b['total'] <=> $a['total']);
+        }
+    }
+
+    // Convert to array and sort by total descending
+    $result = array_values($hierarchy);
+    usort($result, fn($a, $b) => $b['total'] <=> $a['total']);
+
+    return $result;
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     errorResponse('Method not allowed', 405);
@@ -23,7 +97,6 @@ $userId = !empty($_GET['user_id']) ? (int)$_GET['user_id'] : null;
 $startDate = $_GET['start_date'] ?? null;
 $endDate = $_GET['end_date'] ?? null;
 $compare = $_GET['compare'] ?? null;
-$includeTransactions = isset($_GET['include_transactions']) && $_GET['include_transactions'] == '1';
 
 if (!$userId) {
     errorResponse('User ID is required');
@@ -36,26 +109,22 @@ if (!$startDate || !$endDate) {
 try {
     $db = Database::getInstance();
 
-    // Get income by category with sub-categories
+    // Get income by category
     $incomeData = $db->fetchAll(
         "SELECT
             c.id as category_id,
             c.name as category_name,
             c.icon as category_icon,
-            c.parent_id,
-            pc.name as parent_name,
-            pc.icon as parent_icon,
             COALESCE(SUM(t.amount), 0) as total
          FROM categories c
-         LEFT JOIN categories pc ON c.parent_id = pc.id
          LEFT JOIN transactions t ON t.category_id = c.id
             AND t.user_id = :user_id
             AND t.transaction_date BETWEEN :start_date AND :end_date
          WHERE c.category_type = 'income'
             AND (c.user_id = :user_id2 OR c.is_system = 1)
-         GROUP BY c.id, c.name, c.icon, c.parent_id, pc.name, pc.icon
+         GROUP BY c.id, c.name, c.icon
          HAVING total > 0
-         ORDER BY COALESCE(pc.name, c.name), c.name",
+         ORDER BY total DESC",
         [
             'user_id' => $userId,
             'user_id2' => $userId,
@@ -64,26 +133,23 @@ try {
         ]
     );
 
-    // Get expenses by category with sub-categories
+    // Get expenses by category (with parent_id for hierarchy)
     $expenseData = $db->fetchAll(
         "SELECT
             c.id as category_id,
             c.name as category_name,
             c.icon as category_icon,
             c.parent_id,
-            pc.name as parent_name,
-            pc.icon as parent_icon,
             COALESCE(SUM(ABS(t.amount)), 0) as total
          FROM categories c
-         LEFT JOIN categories pc ON c.parent_id = pc.id
          LEFT JOIN transactions t ON t.category_id = c.id
             AND t.user_id = :user_id
             AND t.transaction_date BETWEEN :start_date AND :end_date
          WHERE c.category_type = 'expense'
             AND (c.user_id = :user_id2 OR c.is_system = 1)
-         GROUP BY c.id, c.name, c.icon, c.parent_id, pc.name, pc.icon
+         GROUP BY c.id, c.name, c.icon, c.parent_id
          HAVING total > 0
-         ORDER BY COALESCE(pc.name, c.name), c.name",
+         ORDER BY total DESC",
         [
             'user_id' => $userId,
             'user_id2' => $userId,
@@ -92,48 +158,8 @@ try {
         ]
     );
 
-    // Get transactions for each category if requested
-    $transactionsByCategory = [];
-    if ($includeTransactions) {
-        $allTransactions = $db->fetchAll(
-            "SELECT
-                t.id,
-                t.transaction_date,
-                t.description,
-                t.vendor_name,
-                t.amount,
-                t.category_id,
-                t.check_number,
-                t.reference_number,
-                c.category_type
-             FROM transactions t
-             JOIN categories c ON t.category_id = c.id
-             WHERE t.user_id = :user_id
-                AND t.transaction_date BETWEEN :start_date AND :end_date
-                AND c.category_type IN ('income', 'expense')
-             ORDER BY t.transaction_date DESC",
-            [
-                'user_id' => $userId,
-                'start_date' => $startDate,
-                'end_date' => $endDate
-            ]
-        );
-
-        foreach ($allTransactions as $txn) {
-            $catId = $txn['category_id'];
-            if (!isset($transactionsByCategory[$catId])) {
-                $transactionsByCategory[$catId] = [];
-            }
-            $transactionsByCategory[$catId][] = [
-                'id' => $txn['id'],
-                'date' => $txn['transaction_date'],
-                'description' => $txn['description'],
-                'vendor' => $txn['vendor_name'],
-                'amount' => abs((float)$txn['amount']),
-                'ref' => $txn['check_number'] ?: $txn['reference_number']
-            ];
-        }
-    }
+    // Build hierarchical expense structure
+    $expenseHierarchy = buildCategoryHierarchy($expenseData, $db);
 
     // Calculate totals
     $totalIncome = array_sum(array_column($incomeData, 'total'));
@@ -214,26 +240,24 @@ try {
         ];
     }
 
-    // Format category data and add transactions
+    // Format category data with percent
     foreach ($incomeData as &$item) {
         $item['total'] = (float)$item['total'];
         $item['percent'] = $totalIncome > 0 ? round($item['total'] / $totalIncome * 100, 1) : 0;
-        if ($includeTransactions && isset($transactionsByCategory[$item['category_id']])) {
-            $item['transactions'] = $transactionsByCategory[$item['category_id']];
-        }
     }
 
     foreach ($expenseData as &$item) {
         $item['total'] = (float)$item['total'];
         $item['percent'] = $totalExpenses > 0 ? round($item['total'] / $totalExpenses * 100, 1) : 0;
-        if ($includeTransactions && isset($transactionsByCategory[$item['category_id']])) {
-            $item['transactions'] = $transactionsByCategory[$item['category_id']];
-        }
     }
 
-    // Build hierarchical structure for accordion view
-    $incomeHierarchy = buildCategoryHierarchy($incomeData);
-    $expenseHierarchy = buildCategoryHierarchy($expenseData);
+    // Add percent to hierarchical data
+    foreach ($expenseHierarchy as &$parent) {
+        $parent['percent'] = $totalExpenses > 0 ? round($parent['total'] / $totalExpenses * 100, 1) : 0;
+        foreach ($parent['children'] as &$child) {
+            $child['percent'] = $totalExpenses > 0 ? round($child['total'] / $totalExpenses * 100, 1) : 0;
+        }
+    }
 
     successResponse([
         'period' => [
@@ -242,12 +266,11 @@ try {
         ],
         'income' => [
             'categories' => $incomeData,
-            'hierarchy' => $incomeHierarchy,
             'total' => $totalIncome
         ],
         'expenses' => [
             'categories' => $expenseData,
-            'hierarchy' => $expenseHierarchy,
+            'categories_hierarchy' => $expenseHierarchy,
             'total' => $totalExpenses
         ],
         'net_income' => $netIncome,
@@ -262,87 +285,4 @@ try {
 } catch (Exception $e) {
     appLog('P&L Report error: ' . $e->getMessage(), 'error');
     errorResponse($e->getMessage(), 500);
-}
-
-/**
- * Build hierarchical structure for categories
- * Groups sub-categories under their parent categories
- */
-function buildCategoryHierarchy($categories) {
-    $hierarchy = [];
-    $parentCategories = [];
-    $childCategories = [];
-
-    // Separate parent and child categories
-    foreach ($categories as $cat) {
-        if (empty($cat['parent_id'])) {
-            // This is a parent category or standalone category
-            $parentCategories[$cat['category_id']] = [
-                'id' => $cat['category_id'],
-                'name' => $cat['category_name'],
-                'icon' => $cat['category_icon'],
-                'total' => $cat['total'],
-                'percent' => $cat['percent'],
-                'transactions' => $cat['transactions'] ?? [],
-                'sub_categories' => []
-            ];
-        } else {
-            // This is a child category
-            $childCategories[] = $cat;
-        }
-    }
-
-    // Assign children to their parents
-    foreach ($childCategories as $child) {
-        $parentId = $child['parent_id'];
-
-        // If parent exists in our list, add as sub-category
-        if (isset($parentCategories[$parentId])) {
-            $parentCategories[$parentId]['sub_categories'][] = [
-                'id' => $child['category_id'],
-                'name' => $child['category_name'],
-                'icon' => $child['category_icon'],
-                'total' => $child['total'],
-                'percent' => $child['percent'],
-                'transactions' => $child['transactions'] ?? []
-            ];
-        } else {
-            // Parent not in list (maybe has no transactions), create virtual parent group
-            $virtualParentKey = 'parent_' . $parentId;
-            if (!isset($parentCategories[$virtualParentKey])) {
-                $parentCategories[$virtualParentKey] = [
-                    'id' => $parentId,
-                    'name' => $child['parent_name'] ?? 'Other',
-                    'icon' => $child['parent_icon'] ?? '📁',
-                    'total' => 0,
-                    'percent' => 0,
-                    'transactions' => [],
-                    'sub_categories' => []
-                ];
-            }
-            $parentCategories[$virtualParentKey]['sub_categories'][] = [
-                'id' => $child['category_id'],
-                'name' => $child['category_name'],
-                'icon' => $child['category_icon'],
-                'total' => $child['total'],
-                'percent' => $child['percent'],
-                'transactions' => $child['transactions'] ?? []
-            ];
-            $parentCategories[$virtualParentKey]['total'] += $child['total'];
-        }
-    }
-
-    // Calculate totals for parents with sub-categories (if parent has no direct transactions)
-    foreach ($parentCategories as &$parent) {
-        if (!empty($parent['sub_categories']) && $parent['total'] == 0) {
-            $parent['total'] = array_sum(array_column($parent['sub_categories'], 'total'));
-        }
-    }
-
-    // Sort by total descending
-    usort($parentCategories, function($a, $b) {
-        return $b['total'] <=> $a['total'];
-    });
-
-    return array_values($parentCategories);
 }

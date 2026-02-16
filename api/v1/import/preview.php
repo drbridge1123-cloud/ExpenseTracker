@@ -34,8 +34,53 @@ if ($file['error'] !== UPLOAD_ERR_OK) {
 }
 
 $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-if ($ext !== 'csv') {
-    errorResponse('Only CSV files are supported for preview');
+if (!in_array($ext, ['csv', 'zip'])) {
+    errorResponse('Only CSV and ZIP files are supported');
+}
+
+// Handle ZIP files - extract and find CSV files
+$csvFilesToProcess = [];
+$tempExtractPath = null;
+
+if ($ext === 'zip') {
+    $uploadPath = UPLOAD_DIR . '/BankTransaction';
+    if (!is_dir($uploadPath)) {
+        mkdir($uploadPath, 0755, true);
+    }
+
+    $zip = new ZipArchive();
+    if ($zip->open($file['tmp_name']) !== TRUE) {
+        errorResponse('Failed to open ZIP file');
+    }
+
+    $fileHash = hash_file('sha256', $file['tmp_name']);
+    $tempExtractPath = $uploadPath . '/temp_preview_' . $fileHash;
+    if (!is_dir($tempExtractPath)) {
+        mkdir($tempExtractPath, 0755, true);
+    }
+
+    $zip->extractTo($tempExtractPath);
+    $zip->close();
+
+    // Find all CSV files in extracted content
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($tempExtractPath, RecursiveDirectoryIterator::SKIP_DOTS)
+    );
+    foreach ($iterator as $extractedFile) {
+        if (strtolower($extractedFile->getExtension()) === 'csv') {
+            $csvFilesToProcess[] = $extractedFile->getPathname();
+        }
+    }
+
+    if (empty($csvFilesToProcess)) {
+        // Cleanup
+        array_map('unlink', glob("$tempExtractPath/*"));
+        @rmdir($tempExtractPath);
+        errorResponse('No CSV files found in ZIP');
+    }
+} else {
+    // Single CSV file
+    $csvFilesToProcess[] = $file['tmp_name'];
 }
 
 try {
@@ -65,89 +110,109 @@ try {
         }
     }
 
-    // Parse CSV file
-    $handle = fopen($file['tmp_name'], 'r');
-    if (!$handle) {
-        errorResponse('Failed to open CSV file');
-    }
-
-    // Skip BOM
-    $bom = fread($handle, 3);
-    if ($bom !== "\xEF\xBB\xBF") {
-        rewind($handle);
-    }
-
-    $header = fgetcsv($handle);
-    if (!$header) {
-        fclose($handle);
-        errorResponse('Empty CSV file');
-    }
-
-    $headerMap = array_flip(array_map('strtolower', array_map('trim', $header)));
-
-    // Validate format
-    if ($format === 'amex') {
-        if (!isset($headerMap['date']) || !isset($headerMap['description']) || !isset($headerMap['amount'])) {
-            fclose($handle);
-            errorResponse('Invalid AMEX CSV format. Required: Date, Description, Amount');
-        }
-    }
-
+    // Parse all CSV files
     $allTransactions = [];
-    $rowNum = 1;
     $errors = [];
+    $globalRowNum = 0;
 
-    while (($row = fgetcsv($handle)) !== false) {
-        $rowNum++;
-
-        try {
-            if ($format === 'amex') {
-                $transactionDate = trim($row[$headerMap['date']] ?? '');
-                $description = trim($row[$headerMap['description']] ?? '');
-                $amount = (float)($row[$headerMap['amount']] ?? 0);
-            } else {
-                // Chase format
-                $transactionDate = trim($row[$headerMap['transaction date'] ?? $headerMap['posting date'] ?? $headerMap['date']] ?? '');
-                $description = trim($row[$headerMap['description']] ?? '');
-                $amount = (float)($row[$headerMap['amount']] ?? 0);
-            }
-
-            if (empty($transactionDate) || empty($description)) {
-                continue;
-            }
-
-            // Parse date
-            $dateObj = DateTime::createFromFormat('m/d/Y', $transactionDate);
-            if (!$dateObj) {
-                $dateObj = DateTime::createFromFormat('Y-m-d', $transactionDate);
-            }
-            if (!$dateObj) {
-                $errors[] = "Row $rowNum: Invalid date format: $transactionDate";
-                continue;
-            }
-            $formattedDate = $dateObj->format('Y-m-d');
-
-            // Skip payments
-            $isPayment = stripos($description, 'PAYMENT') !== false && $amount < 0;
-
-            // Normalize amount for our system (AMEX: positive = expense = our negative)
-            $normalizedAmount = $format === 'amex' ? -$amount : $amount;
-
-            $allTransactions[] = [
-                'row' => $rowNum,
-                'date' => $formattedDate,
-                'description' => $description,
-                'amount' => $normalizedAmount,
-                'original_amount' => $amount,
-                'is_payment' => $isPayment
-            ];
-
-        } catch (Exception $e) {
-            $errors[] = "Row $rowNum: " . $e->getMessage();
+    foreach ($csvFilesToProcess as $csvFilePath) {
+        $handle = fopen($csvFilePath, 'r');
+        if (!$handle) {
+            $errors[] = "Failed to open CSV file: " . basename($csvFilePath);
+            continue;
         }
+
+        // Skip BOM
+        $bom = fread($handle, 3);
+        if ($bom !== "\xEF\xBB\xBF") {
+            rewind($handle);
+        }
+
+        $header = fgetcsv($handle);
+        if (!$header) {
+            fclose($handle);
+            $errors[] = "Empty CSV file: " . basename($csvFilePath);
+            continue;
+        }
+
+        $headerMap = array_flip(array_map('strtolower', array_map('trim', $header)));
+
+        // Validate format for AMEX
+        if ($format === 'amex') {
+            if (!isset($headerMap['date']) || !isset($headerMap['description']) || !isset($headerMap['amount'])) {
+                fclose($handle);
+                $errors[] = "Invalid AMEX CSV format in " . basename($csvFilePath) . ". Required: Date, Description, Amount";
+                continue;
+            }
+        }
+
+        $rowNum = 1;
+        $fileName = basename($csvFilePath);
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNum++;
+            $globalRowNum++;
+
+            try {
+                if ($format === 'amex') {
+                    $transactionDate = trim($row[$headerMap['date']] ?? '');
+                    $description = trim($row[$headerMap['description']] ?? '');
+                    $amount = (float)($row[$headerMap['amount']] ?? 0);
+                } else {
+                    // Chase format - check multiple possible column names
+                    $dateCol = $headerMap['posting date'] ?? $headerMap['transaction date'] ?? $headerMap['date'] ?? null;
+                    $transactionDate = $dateCol !== null ? trim($row[$dateCol] ?? '') : '';
+                    $description = trim($row[$headerMap['description']] ?? '');
+                    $amount = (float)($row[$headerMap['amount']] ?? 0);
+                }
+
+                if (empty($transactionDate) || empty($description)) {
+                    continue;
+                }
+
+                // Parse date
+                $dateObj = DateTime::createFromFormat('m/d/Y', $transactionDate);
+                if (!$dateObj) {
+                    $dateObj = DateTime::createFromFormat('Y-m-d', $transactionDate);
+                }
+                if (!$dateObj) {
+                    $errors[] = "$fileName Row $rowNum: Invalid date format: $transactionDate";
+                    continue;
+                }
+                $formattedDate = $dateObj->format('Y-m-d');
+
+                // Skip payments
+                $isPayment = stripos($description, 'PAYMENT') !== false && $amount < 0;
+
+                // Normalize amount for our system (AMEX: positive = expense = our negative)
+                $normalizedAmount = $format === 'amex' ? -$amount : $amount;
+
+                $allTransactions[] = [
+                    'row' => $globalRowNum,
+                    'file' => $fileName,
+                    'date' => $formattedDate,
+                    'description' => $description,
+                    'amount' => $normalizedAmount,
+                    'original_amount' => $amount,
+                    'is_payment' => $isPayment
+                ];
+
+            } catch (Exception $e) {
+                $errors[] = "$fileName Row $rowNum: " . $e->getMessage();
+            }
+        }
+
+        fclose($handle);
     }
 
-    fclose($handle);
+    // Cleanup temp directory if it was created for ZIP extraction
+    if ($tempExtractPath && is_dir($tempExtractPath)) {
+        $files = glob("$tempExtractPath/*");
+        foreach ($files as $f) {
+            if (is_file($f)) unlink($f);
+        }
+        @rmdir($tempExtractPath);
+    }
 
     // Group transactions by date+description+amount to find duplicates within CSV
     $groups = [];

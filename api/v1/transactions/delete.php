@@ -59,10 +59,13 @@ try {
         $balanceAdjustments[$accountId] -= (float)$txn['amount'];
     }
 
-    // Delete transactions
+    // Soft delete transactions (set deleted_at instead of hard delete)
+    $userId = $transactions[0]['user_id'] ?? null;
+    $deletedAt = date('Y-m-d H:i:s');
+
     $db->query(
-        "DELETE FROM transactions WHERE id IN ($placeholders)",
-        $ids
+        "UPDATE transactions SET deleted_at = ?, deleted_by = ?, status = 'void' WHERE id IN ($placeholders)",
+        array_merge([$deletedAt, $userId], $ids)
     );
 
     // Update account balances
@@ -73,15 +76,21 @@ try {
         );
     }
 
+    // Log deletion using AuditService
+    $audit = new AuditService($userId);
+    foreach ($transactions as $txn) {
+        $audit->logDelete('transaction', $txn['id'], $txn, $input['reason'] ?? 'User deleted');
+    }
+
     $db->commit();
 
     $count = count($transactions);
-    appLog("Deleted $count transaction(s): " . implode(', ', $ids));
+    appLog("Soft-deleted $count transaction(s): " . implode(', ', $ids));
 
     successResponse([
         'deleted_count' => $count,
         'deleted_ids' => array_column($transactions, 'id'),
-        'message' => $count === 1 ? 'Transaction deleted' : "$count transactions deleted"
+        'message' => $count === 1 ? 'Transaction voided' : "$count transactions voided"
     ]);
 
 } catch (Exception $e) {

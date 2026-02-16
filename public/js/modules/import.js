@@ -42,17 +42,38 @@ async function loadImportPage() {
     // Setup form submission
     document.getElementById('import-form').onsubmit = handleImport;
 
-    // Setup file input change handler to show selected filename
+    // Setup file input change handler to show selected files
     const fileInput = document.getElementById('import-file');
     const fileUploadText = document.querySelector('.file-upload-text span');
+    const selectedFilesList = document.getElementById('selected-files-list');
 
     fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            fileUploadText.textContent = e.target.files[0].name;
+        const files = e.target.files;
+        if (files.length > 0) {
+            if (files.length === 1) {
+                fileUploadText.textContent = files[0].name;
+            } else {
+                fileUploadText.textContent = `${files.length} files selected`;
+            }
             fileUploadText.style.color = 'var(--primary)';
+
+            // Show file list
+            if (files.length > 1 || files[0].name.endsWith('.zip')) {
+                selectedFilesList.style.display = 'block';
+                selectedFilesList.innerHTML = Array.from(files).map(f =>
+                    `<div class="selected-file-item">
+                        <span class="file-icon">${f.name.endsWith('.zip') ? '📦' : '📄'}</span>
+                        <span class="file-name">${f.name}</span>
+                        <span class="file-size">(${formatFileSize(f.size)})</span>
+                    </div>`
+                ).join('');
+            } else {
+                selectedFilesList.style.display = 'none';
+            }
         } else {
-            fileUploadText.textContent = 'Drop CSV file here or click to browse';
+            fileUploadText.textContent = 'Drop CSV/ZIP files here or click to browse (multiple allowed)';
             fileUploadText.style.color = '';
+            selectedFilesList.style.display = 'none';
         }
     });
 
@@ -60,14 +81,32 @@ async function loadImportPage() {
     await loadImportHistory();
 }
 
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
 async function handleImport(e) {
     e.preventDefault();
+
+    const files = document.getElementById('import-file').files;
+    if (files.length === 0) {
+        showToast('Please select at least one file', 'warning');
+        return;
+    }
 
     const formData = new FormData();
     formData.append('user_id', state.currentUser);
     formData.append('account_id', document.getElementById('import-account').value);
     formData.append('institution_code', document.getElementById('import-institution').value);
-    formData.append('csv_file', document.getElementById('import-file').files[0]);
+
+    // Append all files with array notation
+    for (let i = 0; i < files.length; i++) {
+        formData.append('csv_file[]', files[i]);
+    }
 
     showLoading();
 
@@ -81,26 +120,48 @@ async function handleImport(e) {
 
         hideLoading();
 
-        // 409 Conflict = duplicate file
-        if (response.status === 409) {
-            showToast('This file was already imported. Please select a different file.', 'warning');
-            return;
-        }
-
         const resultDiv = document.getElementById('import-result');
         resultDiv.style.display = 'block';
 
         if (result.success) {
-            resultDiv.className = 'import-result success';
-            resultDiv.innerHTML = `
-                <strong>Import Successful!</strong><br>
-                Imported: ${result.data.imported} transactions<br>
-                Duplicates skipped: ${result.data.duplicates}
+            // Build detailed result HTML
+            let resultHtml = `
+                <strong>Import Completed!</strong><br>
+                <div class="import-summary">
+                    <span>Total files: ${result.data.total_files}</span>
+                    <span>Imported: ${result.data.imported} transactions</span>
+                    <span>Duplicates: ${result.data.duplicates}</span>
+                </div>
             `;
-            showToast('Import completed successfully!', 'success');
+
+            // Show per-file results if multiple files
+            if (result.data.file_results && result.data.file_results.length > 1) {
+                resultHtml += '<div class="file-results"><strong>File Details:</strong><ul>';
+                result.data.file_results.forEach(fr => {
+                    const icon = fr.status === 'success' ? '✅' : (fr.status === 'skipped' ? '⏭️' : '❌');
+                    resultHtml += `<li>${icon} ${fr.file}: `;
+                    if (fr.status === 'success') {
+                        resultHtml += `${fr.imported} imported, ${fr.duplicates} duplicates`;
+                    } else if (fr.status === 'skipped') {
+                        resultHtml += fr.message;
+                    } else {
+                        resultHtml += `Failed - ${fr.message}`;
+                    }
+                    resultHtml += '</li>';
+                });
+                resultHtml += '</ul></div>';
+            }
+
+            resultDiv.className = 'import-result success';
+            resultDiv.innerHTML = resultHtml;
+            showToast(`Import completed: ${result.data.imported} transactions imported!`, 'success');
             await loadImportHistory();
-            // Reset file input
+
+            // Reset form
             document.getElementById('import-file').value = '';
+            document.querySelector('.file-upload-text span').textContent = 'Drop CSV/ZIP files here or click to browse (multiple allowed)';
+            document.querySelector('.file-upload-text span').style.color = '';
+            document.getElementById('selected-files-list').style.display = 'none';
         } else {
             resultDiv.className = 'import-result error';
             resultDiv.innerHTML = `<strong>Import Failed:</strong> ${result.message}`;

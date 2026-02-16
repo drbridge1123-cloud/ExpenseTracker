@@ -22,7 +22,7 @@ try {
     $offset = ($page - 1) * $limit;
 
     // Build WHERE conditions
-    $conditions = ['1=1'];
+    $conditions = ['t.deleted_at IS NULL'];  // Exclude soft-deleted transactions
     $params = [];
 
     // Filter by specific transaction ID
