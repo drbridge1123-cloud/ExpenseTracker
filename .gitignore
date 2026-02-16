@@ -13,6 +13,7 @@ logs/
 
 # Backups
 _backup_*/
+seed/sql/
 
 # IDE
 .idea/
